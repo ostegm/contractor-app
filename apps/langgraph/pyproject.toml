@@ -28,7 +28,7 @@ requires = ["setuptools>=73.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["file_processor", "baml_client_py"]
+packages = ["file_processor", "baml_client"]
 [tool.setuptools.package-dir]
 "file_processor" = "src/file_processor"
 

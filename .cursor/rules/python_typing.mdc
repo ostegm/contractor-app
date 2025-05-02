@@ -1,0 +1,32 @@
+---
+description: 
+globs: **/*.py
+alwaysApply: false
+---
+# Python Typing Conventions
+
+When working with Python type hints:
+- Use built-in `dict` instead of `Dict` from typing module
+- Use built-in `list` instead of `List` from typing module
+- Prefer using built-in collection types when possible
+- Only import from typing module when absolutely necessary (e.g., for Union, Optional, etc.)
+
+Examples of preferred style:
+```python
+def process_data(items: list[str]) -> dict[str, int]:
+    pass
+
+def get_config(data: dict[str, any]) -> None:
+    pass
+```
+
+Instead of:
+```python
+from typing import Dict, List
+
+def process_data(items: List[str]) -> Dict[str, int]:
+    pass
+
+def get_config(data: Dict[str, any]) -> None:
+    pass
+``` 
