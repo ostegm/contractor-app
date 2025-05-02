@@ -72,8 +72,8 @@ async def process_files(state: State, config: RunnableConfig) -> Dict[str, Any]:
         if file.type == "image":
             file.image_data = Image.from_base64("image/png", file.content)
             logger.info(f"Successfully created image data for file: {file.name} with length {len(file.image_data.as_base64())}")
-            assert file.image_data.as_base64()[0] == file.content
             file.content = None
+        # TODO Add audio and video processing.
 
     # Call BAML function
     try:
