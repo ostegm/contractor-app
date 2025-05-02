@@ -20,7 +20,7 @@ import { toBamlError } from "@boundaryml/baml"
 import type { Checked, Check } from "./types"
 import type { partial_types } from "./partial_types"
 import type * as types from "./types"
-import type {ContractorEstimate, LineItem, Milestone, TimelineInfo} from "./types"
+import type {ConstructionProjectData, ContractorEstimate, EstimateLineItem, InputFile, LineItem, Milestone, TimelineInfo} from "./types"
 import type TypeBuilder from "./type_builder"
 
 export class LlmResponseParser {
@@ -45,6 +45,42 @@ export class LlmResponseParser {
     }
   }
   
+  GenerateProjectEstimate(
+      llmResponse: string,
+      __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry }
+  ): ConstructionProjectData {
+    try {
+      return this.runtime.parseLlmResponse(
+        "GenerateProjectEstimate",
+        llmResponse,
+        false,
+        this.ctxManager.cloneContext(),
+        __baml_options__?.tb?.__tb(),
+        __baml_options__?.clientRegistry,
+      ) as ConstructionProjectData
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
+  ProcessProjectFiles(
+      llmResponse: string,
+      __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry }
+  ): string {
+    try {
+      return this.runtime.parseLlmResponse(
+        "ProcessProjectFiles",
+        llmResponse,
+        false,
+        this.ctxManager.cloneContext(),
+        __baml_options__?.tb?.__tb(),
+        __baml_options__?.clientRegistry,
+      ) as string
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
 }
 
 export class LlmStreamParser {
@@ -64,6 +100,42 @@ export class LlmStreamParser {
         __baml_options__?.tb?.__tb(),
         __baml_options__?.clientRegistry,
       ) as partial_types.ContractorEstimate
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
+  GenerateProjectEstimate(
+      llmResponse: string,
+      __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry }
+  ): partial_types.ConstructionProjectData {
+    try {
+      return this.runtime.parseLlmResponse(
+        "GenerateProjectEstimate",
+        llmResponse,
+        true,
+        this.ctxManager.cloneContext(),
+        __baml_options__?.tb?.__tb(),
+        __baml_options__?.clientRegistry,
+      ) as partial_types.ConstructionProjectData
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
+  ProcessProjectFiles(
+      llmResponse: string,
+      __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry }
+  ): string {
+    try {
+      return this.runtime.parseLlmResponse(
+        "ProcessProjectFiles",
+        llmResponse,
+        true,
+        this.ctxManager.cloneContext(),
+        __baml_options__?.tb?.__tb(),
+        __baml_options__?.clientRegistry,
+      ) as string
     } catch (error) {
       throw toBamlError(error);
     }

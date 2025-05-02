@@ -9,5 +9,5 @@ generator py_client {
   output_type        "python/pydantic"
   output_dir         "../apps/langgraph/src/file_processor"
   version            "0.86.1"
-  default_client_mode sync
+  default_client_mode async
 }

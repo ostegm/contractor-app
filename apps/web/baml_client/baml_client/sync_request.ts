@@ -19,7 +19,7 @@ import type { BamlRuntime, BamlCtxManager, ClientRegistry, Image, Audio } from "
 import { toBamlError, HTTPRequest } from "@boundaryml/baml"
 import type { Checked, Check } from "./types"
 import type * as types from "./types"
-import type {ContractorEstimate, LineItem, Milestone, TimelineInfo} from "./types"
+import type {ConstructionProjectData, ContractorEstimate, EstimateLineItem, InputFile, LineItem, Milestone, TimelineInfo} from "./types"
 import type TypeBuilder from "./type_builder"
 
 type BamlCallOptions = {
@@ -51,6 +51,46 @@ export class HttpRequest {
     }
   }
   
+  GenerateProjectEstimate(
+      project_assessment: string,
+      __baml_options__?: BamlCallOptions
+  ): HTTPRequest {
+    try {
+      return this.runtime.buildRequestSync(
+        "GenerateProjectEstimate",
+        {
+          "project_assessment": project_assessment
+        },
+        this.ctxManager.cloneContext(),
+        __baml_options__?.tb?.__tb(),
+        __baml_options__?.clientRegistry,
+        false,
+      )
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
+  ProcessProjectFiles(
+      project_info: string,files: InputFile[],
+      __baml_options__?: BamlCallOptions
+  ): HTTPRequest {
+    try {
+      return this.runtime.buildRequestSync(
+        "ProcessProjectFiles",
+        {
+          "project_info": project_info,"files": files
+        },
+        this.ctxManager.cloneContext(),
+        __baml_options__?.tb?.__tb(),
+        __baml_options__?.clientRegistry,
+        false,
+      )
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
 }
 
 export class HttpStreamRequest {
@@ -66,6 +106,46 @@ export class HttpStreamRequest {
         "GenerateEstimate",
         {
           "project_name": project_name,"description": description,"requirements": requirements
+        },
+        this.ctxManager.cloneContext(),
+        __baml_options__?.tb?.__tb(),
+        __baml_options__?.clientRegistry,
+        true,
+      )
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
+  GenerateProjectEstimate(
+      project_assessment: string,
+      __baml_options__?: BamlCallOptions
+  ): HTTPRequest {
+    try {
+      return this.runtime.buildRequestSync(
+        "GenerateProjectEstimate",
+        {
+          "project_assessment": project_assessment
+        },
+        this.ctxManager.cloneContext(),
+        __baml_options__?.tb?.__tb(),
+        __baml_options__?.clientRegistry,
+        true,
+      )
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
+  ProcessProjectFiles(
+      project_info: string,files: InputFile[],
+      __baml_options__?: BamlCallOptions
+  ): HTTPRequest {
+    try {
+      return this.runtime.buildRequestSync(
+        "ProcessProjectFiles",
+        {
+          "project_info": project_info,"files": files
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),

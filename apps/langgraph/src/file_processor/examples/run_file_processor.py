@@ -2,15 +2,27 @@
 """Example script to demonstrate how to use the file processor agent."""
 
 import asyncio
-import os
 import base64
 import json
+import os
+# import sys # Removed sys import
 from pathlib import Path
+
+# Removed sys.path modification
+# script_dir = Path(__file__).parent
+# src_dir = script_dir.parent / "src"
+# sys.path.insert(0, str(src_dir))
+
+# Adjust imports relative to the parent file_processor package
+from ..baml_client.types import InputFile
 from dotenv import load_dotenv
 
-from file_processor import graph
-from file_processor.state import State, File
+from .. import graph
+from ..state import State
 
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 async def main():
     """Run the file processor agent with example inputs."""
@@ -30,7 +42,8 @@ async def main():
         return
     
     # Path to the test image
-    image_path = Path(__file__).parent.parent / "tests" / "testdata" / "dated-bathroom.png"
+    # Adjust path relative to the new script location
+    image_path = Path(__file__).parent.parent.parent.parent / "tests" / "testdata" / "dated-bathroom.png"
     
     # Check if the image exists
     if not image_path.exists():
@@ -42,20 +55,20 @@ async def main():
         image_content = base64.b64encode(img_file.read()).decode("utf-8")
     
     # Create example files using the File class
-    client_notes = File(
+    client_notes = InputFile(
         type="text",
         name="client_notes.txt",
         content="Client wants a modern bathroom with a walk-in shower, double vanity, and heated floors. Budget is $15,000-$20,000. Timeline: would like to complete within 3 months."
     )
-    
-    bathroom_image = File(
+    print("Image content length:", len(image_content))
+    bathroom_image = InputFile(
         type="image",
         name="current_bathroom.png",
         content=image_content,  # Include the actual image content
         description="Image shows a dated bathroom with beige tile, a shower/tub combo, single vanity with cultured marble top, and limited storage. The bathroom has oak cabinets and patterned floor tiles."
     )
     
-    measurements = File(
+    measurements = InputFile(
         type="text",
         name="measurements.txt",
         content="Bathroom dimensions: 8ft x 10ft. Ceiling height: 8ft. Window on east wall. Plumbing on north and west walls."
@@ -67,8 +80,8 @@ async def main():
         files=[client_notes, bathroom_image, measurements]
     )
     
-    print("Processing files for bathroom renovation project...")
-    print("Using actual bathroom image from tests/testdata/dated-bathroom.png")
+    print(f"Processing {len(state.files)} files for bathroom renovation project...")
+    print(f"Using actual bathroom image from {image_path}")
     
     # Run the graph
     result = await graph.ainvoke(state)

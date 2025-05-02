@@ -40,6 +40,18 @@ def all_succeeded(checks: Dict[CheckName, Check]) -> bool:
 
 
 
+class ConstructionProjectData(BaseModel):
+    project_description: str
+    estimated_total_min: Optional[float] = None
+    estimated_total_max: Optional[float] = None
+    estimated_timeline_days: Optional[int] = None
+    key_considerations: List[str]
+    confidence_level: str
+    estimate_items: List["EstimateLineItem"]
+    next_steps: List[str]
+    missing_information: List[str]
+    key_risks: List[str]
+
 class ContractorEstimate(BaseModel):
     project_name: str
     description: str
@@ -47,6 +59,26 @@ class ContractorEstimate(BaseModel):
     line_items: List["LineItem"]
     estimated_hours: float
     timeline: "TimelineInfo"
+
+class EstimateLineItem(BaseModel):
+    description: str
+    category: str
+    subcategory: Optional[str] = None
+    cost_range_min: float
+    cost_range_max: float
+    unit: Optional[str] = None
+    quantity: Optional[float] = None
+    assumptions: Optional[str] = None
+    confidence_score: Optional[str] = None
+    notes: Optional[str] = None
+
+class InputFile(BaseModel):
+    name: str
+    type: str
+    description: Optional[str] = None
+    content: Optional[str] = None
+    download_url: Optional[str] = None
+    image_data: Optional[baml_py.Image] = None
 
 class LineItem(BaseModel):
     description: str

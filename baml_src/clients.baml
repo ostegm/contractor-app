@@ -16,6 +16,16 @@ client<llm> LocalQwen3 {
   }
 }
 
+// Step 2b: Define BAML Clients
+client<llm> GeminiProcessor {
+  provider google-ai
+  options {
+    // Pull model name from env or keep configurable if needed
+    model "gemini-2.5-flash-preview-04-17"
+    api_key env.GOOGLE_API_KEY
+
+  }
+}
 
 client<llm> O4Mini {
   provider openai

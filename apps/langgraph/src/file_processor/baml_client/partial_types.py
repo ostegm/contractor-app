@@ -35,6 +35,18 @@ class StreamState(BaseModel, Generic[T]):
     state: Literal["Pending", "Incomplete", "Complete"]
 
 
+class ConstructionProjectData(BaseModel):
+    project_description: Optional[str] = None
+    estimated_total_min: Optional[float] = None
+    estimated_total_max: Optional[float] = None
+    estimated_timeline_days: Optional[int] = None
+    key_considerations: List[str]
+    confidence_level: Optional[str] = None
+    estimate_items: List["EstimateLineItem"]
+    next_steps: List[str]
+    missing_information: List[str]
+    key_risks: List[str]
+
 class ContractorEstimate(BaseModel):
     project_name: Optional[str] = None
     description: Optional[str] = None
@@ -42,6 +54,26 @@ class ContractorEstimate(BaseModel):
     line_items: List["LineItem"]
     estimated_hours: Optional[float] = None
     timeline: Optional["TimelineInfo"] = None
+
+class EstimateLineItem(BaseModel):
+    description: Optional[str] = None
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+    cost_range_min: Optional[float] = None
+    cost_range_max: Optional[float] = None
+    unit: Optional[str] = None
+    quantity: Optional[float] = None
+    assumptions: Optional[str] = None
+    confidence_score: Optional[str] = None
+    notes: Optional[str] = None
+
+class InputFile(BaseModel):
+    name: Optional[str] = None
+    type: Optional[str] = None
+    description: Optional[str] = None
+    content: Optional[str] = None
+    download_url: Optional[str] = None
+    image_data: Optional[baml_py.Image] = None
 
 class LineItem(BaseModel):
     description: Optional[str] = None

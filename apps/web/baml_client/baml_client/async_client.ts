@@ -20,7 +20,7 @@ import { toBamlError, BamlStream, type HTTPRequest } from "@boundaryml/baml"
 import type { Checked, Check, RecursivePartialNull as MovedRecursivePartialNull } from "./types"
 import type { partial_types } from "./partial_types"
 import type * as types from "./types"
-import type {ContractorEstimate, LineItem, Milestone, TimelineInfo} from "./types"
+import type {ConstructionProjectData, ContractorEstimate, EstimateLineItem, InputFile, LineItem, Milestone, TimelineInfo} from "./types"
 import type TypeBuilder from "./type_builder"
 import { AsyncHttpRequest, AsyncHttpStreamRequest } from "./async_request"
 import { LlmResponseParser, LlmStreamParser } from "./parser"
@@ -106,6 +106,52 @@ export class BamlAsyncClient {
     }
   }
   
+  async GenerateProjectEstimate(
+      project_assessment: string,
+      __baml_options__?: BamlCallOptions
+  ): Promise<ConstructionProjectData> {
+    try {
+      const options = { ...this.bamlOptions, ...(__baml_options__ || {}) }
+      const collector = options.collector ? (Array.isArray(options.collector) ? options.collector : [options.collector]) : [];
+      const raw = await this.runtime.callFunction(
+        "GenerateProjectEstimate",
+        {
+          "project_assessment": project_assessment
+        },
+        this.ctxManager.cloneContext(),
+        options.tb?.__tb(),
+        options.clientRegistry,
+        collector,
+      )
+      return raw.parsed(false) as ConstructionProjectData
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
+  async ProcessProjectFiles(
+      project_info: string,files: InputFile[],
+      __baml_options__?: BamlCallOptions
+  ): Promise<string> {
+    try {
+      const options = { ...this.bamlOptions, ...(__baml_options__ || {}) }
+      const collector = options.collector ? (Array.isArray(options.collector) ? options.collector : [options.collector]) : [];
+      const raw = await this.runtime.callFunction(
+        "ProcessProjectFiles",
+        {
+          "project_info": project_info,"files": files
+        },
+        this.ctxManager.cloneContext(),
+        options.tb?.__tb(),
+        options.clientRegistry,
+        collector,
+      )
+      return raw.parsed(false) as string
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
 }
 
 class BamlStreamClient {
@@ -142,6 +188,64 @@ class BamlStreamClient {
         raw,
         (a): partial_types.ContractorEstimate => a,
         (a): ContractorEstimate => a,
+        this.ctxManager.cloneContext(),
+      )
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
+  GenerateProjectEstimate(
+      project_assessment: string,
+      __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry, collector?: Collector | Collector[] }
+  ): BamlStream<partial_types.ConstructionProjectData, ConstructionProjectData> {
+    try {
+      const options = { ...this.bamlOptions, ...(__baml_options__ || {}) }
+      const collector = options.collector ? (Array.isArray(options.collector) ? options.collector : [options.collector]) : [];
+      const raw = this.runtime.streamFunction(
+        "GenerateProjectEstimate",
+        {
+          "project_assessment": project_assessment
+        },
+        undefined,
+        this.ctxManager.cloneContext(),
+        options.tb?.__tb(),
+        options.clientRegistry,
+        collector,
+      )
+      return new BamlStream<partial_types.ConstructionProjectData, ConstructionProjectData>(
+        raw,
+        (a): partial_types.ConstructionProjectData => a,
+        (a): ConstructionProjectData => a,
+        this.ctxManager.cloneContext(),
+      )
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
+  ProcessProjectFiles(
+      project_info: string,files: InputFile[],
+      __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry, collector?: Collector | Collector[] }
+  ): BamlStream<string, string> {
+    try {
+      const options = { ...this.bamlOptions, ...(__baml_options__ || {}) }
+      const collector = options.collector ? (Array.isArray(options.collector) ? options.collector : [options.collector]) : [];
+      const raw = this.runtime.streamFunction(
+        "ProcessProjectFiles",
+        {
+          "project_info": project_info,"files": files
+        },
+        undefined,
+        this.ctxManager.cloneContext(),
+        options.tb?.__tb(),
+        options.clientRegistry,
+        collector,
+      )
+      return new BamlStream<string, string>(
+        raw,
+        (a): string => a,
+        (a): string => a,
         this.ctxManager.cloneContext(),
       )
     } catch (error) {

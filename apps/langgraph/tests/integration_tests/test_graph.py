@@ -1,11 +1,12 @@
-import pytest
 import base64
 import os
 from pathlib import Path
+
+import pytest
 from dotenv import load_dotenv
 
 from file_processor import graph
-from file_processor.state import State, File
+from file_processor.state import File, State
 
 
 @pytest.mark.asyncio

@@ -1,0 +1,175 @@
+{
+  "project_description": "Full bathroom renovation in a 1990s 8x10 ft home bathroom to create a modern space with a walk-in shower, double vanity, heated floors, and updated finishes. Includes demolition, plumbing/electrical updates, new tile, fixtures, and potential window replacement.",
+  "estimated_total_min": 16000.0,
+  "estimated_total_max": 20000.0,
+  "estimated_timeline_days": 60,
+  "key_considerations": [
+    "Client budget is $15,000 - $20,000",
+    "Client wants modern finishes and heated floors (higher-end features)",
+    "Space constraints (8x10 ft) may limit layout options",
+    "Demolition of existing finishes and fixtures required",
+    "Plumbing likely needs reconfiguration for double vanity and relocated shower",
+    "Heated floor requires new electrical circuit/wiring",
+    "Ventilation adequacy needs verification",
+    "Window may need updating or replacement"
+  ],
+  "confidence_level": "Medium",
+  "estimate_items": [
+    {
+      "description": "Demolition and disposal of old fixtures, tile, vanity, and shower/tub combo",
+      "category": "Demo",
+      "subcategory": "Removal & Disposal",
+      "cost_range_min": 1000.0,
+      "cost_range_max": 1500.0,
+      "unit": "lump sum",
+      "quantity": 1.0,
+      "assumptions": "Includes labor, debris removal, and dumpster rental",
+      "confidence_score": "High",
+      "notes": "Standard demolition; no known hazardous materials"
+    },
+    {
+      "description": "Rough plumbing for walk-in shower and double vanity, including new lines as needed",
+      "category": "Plumbing",
+      "subcategory": "Rough-In",
+      "cost_range_min": 2000.0,
+      "cost_range_max": 2800.0,
+      "unit": "lump sum",
+      "quantity": 1.0,
+      "assumptions": "Plumbing accessible via adjacent walls; minor concrete cutting may be required",
+      "confidence_score": "Medium",
+      "notes": "Old plumbing removed; fixtures provided by owner or included separately"
+    },
+    {
+      "description": "Electrical for heated floors, lighting, new outlets, and code upgrades",
+      "category": "Electrical",
+      "subcategory": "Wiring & Fixtures",
+      "cost_range_min": 1400.0,
+      "cost_range_max": 1800.0,
+      "unit": "lump sum",
+      "quantity": 1.0,
+      "assumptions": "Includes new GFCI outlets and circuit for heated floor; existing panel has spare capacity",
+      "confidence_score": "Medium",
+      "notes": "Does not include unforeseen code upgrades"
+    },
+    {
+      "description": "Supply and installation of heated floor system (materials and labor)",
+      "category": "Flooring",
+      "subcategory": "Heated Floor",
+      "cost_range_min": 1200.0,
+      "cost_range_max": 1800.0,
+      "unit": "sq ft",
+      "quantity": 80.0,
+      "assumptions": "Covers main walking areas; uses electric radiant mats",
+      "confidence_score": "Medium",
+      "notes": "Thermostat control included"
+    },
+    {
+      "description": "Supply and installation of new porcelain/ceramic tile throughout (floor and shower walls), including waterproofing",
+      "category": "Flooring",
+      "subcategory": "Tiling",
+      "cost_range_min": 2500.0,
+      "cost_range_max": 3500.0,
+      "unit": "sq ft",
+      "quantity": 180.0,
+      "assumptions": "Includes 80 sq ft floor and approx. 100 sq ft shower tile; mid-range tile selected",
+      "confidence_score": "Medium",
+      "notes": "Includes Schluter or equivalent waterproofing for shower"
+    },
+    {
+      "description": "Supply and installation of glass walk-in shower enclosure and base",
+      "category": "Fixtures",
+      "subcategory": "Shower",
+      "cost_range_min": 2200.0,
+      "cost_range_max": 3000.0,
+      "unit": "lump sum",
+      "quantity": 1.0,
+      "assumptions": "Standard clear glass, single panel with door; tile shower pan",
+      "confidence_score": "Medium",
+      "notes": "Custom glass may increase lead time and cost"
+    },
+    {
+      "description": "Purchase and installation of double vanity, sinks, faucets, and associated hardware",
+      "category": "Fixtures",
+      "subcategory": "Vanity",
+      "cost_range_min": 2000.0,
+      "cost_range_max": 2800.0,
+      "unit": "lump sum",
+      "quantity": 1.0,
+      "assumptions": "Factory/stock vanity selected; quartz or granite top; mid-range fixtures",
+      "confidence_score": "Medium",
+      "notes": "Does not include custom cabinetry"
+    },
+    {
+      "description": "Painting of walls and ceiling",
+      "category": "Finishes",
+      "subcategory": "Painting",
+      "cost_range_min": 400.0,
+      "cost_range_max": 600.0,
+      "unit": "sq ft",
+      "quantity": 250.0,
+      "assumptions": "Standard prep over drywall",
+      "confidence_score": "High",
+      "notes": "Moisture-resistant paint included"
+    },
+    {
+      "description": "Window assessment, possible repair or replacement",
+      "category": "Windows",
+      "subcategory": "Replacement or Repair",
+      "cost_range_min": 500.0,
+      "cost_range_max": 1200.0,
+      "unit": "each",
+      "quantity": 1.0,
+      "assumptions": "Budget for contingency depending on existing window condition",
+      "confidence_score": "Low",
+      "notes": "Final cost dependent on scope of window work"
+    },
+    {
+      "description": "General carpentry, trim, and finishing details (baseboards, storage, mirrors, accessories)",
+      "category": "Carpentry",
+      "subcategory": "Finish Carpentry",
+      "cost_range_min": 900.0,
+      "cost_range_max": 1300.0,
+      "unit": "lump sum",
+      "quantity": 1.0,
+      "assumptions": "Includes standard trim, installation of towel bars, mirrors, and minor storage shelving",
+      "confidence_score": "Medium",
+      "notes": "No custom millwork assumed"
+    },
+    {
+      "description": "Ventilation assessment and potential upgrade",
+      "category": "HVAC",
+      "subcategory": "Ventilation",
+      "cost_range_min": 300.0,
+      "cost_range_max": 600.0,
+      "unit": "lump sum",
+      "quantity": 1.0,
+      "assumptions": "Assumes minor upgrade to existing vent fan if needed",
+      "confidence_score": "Low",
+      "notes": "Major duct relocation not included"
+    }
+  ],
+  "next_steps": [
+    "Conduct site visit for onsite measurements and verification of plumbing/electrical locations",
+    "Assess window and ventilation system for code compliance and condition",
+    "Review specific product and material selections with client (tile, vanity, fixtures, etc.)",
+    "Confirm electrical panel capacity for heated flooring system",
+    "Discuss final bathroom layout to ensure all elements fit the space",
+    "Provide revised, itemized estimate after confirming selections and site conditions"
+  ],
+  "missing_information": [
+    "Exact product/brand/model preferences for fixtures, tiles, and vanity",
+    "Condition and age of existing window on east wall",
+    "Condition and venting capacity of current bath fan",
+    "Type and amperage capacity of electrical panel",
+    "Potential presence of asbestos or lead (unlikely but possible in 1990s home)",
+    "Preferred tile pattern and size"
+  ],
+  "key_risks": [
+    "Plumbing modifications uncovered to be more extensive than anticipated",
+    "Electrical upgrade needed if heated floor exceeds existing circuit capacity",
+    "Material price fluctuations or backorders (especially for custom glass or fixtures)",
+    "Window may require full replacement, exceeding budget",
+    "Discovery of hidden damage (mold, rot) behind walls or under existing tile",
+    "Timeline affected by material lead times or unforeseen complications"
+  ]
+}

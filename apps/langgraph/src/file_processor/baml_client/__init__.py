@@ -41,7 +41,7 @@ with EnsureBamlPyImport(__version__) as e:
   from . import config
   from .config import reset_baml_env_vars
   
-  from .sync_client import b
+  from .async_client import b
   
 
 __all__ = [

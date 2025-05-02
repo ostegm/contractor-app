@@ -1,9 +1,6 @@
-import pytest
-import os
 import base64
-from pathlib import Path
-from dotenv import load_dotenv
-import aiohttp
+
+import pytest
 
 from file_processor.graph import download_from_url
 

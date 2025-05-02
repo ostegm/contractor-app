@@ -17,6 +17,7 @@ dependencies = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.23.5",
     "aiohttp>=3.9.0",
+    "baml-py==0.86.1"
 ]
 
 
@@ -28,15 +29,15 @@ requires = ["setuptools>=73.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["file_processor", "baml_client"]
+packages = ["file_processor"]
 [tool.setuptools.package-dir]
 "file_processor" = "src/file_processor"
-
 
 [tool.setuptools.package-data]
 "*" = ["py.typed"]
 
 [tool.ruff]
+exclude = ["src/file_processor/baml_client/**"]
 lint.select = [
     "E",    # pycodestyle
     "F",    # pyflakes
@@ -53,6 +54,7 @@ lint.ignore = [
     "UP035",
     # Relax the convention by _not_ requiring documentation for every function parameter.
     "D417",
+    "T201",
     "E501",
 ]
 [tool.ruff.lint.per-file-ignores]

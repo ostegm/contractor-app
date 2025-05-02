@@ -21,7 +21,7 @@ import { b } from '../index';
 import type { Check, Checked  } from "../types";
 import type { Image, Audio } from "@boundaryml/baml";
 
-import type {  ContractorEstimate,  LineItem,  Milestone,  TimelineInfo } from "../types"
+import type {  ConstructionProjectData,  ContractorEstimate,  EstimateLineItem,  InputFile,  LineItem,  Milestone,  TimelineInfo } from "../types"
 
 import type * as types from "../types"
 
@@ -50,6 +50,47 @@ export const GenerateEstimate = async (
     project_name,
     description,
     requirements,
+  );
+  return Promise.resolve(stream.toStreamable());
+};
+
+/**
+ * Executes the streaming variant of the "GenerateProjectEstimate" BAML action.
+ *
+ * This action initiates a streaming response by calling the corresponding
+ * BAML stream function. The returned stream yields incremental updates.
+ *
+ * @param { string } project_assessment - Input parameter.
+ *
+ * @returns {ReadableStream<Uint8Array>} A stream that yields incremental updates from the action.
+ */
+export const GenerateProjectEstimate = async (
+  project_assessment: string,
+): Promise<ReadableStream<Uint8Array>> => {
+  const stream = b.stream.GenerateProjectEstimate(
+    project_assessment,
+  );
+  return Promise.resolve(stream.toStreamable());
+};
+
+/**
+ * Executes the streaming variant of the "ProcessProjectFiles" BAML action.
+ *
+ * This action initiates a streaming response by calling the corresponding
+ * BAML stream function. The returned stream yields incremental updates.
+ *
+ * @param { string } project_info - Input parameter.
+ * @param { InputFile[] } files - Input parameter.
+ *
+ * @returns {ReadableStream<Uint8Array>} A stream that yields incremental updates from the action.
+ */
+export const ProcessProjectFiles = async (
+  project_info: string,
+  files: InputFile[],
+): Promise<ReadableStream<Uint8Array>> => {
+  const stream = b.stream.ProcessProjectFiles(
+    project_info,
+    files,
   );
   return Promise.resolve(stream.toStreamable());
 };

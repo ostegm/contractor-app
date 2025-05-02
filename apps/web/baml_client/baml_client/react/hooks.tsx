@@ -407,3 +407,101 @@ export function useGenerateEstimate(
   }
   return useBamlAction(action, props)
 }
+/**
+ * A specialized hook for the GenerateProjectEstimate BAML function that supports both streaming and non‑streaming responses.
+ *
+ * **Input Types:**
+ *
+ * - project_assessment: string
+ *
+ *
+ * **Return Type:**
+ * - **Non‑streaming:** ConstructionProjectData
+ * - **Streaming Partial:** partial_types.ConstructionProjectData
+ * - **Streaming Final:** ConstructionProjectData
+ *
+ * **Usage Patterns:**
+ * 1. **Non‑streaming (Default)**
+ *    - Best for quick responses and simple UI updates.
+ * 2. **Streaming**
+ *    - Ideal for long‑running operations or real‑time feedback.
+ *
+ * **Edge Cases:**
+ * - Ensure robust error handling via `onError`.
+ * - Handle cases where partial data may be incomplete or missing.
+ *
+ * @example
+ * ```tsx
+ * // Basic non‑streaming usage:
+ * const { data, error, isLoading, mutate } = useGenerateProjectEstimate({ stream: false});
+ *
+ * // Streaming usage:
+ * const { data, streamData, isLoading, error, mutate } = useGenerateProjectEstimate({
+ *   stream: true | undefined,
+ *   onStreamData: (partial) => console.log('Partial update:', partial),
+ *   onFinalData: (final) => console.log('Final result:', final),
+ *   onError: (err) => console.error('Error:', err),
+ * });
+ * ```
+ */
+export function useGenerateProjectEstimate(props: HookInput<'GenerateProjectEstimate', { stream: false }>): HookOutput<'GenerateProjectEstimate', { stream: false }>
+export function useGenerateProjectEstimate(props?: HookInput<'GenerateProjectEstimate', { stream?: true }>): HookOutput<'GenerateProjectEstimate', { stream: true }>
+export function useGenerateProjectEstimate(
+  props: HookInput<'GenerateProjectEstimate', { stream?: boolean }> = {},
+): HookOutput<'GenerateProjectEstimate', { stream: true }> | HookOutput<'GenerateProjectEstimate', { stream: false }> {
+  let action = Actions.GenerateProjectEstimate;
+  if (isStreamingProps(props)) {
+    action = StreamingActions.GenerateProjectEstimate;
+  }
+  return useBamlAction(action, props)
+}
+/**
+ * A specialized hook for the ProcessProjectFiles BAML function that supports both streaming and non‑streaming responses.
+ *
+ * **Input Types:**
+ *
+ * - project_info: string
+ *
+ * - files: InputFile[]
+ *
+ *
+ * **Return Type:**
+ * - **Non‑streaming:** string
+ * - **Streaming Partial:** string
+ * - **Streaming Final:** string
+ *
+ * **Usage Patterns:**
+ * 1. **Non‑streaming (Default)**
+ *    - Best for quick responses and simple UI updates.
+ * 2. **Streaming**
+ *    - Ideal for long‑running operations or real‑time feedback.
+ *
+ * **Edge Cases:**
+ * - Ensure robust error handling via `onError`.
+ * - Handle cases where partial data may be incomplete or missing.
+ *
+ * @example
+ * ```tsx
+ * // Basic non‑streaming usage:
+ * const { data, error, isLoading, mutate } = useProcessProjectFiles({ stream: false});
+ *
+ * // Streaming usage:
+ * const { data, streamData, isLoading, error, mutate } = useProcessProjectFiles({
+ *   stream: true | undefined,
+ *   onStreamData: (partial) => console.log('Partial update:', partial),
+ *   onFinalData: (final) => console.log('Final result:', final),
+ *   onError: (err) => console.error('Error:', err),
+ * });
+ * ```
+ */
+export function useProcessProjectFiles(props: HookInput<'ProcessProjectFiles', { stream: false }>): HookOutput<'ProcessProjectFiles', { stream: false }>
+export function useProcessProjectFiles(props?: HookInput<'ProcessProjectFiles', { stream?: true }>): HookOutput<'ProcessProjectFiles', { stream: true }>
+export function useProcessProjectFiles(
+  props: HookInput<'ProcessProjectFiles', { stream?: boolean }> = {},
+): HookOutput<'ProcessProjectFiles', { stream: true }> | HookOutput<'ProcessProjectFiles', { stream: false }> {
+  let action = Actions.ProcessProjectFiles;
+  if (isStreamingProps(props)) {
+    action = StreamingActions.ProcessProjectFiles;
+  }
+  return useBamlAction(action, props)
+}

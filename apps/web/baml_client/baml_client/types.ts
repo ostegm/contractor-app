@@ -46,6 +46,20 @@ export function all_succeeded<CheckName extends string>(checks: Record<CheckName
 export function get_checks<CheckName extends string>(checks: Record<CheckName, Check>): Check[] {
     return Object.values(checks)
 }
+export interface ConstructionProjectData {
+  project_description: string
+  estimated_total_min?: number | null
+  estimated_total_max?: number | null
+  estimated_timeline_days?: number | null
+  key_considerations: string[]
+  confidence_level: string
+  estimate_items: EstimateLineItem[]
+  next_steps: string[]
+  missing_information: string[]
+  key_risks: string[]
+  
+}
+
 export interface ContractorEstimate {
   project_name: string
   description: string
@@ -53,6 +67,30 @@ export interface ContractorEstimate {
   line_items: LineItem[]
   estimated_hours: number
   timeline: TimelineInfo
+  
+}
+
+export interface EstimateLineItem {
+  description: string
+  category: string
+  subcategory?: string | null
+  cost_range_min: number
+  cost_range_max: number
+  unit?: string | null
+  quantity?: number | null
+  assumptions?: string | null
+  confidence_score?: string | null
+  notes?: string | null
+  
+}
+
+export interface InputFile {
+  name: string
+  type: string
+  description?: string | null
+  content?: string | null
+  download_url?: string | null
+  image_data?: Image | null
   
 }
 
