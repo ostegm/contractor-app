@@ -472,5 +472,3 @@ async def handle_message(text, thread_state):
     
     return "I'm not sure how to respond."
 ```
-
-By following this documentation, junior engineers should be able to understand and start working with BAML for LLM applications. The language provides a structured approach to prompt engineering, making it easier to build, test, and maintain AI-powered features.
