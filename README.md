@@ -65,3 +65,17 @@ contractor-monorepo/
 
 - Web UI: `pnpm --filter @contractor/web test`
 - Python service: `cd apps/langgraph && poetry run pytest`
+
+
+
+
+## TODOS
+- Fix baml interpreter in cursor
+- Write a few baml tests to verify in/outs with image input
+- Modify frontend to rely on baml types
+- Add chat interface to frontend which follows 12 factor agents (RespondToUser, UpdateEstimate, ReadFiles).
+- PlanUpdates should include an edits description to return to user.
+- Deploy to vercel/langgraph/supabase
+- Figure out how to use runs/start and not wait - put some in flight task id in the db and periodically check for updates - resilient to server restarts?
+- Audio notes? Video input - video probably needs to be parsed into screenshots
+- Do we really need a two step pipeline - maybe remove langgraph?
