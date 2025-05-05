@@ -4,9 +4,10 @@ import { useState, useEffect, use } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Trash2, Upload, File, ArrowLeft, FileText, Play, ChevronDown, ChevronRight, StickyNote, ExternalLink, Download, RefreshCw } from "lucide-react"
+import { Trash2, Upload, File, ArrowLeft, FileText, Play, ChevronDown, ChevronRight, StickyNote, Download, RefreshCw } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { uploadFile, processFiles, updateProjectInfo, clearProjectInfo, clearProjectEstimate, AIEstimate } from "./actions"
+import { uploadFile, processFiles, updateProjectInfo, clearProjectInfo, clearProjectEstimate } from "./actions"
+import { ConstructionProjectData, InputFile } from "@/baml_client/baml_client/types"
 import { toast } from "sonner"
 import Link from "next/link"
 import ReactMarkdown from "react-markdown"
@@ -26,11 +27,8 @@ interface UploadedFile {
   uploaded_at: string
 }
 
-interface FileToProcess {
-  type: string
-  name: string
-  content?: string
-  description: string
+// Extended InputFile type for the web application
+interface FileToProcess extends InputFile {
   path?: string
 }
 
@@ -51,7 +49,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [isProcessing, setIsProcessing] = useState(false)
   const [projectInfo, setProjectInfo] = useState<string>("")
   const [project, setProject] = useState<Project | null>(null)
-  const [aiEstimate, setAiEstimate] = useState<AIEstimate | null>(null)
+  const [aiEstimate, setAiEstimate] = useState<ConstructionProjectData | null>(null)
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
   const [noteDialogOpen, setNoteDialogOpen] = useState(false)
   const [fileToUpload, setFileToUpload] = useState<File | null>(null)
@@ -267,15 +265,15 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         
         // Check if there are failed files and display more specific error
         if (result.failedFiles && result.failedFiles.length > 0) {
-          const failedFileNames = result.failedFiles.map((f: any) => f.name).join(', ');
+          const failedFileNames = result.failedFiles.map((f) => f.name).join(', ');
           toast.error(`Failed to process files: Could not fetch content for ${failedFileNames}`, {
             duration: 5000,
           });
           
           // Show detailed errors for each failed file
-          result.failedFiles.forEach((file: any) => {
-            if (file.error) {
-              toast.error(`${file.name}: ${file.error}`, {
+          result.failedFiles.forEach((file) => {
+            if ((file as any).error) {
+              toast.error(`${file.name}: ${(file as any).error}`, {
                 duration: 5000,
               });
             }
@@ -1060,11 +1058,18 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 {previewFile && isImageFile(previewFile.file_name) ? (
                   <div className="flex justify-center">
                     {previewFile.file_url ? (
-                      <img 
-                        src={signedImageUrl} 
-                        alt={previewFile.file_name} 
-                        className="max-h-[60vh] object-contain"
-                      />
+                      signedImageUrl ? (
+                        <img 
+                          src={signedImageUrl} 
+                          alt={previewFile.file_name} 
+                          className="max-h-[60vh] object-contain"
+                        />
+                      ) : (
+                        <div className="text-center text-gray-400">
+                          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2" />
+                          Loading image...
+                        </div>
+                      )
                     ) : (
                       <div className="text-center text-gray-400">
                         Image path not available. This file may need to be re-uploaded.

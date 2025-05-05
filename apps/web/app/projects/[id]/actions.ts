@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { ConstructionProjectData, EstimateLineItem, InputFile } from '@/baml_client/baml_client/types'
 
 if (!process.env.SUPABASE_STORAGE_BUCKET) {
   throw new Error('Missing SUPABASE_STORAGE_BUCKET environment variable')
@@ -50,7 +51,7 @@ export async function uploadFile(formData: FormData, projectId: string) {
     const filePath = `${projectId}/${sanitizedFileName}`
 
     // Upload file to Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from(STORAGE_BUCKET)
       .upload(filePath, file)
 
@@ -89,42 +90,16 @@ export async function uploadFile(formData: FormData, projectId: string) {
   }
 }
 
-interface FileToProcess {
-  type: string;
-  name: string;
-  content?: string;
-  description: string;
+// Extended InputFile type to add fields needed for our web application
+interface FileToProcess extends InputFile {
   error?: string;
   path?: string;
   bucket?: string;
 }
 
-// Define the AI estimate interface based on the provided JSON structure
-export interface EstimateItem {
-  description: string;
-  category: string;
-  subcategory?: string | null;
-  cost_range_min: number;
-  cost_range_max: number;
-  unit?: string | null;
-  quantity?: number;
-  assumptions?: string;
-  confidence_score?: string;
-  notes?: string;
-}
-
-export interface AIEstimate {
-  project_description: string;
-  estimated_total_min: number;
-  estimated_total_max: number;
-  estimated_timeline_days?: number;
-  key_considerations: string[];
-  confidence_level: string;
-  estimate_items: EstimateItem[];
-  next_steps: string[];
-  missing_information: string[];
-  key_risks: string[];
-}
+// Re-export the BAML types for use in other files
+export type EstimateItem = EstimateLineItem;
+export type AIEstimate = ConstructionProjectData;
 
 export async function processFiles(projectId: string, files: FileToProcess[]) {
   try {
@@ -208,13 +183,13 @@ export async function processFiles(projectId: string, files: FileToProcess[]) {
 
     // Check if any files failed to load their content
     const failedFiles = processedFiles.filter(file => 
-      (file.type === 'image' && !file.content && file.error) || 
-      (file.type === 'text' && !file.content && file.error)
+      (file.type === 'image' && !file.content && (file as any).error) || 
+      (file.type === 'text' && !file.content && (file as any).error)
     );
 
     if (failedFiles.length > 0) {
       const failedFileNames = failedFiles.map(f => f.name).join(', ');
-      const errors = failedFiles.map(f => `${f.name}: ${f.error}`).join('\n');
+      const errors = failedFiles.map(f => `${f.name}: ${(f as any).error}`).join('\n');
       console.error('Failed to fetch content for files:', errors);
       return { 
         error: `Failed to fetch content for ${failedFiles.length} file(s): ${failedFileNames}. Please check the file URLs and try again.`,
@@ -225,7 +200,7 @@ export async function processFiles(projectId: string, files: FileToProcess[]) {
     // Create the input state with project information and files
     const inputState: {
       project_info: string;
-      files: FileToProcess[];
+      files: InputFile[];
       updated_project_info: string;
     } = {
       project_info: project.project_info || `# ${project.name}\n\n${project.description}`,
@@ -280,7 +255,7 @@ export async function processFiles(projectId: string, files: FileToProcess[]) {
     }
     
     // Extract the AI estimate from the response
-    let aiEstimate: AIEstimate | null = null;
+    let aiEstimate: ConstructionProjectData | null = null;
     
     if (result.ai_estimate) {
       // Direct property
@@ -316,7 +291,7 @@ export async function processFiles(projectId: string, files: FileToProcess[]) {
   }
 }
 
-export async function updateProjectEstimate(projectId: string, estimate: AIEstimate) {
+export async function updateProjectEstimate(projectId: string, estimate: ConstructionProjectData) {
   try {
     const supabase = await createClient()
     
