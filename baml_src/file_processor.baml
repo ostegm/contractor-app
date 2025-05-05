@@ -47,8 +47,6 @@ function ProcessProjectFiles(project_info: string, files: InputFile[]) -> string
   Current Project Information:
   {{ project_info }}
 
-  {{img}}
-
   Provided Files:
   {% for file in files %}
   <file name={{ file.name }} type={{ file.type }} description={{ file.description }}>
