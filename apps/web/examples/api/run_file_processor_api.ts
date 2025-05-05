@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env ts-node
 
 /**
  * Example script to demonstrate how to use the file processor agent via REST API.
@@ -10,15 +10,16 @@
  * 4. Displays the results
  * 
  * Usage:
- * - Make sure you have Node.js installed
- * - Run: npm install node-fetch fs path
- * - Run: node run_file_processor_api.js [port]
+ * - Make sure you have Node.js and TypeScript installed
+ * - Run: npm install node-fetch fs path @types/node-fetch @types/node
+ * - Run: npx ts-node run_file_processor_api.ts [port]
  *   (where [port] is optional and defaults to 59342)
  */
 
-const fs = require('fs');
-const path = require('path');
-const fetch = require('node-fetch');
+import * as fs from 'fs';
+import * as path from 'path';
+import fetch from 'node-fetch';
+import { ConstructionProjectData, InputFile } from '../../baml_client/baml_client/types';
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -26,7 +27,7 @@ const port = args[0] || '59342'; // Use provided port or default to 59342
 
 // Configuration
 const API_BASE_URL = `http://localhost:${port}`;
-const TEST_IMAGE_PATH = path.join(__dirname, '..', 'tests', 'testdata', 'dated-bathroom.png');
+const TEST_IMAGE_PATH = path.join(__dirname, '../../../langgraph/tests/testdata/dated-bathroom.png');
 
 /**
  * Main function to run the file processor agent
@@ -41,26 +42,28 @@ async function main() {
     const imageContent = fs.readFileSync(TEST_IMAGE_PATH).toString('base64');
 
     // Create the input state with project information and files
+    const files: InputFile[] = [
+      {
+        type: 'text',
+        name: 'client_notes.txt',
+        content: 'Client wants a modern bathroom with a walk-in shower, double vanity, and heated floors. Budget is $15,000-$20,000. Timeline: would like to complete within 3 months.'
+      },
+      {
+        type: 'image',
+        name: 'current_bathroom.png',
+        content: imageContent,
+        description: 'Image shows a dated bathroom with beige tile, a shower/tub combo, single vanity with cultured marble top, and limited storage. The bathroom has oak cabinets and patterned floor tiles.'
+      },
+      {
+        type: 'text',
+        name: 'measurements.txt',
+        content: 'Bathroom dimensions: 8ft x 10ft. Ceiling height: 8ft. Window on east wall. Plumbing on north and west walls.'
+      }
+    ];
+
     const inputState = {
       project_info: '# Bathroom Renovation Project\n\nInitial consultation for bathroom renovation in a 1990s home.',
-      files: [
-        {
-          type: 'text',
-          name: 'client_notes.txt',
-          content: 'Client wants a modern bathroom with a walk-in shower, double vanity, and heated floors. Budget is $15,000-$20,000. Timeline: would like to complete within 3 months.'
-        },
-        {
-          type: 'image',
-          name: 'current_bathroom.png',
-          content: imageContent,
-          description: 'Image shows a dated bathroom with beige tile, a shower/tub combo, single vanity with cultured marble top, and limited storage. The bathroom has oak cabinets and patterned floor tiles.'
-        },
-        {
-          type: 'text',
-          name: 'measurements.txt',
-          content: 'Bathroom dimensions: 8ft x 10ft. Ceiling height: 8ft. Window on east wall. Plumbing on north and west walls.'
-        }
-      ],
+      files,
       updated_project_info: ''
     };
 
@@ -81,7 +84,11 @@ async function main() {
       throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
 
-    const result = await response.json();
+    const result = await response.json() as {
+      updated_project_info: string;
+      ai_estimate: ConstructionProjectData;
+    };
+    
     console.log('Raw result:', result);
 
     // Print the updated project information
@@ -94,7 +101,7 @@ async function main() {
     const estimate = result.ai_estimate;
     
     console.log(`Project Description: ${estimate.project_description}`);
-    console.log(`Estimated Cost Range: $${estimate.estimated_total_min.toLocaleString()} - $${estimate.estimated_total_max.toLocaleString()}`);
+    console.log(`Estimated Cost Range: $${estimate.estimated_total_min?.toLocaleString() || 0} - $${estimate.estimated_total_max?.toLocaleString() || 0}`);
     if (estimate.estimated_timeline_days) {
       console.log(`Estimated Timeline: ${estimate.estimated_timeline_days} days`);
     }
@@ -140,12 +147,16 @@ async function main() {
     console.log('\nEstimate saved to construction_estimate_api.json');
 
   } catch (error) {
-    console.error('Error:', error.message);
-    if (error.stack) {
-      console.error(error.stack);
+    if (error instanceof Error) {
+      console.error('Error:', error.message);
+      if (error.stack) {
+        console.error(error.stack);
+      }
+    } else {
+      console.error('An unknown error occurred:', error);
     }
   }
 }
 
 // Run the main function
-main(); 
+main();

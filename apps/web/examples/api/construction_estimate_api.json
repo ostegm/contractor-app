@@ -1,0 +1,148 @@
+{
+  "project_description": "Full renovation of an 8x10 ft bathroom in a 1990s home, including demolition, conversion of a tub/shower combo to a walk-in shower, installation of a double vanity, addition of heated floors, new modern finishes, and updating plumbing/electrical as needed to accommodate new layout and features.",
+  "estimated_total_min": 15500,
+  "estimated_total_max": 19500,
+  "estimated_timeline_days": 60,
+  "key_considerations": [
+    "Space planning to fit both a walk-in shower and double vanity within 80 sq ft",
+    "Existing plumbing location on north and west walls may limit fixture placement and could increase costs if significant relocation is needed",
+    "Addition of heated floors requires electrical tie-ins and compatible underlayment",
+    "Proper waterproofing critical for walk-in shower to prevent leakage",
+    "Material selections (tile, fixtures, vanity) must align with modern aesthetic and budget range",
+    "Sequencing of trades (demo, plumbing, electrical, tiling, install) to meet 3-month timeline"
+  ],
+  "confidence_level": "Medium",
+  "estimate_items": [
+    {
+      "description": "Demolition and disposal of existing bathroom finishes, fixtures, and flooring.",
+      "category": "Demolition",
+      "subcategory": "Interior",
+      "cost_range_min": 1200,
+      "cost_range_max": 1800,
+      "unit": "sq ft",
+      "quantity": 80,
+      "assumptions": "Standard drywall, tile, and fixture removal; no hazardous materials present.",
+      "confidence_score": "High",
+      "notes": "Includes removal/haul away of old tub, vanity, toilet, tiles."
+    },
+    {
+      "description": "Rough plumbing adjustments for walk-in shower and double vanity, including moving supply/drain lines as needed.",
+      "category": "Plumbing",
+      "subcategory": "Rough-In",
+      "cost_range_min": 2000,
+      "cost_range_max": 3000,
+      "unit": "sum",
+      "quantity": 1,
+      "assumptions": "Accessible crawlspace; supply/drain lines can be repositioned within wall/floor cavities; no slab work required.",
+      "confidence_score": "Medium",
+      "notes": "Scope could expand if additional rerouting required for optimal vanity/shower placement."
+    },
+    {
+      "description": "Installation of new walk-in shower pan, waterproofing membrane, and tile walls with modern fixtures.",
+      "category": "Shower",
+      "subcategory": "Installation",
+      "cost_range_min": 2600,
+      "cost_range_max": 3500,
+      "unit": "sum",
+      "quantity": 1,
+      "assumptions": "Ceramic or porcelain tile, midrange fixtures; 4 ft wide shower; glass half-wall or standard glass panel included.",
+      "confidence_score": "Medium",
+      "notes": "Includes waterproofing labor/materials; excludes high-end custom glass ($$)."
+    },
+    {
+      "description": "Supply and install double vanity with quartz or cultured marble top, undermount sinks, modern faucets & hardware.",
+      "category": "Fixtures",
+      "subcategory": "Vanity",
+      "cost_range_min": 2200,
+      "cost_range_max": 3200,
+      "unit": "sum",
+      "quantity": 1,
+      "assumptions": "Off-the-shelf or semi-custom vanity (60 inches max); standard plumbing tie-ins.",
+      "confidence_score": "Medium",
+      "notes": "Includes cabinet, counter, sinks, faucets, standard delivery."
+    },
+    {
+      "description": "Ceramic or porcelain tile flooring, including subfloor prep and installation of electric radiant heated floor system.",
+      "category": "Flooring",
+      "subcategory": "Tile & Heating",
+      "cost_range_min": 2500,
+      "cost_range_max": 3500,
+      "unit": "sq ft",
+      "quantity": 80,
+      "assumptions": "Flooring is level; electric mat system used; midrange tile selected; compatible with subfloor.",
+      "confidence_score": "Medium",
+      "notes": "Includes thermoset controls, bathroom-rated electrical for heating system."
+    },
+    {
+      "description": "Electrical upgrades for heated floors, new bathroom lighting, and GFCI outlets as needed.",
+      "category": "Electrical",
+      "subcategory": "Upgrades",
+      "cost_range_min": 1200,
+      "cost_range_max": 1700,
+      "unit": "sum",
+      "quantity": 1,
+      "assumptions": "Service panel has capacity; no rewiring beyond bathroom required.",
+      "confidence_score": "Medium",
+      "notes": "Allows for 1-2 new circuits if required; includes code-required GFCIs."
+    },
+    {
+      "description": "Drywall repair, new paint (walls & ceiling), and patching as needed.",
+      "category": "Finishes",
+      "subcategory": "Paint",
+      "cost_range_min": 800,
+      "cost_range_max": 1100,
+      "unit": "sq ft",
+      "quantity": 300,
+      "assumptions": "Standard latex bathroom paint; limited to walls/ceiling.",
+      "confidence_score": "High",
+      "notes": "Minor patching included after demo and rough-in."
+    },
+    {
+      "description": "Toilet replacement with standard modern elongated model.",
+      "category": "Fixtures",
+      "subcategory": "Toilet",
+      "cost_range_min": 400,
+      "cost_range_max": 600,
+      "unit": "each",
+      "quantity": 1,
+      "assumptions": "Midrange model; standard rough-in.",
+      "confidence_score": "High",
+      "notes": "Installation included."
+    },
+    {
+      "description": "Mirror, lighting fixtures (vanity & overhead), and accessories (towel bars, TP holder, etc.).",
+      "category": "Finishes",
+      "subcategory": "Accessories",
+      "cost_range_min": 600,
+      "cost_range_max": 900,
+      "unit": "sum",
+      "quantity": 1,
+      "assumptions": "Standard modern fixtures; no custom items.",
+      "confidence_score": "High",
+      "notes": "Includes light fixture installation labor."
+    }
+  ],
+  "next_steps": [
+    "Conduct detailed site measurement to confirm fixture placement and feasibility of double vanity and walk-in shower in available space.",
+    "Verify electrical panel capacity for heated floor system and any additional outlets/lighting.",
+    "Assess condition and routing of current plumbing supply/drain lines for potential relocation needs.",
+    "Work with client to select tile, fixtures, and finishes that align with both style and budget constraints.",
+    "Determine preferred walk-in shower size/create preliminary layout drawings for client review.",
+    "Finalize schedule and sequence of trades to meet 3-month timeline."
+  ],
+  "missing_information": [
+    "Exact location of in-wall plumbing and its compatibility with new vanity/shower layout.",
+    "Client's preferred materials/specs for vanity, tile, and fixtures.",
+    "Condition and type of subfloor (affects heated floor installation).",
+    "Electrical panel details—available amps and existing bathroom circuits.",
+    "Desired shower glass style and configuration.",
+    "Potential structural or water damage revealed upon demo."
+  ],
+  "key_risks": [
+    "Cost overruns if significant plumbing relocation or subfloor repair is required.",
+    "Schedule delays due to discovery of hidden conditions (rot, mold, electrical/code issues) after demolition.",
+    "Client material selection exceeding allowance/budget.",
+    "Shower waterproofing failure leading to leaks if not executed properly.",
+    "Electrical service limits preventing safe installation of heated floor and additional outlets."
+  ]
+}
