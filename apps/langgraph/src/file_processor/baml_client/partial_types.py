@@ -47,14 +47,6 @@ class ConstructionProjectData(BaseModel):
     missing_information: List[str]
     key_risks: List[str]
 
-class ContractorEstimate(BaseModel):
-    project_name: Optional[str] = None
-    description: Optional[str] = None
-    total_cost: Optional[float] = None
-    line_items: List["LineItem"]
-    estimated_hours: Optional[float] = None
-    timeline: Optional["TimelineInfo"] = None
-
 class EstimateLineItem(BaseModel):
     description: Optional[str] = None
     category: Optional[str] = None
@@ -74,18 +66,3 @@ class InputFile(BaseModel):
     content: Optional[str] = None
     download_url: Optional[str] = None
     image_data: Optional[baml_py.Image] = None
-
-class LineItem(BaseModel):
-    description: Optional[str] = None
-    cost: Optional[float] = None
-    quantity: Optional[int] = None
-
-class Milestone(BaseModel):
-    name: Optional[str] = None
-    date: Optional[str] = None
-    completion_percentage: Optional[float] = None
-
-class TimelineInfo(BaseModel):
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    milestones: List["Milestone"]

@@ -70,8 +70,6 @@ contractor-monorepo/
 
 
 ## TODOS
-- Fix baml interpreter in cursor
-- Write a few baml tests to verify in/outs with image input
 - Modify frontend to rely on baml types
 - Add chat interface to frontend which follows 12 factor agents (RespondToUser, UpdateEstimate, ReadFiles).
 - PlanUpdates should include an edits description to return to user.

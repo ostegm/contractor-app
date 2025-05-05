@@ -18,13 +18,12 @@ $ pnpm add @boundaryml/baml
 import type { Check, Checked  } from "../types";
 import type { Image, Audio } from "@boundaryml/baml";
 
-import type {  ConstructionProjectData,  ContractorEstimate,  EstimateLineItem,  InputFile,  LineItem,  Milestone,  TimelineInfo } from "../types"
+import type {  ConstructionProjectData,  EstimateLineItem,  InputFile } from "../types"
 
 import type * as types from "../types"
 import type { partial_types }from "../partial_types";
 
 export type StreamingServerTypes = {
-  GenerateEstimate: partial_types.ContractorEstimate,
   GenerateProjectEstimate: partial_types.ConstructionProjectData,
   ProcessProjectFiles: string,
 }

@@ -356,58 +356,6 @@ function useBamlAction<FunctionName extends FunctionNames>(
   } satisfies HookOutput<FunctionName, { stream: typeof props.stream }>
 }
 /**
- * A specialized hook for the GenerateEstimate BAML function that supports both streaming and non‑streaming responses.
- *
- * **Input Types:**
- *
- * - project_name: string
- *
- * - description: string
- *
- * - requirements: string[]
- *
- *
- * **Return Type:**
- * - **Non‑streaming:** ContractorEstimate
- * - **Streaming Partial:** partial_types.ContractorEstimate
- * - **Streaming Final:** ContractorEstimate
- *
- * **Usage Patterns:**
- * 1. **Non‑streaming (Default)**
- *    - Best for quick responses and simple UI updates.
- * 2. **Streaming**
- *    - Ideal for long‑running operations or real‑time feedback.
- *
- * **Edge Cases:**
- * - Ensure robust error handling via `onError`.
- * - Handle cases where partial data may be incomplete or missing.
- *
- * @example
- * ```tsx
- * // Basic non‑streaming usage:
- * const { data, error, isLoading, mutate } = useGenerateEstimate({ stream: false});
- *
- * // Streaming usage:
- * const { data, streamData, isLoading, error, mutate } = useGenerateEstimate({
- *   stream: true | undefined,
- *   onStreamData: (partial) => console.log('Partial update:', partial),
- *   onFinalData: (final) => console.log('Final result:', final),
- *   onError: (err) => console.error('Error:', err),
- * });
- * ```
- */
-export function useGenerateEstimate(props: HookInput<'GenerateEstimate', { stream: false }>): HookOutput<'GenerateEstimate', { stream: false }>
-export function useGenerateEstimate(props?: HookInput<'GenerateEstimate', { stream?: true }>): HookOutput<'GenerateEstimate', { stream: true }>
-export function useGenerateEstimate(
-  props: HookInput<'GenerateEstimate', { stream?: boolean }> = {},
-): HookOutput<'GenerateEstimate', { stream: true }> | HookOutput<'GenerateEstimate', { stream: false }> {
-  let action = Actions.GenerateEstimate;
-  if (isStreamingProps(props)) {
-    action = StreamingActions.GenerateEstimate;
-  }
-  return useBamlAction(action, props)
-}
-/**
  * A specialized hook for the GenerateProjectEstimate BAML function that supports both streaming and non‑streaming responses.
  *
  * **Input Types:**
@@ -463,6 +411,8 @@ export function useGenerateProjectEstimate(
  * - project_info: string
  *
  * - files: InputFile[]
+ *
+ * - img (optional): Image | null
  *
  *
  * **Return Type:**

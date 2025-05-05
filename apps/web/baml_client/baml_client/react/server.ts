@@ -21,37 +21,13 @@ import { b } from '../index';
 import type { Check, Checked  } from "../types";
 import type { Image, Audio } from "@boundaryml/baml";
 
-import type {  ConstructionProjectData,  ContractorEstimate,  EstimateLineItem,  InputFile,  LineItem,  Milestone,  TimelineInfo } from "../types"
+import type {  ConstructionProjectData,  EstimateLineItem,  InputFile } from "../types"
 
 import type * as types from "../types"
 
 /**
  * Regular BAML server actions that return direct responses.
  */
-
-/**
- * Executes the "GenerateEstimate" BAML action.
- *
- * This server action calls the underlying BAML function "GenerateEstimate"
- * with the specified parameters.
- *
- * @param { string } project_name - Input parameter.
- * @param { string } description - Input parameter.
- * @param { string[] } requirements - Input parameter.
- *
- * @returns {Promise<ContractorEstimate>} A promise that resolves with the result of the action.
- */
-export const GenerateEstimate = async (
-  project_name: string,
-  description: string,
-  requirements: string[],
-): Promise<ContractorEstimate> => {
-  return b.GenerateEstimate(
-    project_name,
-    description,
-    requirements,
-  );
-};
 
 /**
  * Executes the "GenerateProjectEstimate" BAML action.
@@ -79,15 +55,18 @@ export const GenerateProjectEstimate = async (
  *
  * @param { string } project_info - Input parameter.
  * @param { InputFile[] } files - Input parameter.
+ * @param { Image | null } img (optional) - Input parameter.
  *
  * @returns {Promise<string>} A promise that resolves with the result of the action.
  */
 export const ProcessProjectFiles = async (
   project_info: string,
   files: InputFile[],
+  img?: Image | null,
 ): Promise<string> => {
   return b.ProcessProjectFiles(
     project_info,
     files,
+    img,
   );
 };

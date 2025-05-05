@@ -20,30 +20,12 @@ import { toBamlError } from "@boundaryml/baml"
 import type { Checked, Check } from "./types"
 import type { partial_types } from "./partial_types"
 import type * as types from "./types"
-import type {ConstructionProjectData, ContractorEstimate, EstimateLineItem, InputFile, LineItem, Milestone, TimelineInfo} from "./types"
+import type {ConstructionProjectData, EstimateLineItem, InputFile} from "./types"
 import type TypeBuilder from "./type_builder"
 
 export class LlmResponseParser {
   constructor(private runtime: BamlRuntime, private ctxManager: BamlCtxManager) {}
 
-  
-  GenerateEstimate(
-      llmResponse: string,
-      __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry }
-  ): ContractorEstimate {
-    try {
-      return this.runtime.parseLlmResponse(
-        "GenerateEstimate",
-        llmResponse,
-        false,
-        this.ctxManager.cloneContext(),
-        __baml_options__?.tb?.__tb(),
-        __baml_options__?.clientRegistry,
-      ) as ContractorEstimate
-    } catch (error) {
-      throw toBamlError(error);
-    }
-  }
   
   GenerateProjectEstimate(
       llmResponse: string,
@@ -86,24 +68,6 @@ export class LlmResponseParser {
 export class LlmStreamParser {
   constructor(private runtime: BamlRuntime, private ctxManager: BamlCtxManager) {}
 
-  
-  GenerateEstimate(
-      llmResponse: string,
-      __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry }
-  ): partial_types.ContractorEstimate {
-    try {
-      return this.runtime.parseLlmResponse(
-        "GenerateEstimate",
-        llmResponse,
-        true,
-        this.ctxManager.cloneContext(),
-        __baml_options__?.tb?.__tb(),
-        __baml_options__?.clientRegistry,
-      ) as partial_types.ContractorEstimate
-    } catch (error) {
-      throw toBamlError(error);
-    }
-  }
   
   GenerateProjectEstimate(
       llmResponse: string,

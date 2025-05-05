@@ -19,7 +19,7 @@ import type { BamlRuntime, BamlCtxManager, ClientRegistry, Image, Audio } from "
 import { toBamlError, HTTPRequest } from "@boundaryml/baml"
 import type { Checked, Check } from "./types"
 import type * as types from "./types"
-import type {ConstructionProjectData, ContractorEstimate, EstimateLineItem, InputFile, LineItem, Milestone, TimelineInfo} from "./types"
+import type {ConstructionProjectData, EstimateLineItem, InputFile} from "./types"
 import type TypeBuilder from "./type_builder"
 
 type BamlCallOptions = {
@@ -30,26 +30,6 @@ type BamlCallOptions = {
 export class AsyncHttpRequest {
   constructor(private runtime: BamlRuntime, private ctxManager: BamlCtxManager) {}
 
-  
-  async GenerateEstimate(
-      project_name: string,description: string,requirements: string[],
-      __baml_options__?: BamlCallOptions
-  ): Promise<HTTPRequest> {
-    try {
-      return await this.runtime.buildRequest(
-        "GenerateEstimate",
-        {
-          "project_name": project_name,"description": description,"requirements": requirements
-        },
-        this.ctxManager.cloneContext(),
-        __baml_options__?.tb?.__tb(),
-        __baml_options__?.clientRegistry,
-        false,
-      )
-    } catch (error) {
-      throw toBamlError(error);
-    }
-  }
   
   async GenerateProjectEstimate(
       project_assessment: string,
@@ -72,14 +52,14 @@ export class AsyncHttpRequest {
   }
   
   async ProcessProjectFiles(
-      project_info: string,files: InputFile[],
+      project_info: string,files: InputFile[],img?: Image | null,
       __baml_options__?: BamlCallOptions
   ): Promise<HTTPRequest> {
     try {
       return await this.runtime.buildRequest(
         "ProcessProjectFiles",
         {
-          "project_info": project_info,"files": files
+          "project_info": project_info,"files": files,"img": img?? null
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),
@@ -97,26 +77,6 @@ export class AsyncHttpStreamRequest {
   constructor(private runtime: BamlRuntime, private ctxManager: BamlCtxManager) {}
 
   
-  async GenerateEstimate(
-      project_name: string,description: string,requirements: string[],
-      __baml_options__?: BamlCallOptions
-  ): Promise<HTTPRequest> {
-    try {
-      return await this.runtime.buildRequest(
-        "GenerateEstimate",
-        {
-          "project_name": project_name,"description": description,"requirements": requirements
-        },
-        this.ctxManager.cloneContext(),
-        __baml_options__?.tb?.__tb(),
-        __baml_options__?.clientRegistry,
-        true,
-      )
-    } catch (error) {
-      throw toBamlError(error);
-    }
-  }
-  
   async GenerateProjectEstimate(
       project_assessment: string,
       __baml_options__?: BamlCallOptions
@@ -138,14 +98,14 @@ export class AsyncHttpStreamRequest {
   }
   
   async ProcessProjectFiles(
-      project_info: string,files: InputFile[],
+      project_info: string,files: InputFile[],img?: Image | null,
       __baml_options__?: BamlCallOptions
   ): Promise<HTTPRequest> {
     try {
       return await this.runtime.buildRequest(
         "ProcessProjectFiles",
         {
-          "project_info": project_info,"files": files
+          "project_info": project_info,"files": files,"img": img?? null
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),

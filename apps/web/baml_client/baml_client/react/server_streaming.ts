@@ -21,38 +21,13 @@ import { b } from '../index';
 import type { Check, Checked  } from "../types";
 import type { Image, Audio } from "@boundaryml/baml";
 
-import type {  ConstructionProjectData,  ContractorEstimate,  EstimateLineItem,  InputFile,  LineItem,  Milestone,  TimelineInfo } from "../types"
+import type {  ConstructionProjectData,  EstimateLineItem,  InputFile } from "../types"
 
 import type * as types from "../types"
 
 /**
  * Streaming BAML server actions that return ReadableStreams.
  */
-
-/**
- * Executes the streaming variant of the "GenerateEstimate" BAML action.
- *
- * This action initiates a streaming response by calling the corresponding
- * BAML stream function. The returned stream yields incremental updates.
- *
- * @param { string } project_name - Input parameter.
- * @param { string } description - Input parameter.
- * @param { string[] } requirements - Input parameter.
- *
- * @returns {ReadableStream<Uint8Array>} A stream that yields incremental updates from the action.
- */
-export const GenerateEstimate = async (
-  project_name: string,
-  description: string,
-  requirements: string[],
-): Promise<ReadableStream<Uint8Array>> => {
-  const stream = b.stream.GenerateEstimate(
-    project_name,
-    description,
-    requirements,
-  );
-  return Promise.resolve(stream.toStreamable());
-};
 
 /**
  * Executes the streaming variant of the "GenerateProjectEstimate" BAML action.
@@ -81,16 +56,19 @@ export const GenerateProjectEstimate = async (
  *
  * @param { string } project_info - Input parameter.
  * @param { InputFile[] } files - Input parameter.
+ * @param { Image | null } img (optional) - Input parameter.
  *
  * @returns {ReadableStream<Uint8Array>} A stream that yields incremental updates from the action.
  */
 export const ProcessProjectFiles = async (
   project_info: string,
   files: InputFile[],
+  img?: Image | null,
 ): Promise<ReadableStream<Uint8Array>> => {
   const stream = b.stream.ProcessProjectFiles(
     project_info,
     files,
+    img,
   );
   return Promise.resolve(stream.toStreamable());
 };

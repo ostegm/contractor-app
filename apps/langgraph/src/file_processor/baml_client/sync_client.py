@@ -98,33 +98,6 @@ class BamlSyncClient:
       return BamlSyncClient(self.__runtime, self.__ctx_manager, new_options)
 
     
-    def GenerateEstimate(
-        self,
-        project_name: str,description: str,requirements: List[str],
-        baml_options: BamlCallOptions = {},
-    ) -> types.ContractorEstimate:
-      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
-      __tb__ = options.get("tb", None)
-      if __tb__ is not None:
-        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
-      else:
-        tb = None
-      __cr__ = options.get("client_registry", None)
-      collector = options.get("collector", None)
-      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
-
-      raw = self.__runtime.call_function_sync(
-        "GenerateEstimate",
-        {
-          "project_name": project_name,"description": description,"requirements": requirements,
-        },
-        self.__ctx_manager.get(),
-        tb,
-        __cr__,
-        collectors,
-      )
-      return cast(types.ContractorEstimate, raw.cast_to(types, types, partial_types, False))
-    
     def GenerateProjectEstimate(
         self,
         project_assessment: str,
@@ -154,7 +127,7 @@ class BamlSyncClient:
     
     def ProcessProjectFiles(
         self,
-        project_info: str,files: List[types.InputFile],
+        project_info: str,files: List[types.InputFile],img: Optional[baml_py.Image],
         baml_options: BamlCallOptions = {},
     ) -> str:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -170,7 +143,7 @@ class BamlSyncClient:
       raw = self.__runtime.call_function_sync(
         "ProcessProjectFiles",
         {
-          "project_info": project_info,"files": files,
+          "project_info": project_info,"files": files,"img": img,
         },
         self.__ctx_manager.get(),
         tb,
@@ -191,42 +164,6 @@ class BamlStreamClient:
       self.__ctx_manager = ctx_manager
       self.__baml_options = baml_options or {}
 
-    
-    def GenerateEstimate(
-        self,
-        project_name: str,description: str,requirements: List[str],
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.BamlSyncStream[partial_types.ContractorEstimate, types.ContractorEstimate]:
-      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
-      __tb__ = options.get("tb", None)
-      if __tb__ is not None:
-        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
-      else:
-        tb = None
-      __cr__ = options.get("client_registry", None)
-      collector = options.get("collector", None)
-      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
-
-      raw = self.__runtime.stream_function_sync(
-        "GenerateEstimate",
-        {
-          "project_name": project_name,
-          "description": description,
-          "requirements": requirements,
-        },
-        None,
-        self.__ctx_manager.get(),
-        tb,
-        __cr__,
-        collectors,
-      )
-
-      return baml_py.BamlSyncStream[partial_types.ContractorEstimate, types.ContractorEstimate](
-        raw,
-        lambda x: cast(partial_types.ContractorEstimate, x.cast_to(types, types, partial_types, True)),
-        lambda x: cast(types.ContractorEstimate, x.cast_to(types, types, partial_types, False)),
-        self.__ctx_manager.get(),
-      )
     
     def GenerateProjectEstimate(
         self,
@@ -264,7 +201,7 @@ class BamlStreamClient:
     
     def ProcessProjectFiles(
         self,
-        project_info: str,files: List[types.InputFile],
+        project_info: str,files: List[types.InputFile],img: Optional[baml_py.Image],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.BamlSyncStream[Optional[str], str]:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -282,6 +219,7 @@ class BamlStreamClient:
         {
           "project_info": project_info,
           "files": files,
+          "img": img,
         },
         None,
         self.__ctx_manager.get(),

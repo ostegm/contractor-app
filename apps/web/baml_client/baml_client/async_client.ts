@@ -20,7 +20,7 @@ import { toBamlError, BamlStream, type HTTPRequest } from "@boundaryml/baml"
 import type { Checked, Check, RecursivePartialNull as MovedRecursivePartialNull } from "./types"
 import type { partial_types } from "./partial_types"
 import type * as types from "./types"
-import type {ConstructionProjectData, ContractorEstimate, EstimateLineItem, InputFile, LineItem, Milestone, TimelineInfo} from "./types"
+import type {ConstructionProjectData, EstimateLineItem, InputFile} from "./types"
 import type TypeBuilder from "./type_builder"
 import { AsyncHttpRequest, AsyncHttpStreamRequest } from "./async_request"
 import { LlmResponseParser, LlmStreamParser } from "./parser"
@@ -83,29 +83,6 @@ export class BamlAsyncClient {
   }
 
   
-  async GenerateEstimate(
-      project_name: string,description: string,requirements: string[],
-      __baml_options__?: BamlCallOptions
-  ): Promise<ContractorEstimate> {
-    try {
-      const options = { ...this.bamlOptions, ...(__baml_options__ || {}) }
-      const collector = options.collector ? (Array.isArray(options.collector) ? options.collector : [options.collector]) : [];
-      const raw = await this.runtime.callFunction(
-        "GenerateEstimate",
-        {
-          "project_name": project_name,"description": description,"requirements": requirements
-        },
-        this.ctxManager.cloneContext(),
-        options.tb?.__tb(),
-        options.clientRegistry,
-        collector,
-      )
-      return raw.parsed(false) as ContractorEstimate
-    } catch (error) {
-      throw toBamlError(error);
-    }
-  }
-  
   async GenerateProjectEstimate(
       project_assessment: string,
       __baml_options__?: BamlCallOptions
@@ -130,7 +107,7 @@ export class BamlAsyncClient {
   }
   
   async ProcessProjectFiles(
-      project_info: string,files: InputFile[],
+      project_info: string,files: InputFile[],img?: Image | null,
       __baml_options__?: BamlCallOptions
   ): Promise<string> {
     try {
@@ -139,7 +116,7 @@ export class BamlAsyncClient {
       const raw = await this.runtime.callFunction(
         "ProcessProjectFiles",
         {
-          "project_info": project_info,"files": files
+          "project_info": project_info,"files": files,"img": img?? null
         },
         this.ctxManager.cloneContext(),
         options.tb?.__tb(),
@@ -165,35 +142,6 @@ class BamlStreamClient {
     this.bamlOptions = bamlOptions || {}
   }
 
-  
-  GenerateEstimate(
-      project_name: string,description: string,requirements: string[],
-      __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry, collector?: Collector | Collector[] }
-  ): BamlStream<partial_types.ContractorEstimate, ContractorEstimate> {
-    try {
-      const options = { ...this.bamlOptions, ...(__baml_options__ || {}) }
-      const collector = options.collector ? (Array.isArray(options.collector) ? options.collector : [options.collector]) : [];
-      const raw = this.runtime.streamFunction(
-        "GenerateEstimate",
-        {
-          "project_name": project_name,"description": description,"requirements": requirements
-        },
-        undefined,
-        this.ctxManager.cloneContext(),
-        options.tb?.__tb(),
-        options.clientRegistry,
-        collector,
-      )
-      return new BamlStream<partial_types.ContractorEstimate, ContractorEstimate>(
-        raw,
-        (a): partial_types.ContractorEstimate => a,
-        (a): ContractorEstimate => a,
-        this.ctxManager.cloneContext(),
-      )
-    } catch (error) {
-      throw toBamlError(error);
-    }
-  }
   
   GenerateProjectEstimate(
       project_assessment: string,
@@ -225,7 +173,7 @@ class BamlStreamClient {
   }
   
   ProcessProjectFiles(
-      project_info: string,files: InputFile[],
+      project_info: string,files: InputFile[],img?: Image | null,
       __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry, collector?: Collector | Collector[] }
   ): BamlStream<string, string> {
     try {
@@ -234,7 +182,7 @@ class BamlStreamClient {
       const raw = this.runtime.streamFunction(
         "ProcessProjectFiles",
         {
-          "project_info": project_info,"files": files
+          "project_info": project_info,"files": files,"img": img ?? null
         },
         undefined,
         this.ctxManager.cloneContext(),

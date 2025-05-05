@@ -60,16 +60,6 @@ export interface ConstructionProjectData {
   
 }
 
-export interface ContractorEstimate {
-  project_name: string
-  description: string
-  total_cost: number
-  line_items: LineItem[]
-  estimated_hours: number
-  timeline: TimelineInfo
-  
-}
-
 export interface EstimateLineItem {
   description: string
   category: string
@@ -91,26 +81,5 @@ export interface InputFile {
   content?: string | null
   download_url?: string | null
   image_data?: Image | null
-  
-}
-
-export interface LineItem {
-  description: string
-  cost: number
-  quantity: number
-  
-}
-
-export interface Milestone {
-  name: string
-  date: string
-  completion_percentage: number
-  
-}
-
-export interface TimelineInfo {
-  start_date: string
-  end_date: string
-  milestones: Milestone[]
   
 }

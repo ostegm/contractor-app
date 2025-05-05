@@ -19,7 +19,7 @@ import type { BamlRuntime, FunctionResult, BamlCtxManager, Image, Audio, ClientR
 import { toBamlError, type HTTPRequest } from "@boundaryml/baml"
 import type { Checked, Check, RecursivePartialNull as MovedRecursivePartialNull } from "./types"
 import type * as types from "./types"
-import type {ConstructionProjectData, ContractorEstimate, EstimateLineItem, InputFile, LineItem, Milestone, TimelineInfo} from "./types"
+import type {ConstructionProjectData, EstimateLineItem, InputFile} from "./types"
 import type TypeBuilder from "./type_builder"
 import { HttpRequest, HttpStreamRequest } from "./sync_request"
 import { LlmResponseParser, LlmStreamParser } from "./parser"
@@ -85,29 +85,6 @@ export class BamlSyncClient {
   }
 
   
-  GenerateEstimate(
-      project_name: string,description: string,requirements: string[],
-      __baml_options__?: BamlCallOptions
-  ): ContractorEstimate {
-    try {
-      const options = { ...this.bamlOptions, ...(__baml_options__ || {}) }
-      const collector = options.collector ? (Array.isArray(options.collector) ? options.collector : [options.collector]) : [];
-      const raw = this.runtime.callFunctionSync(
-        "GenerateEstimate",
-        {
-          "project_name": project_name,"description": description,"requirements": requirements
-        },
-        this.ctxManager.cloneContext(),
-        options.tb?.__tb(),
-        options.clientRegistry,
-        collector,
-      )
-      return raw.parsed(false) as ContractorEstimate
-    } catch (error: any) {
-      throw toBamlError(error);
-    }
-  }
-  
   GenerateProjectEstimate(
       project_assessment: string,
       __baml_options__?: BamlCallOptions
@@ -132,7 +109,7 @@ export class BamlSyncClient {
   }
   
   ProcessProjectFiles(
-      project_info: string,files: InputFile[],
+      project_info: string,files: InputFile[],img?: Image | null,
       __baml_options__?: BamlCallOptions
   ): string {
     try {
@@ -141,7 +118,7 @@ export class BamlSyncClient {
       const raw = this.runtime.callFunctionSync(
         "ProcessProjectFiles",
         {
-          "project_info": project_info,"files": files
+          "project_info": project_info,"files": files,"img": img?? null
         },
         this.ctxManager.cloneContext(),
         options.tb?.__tb(),

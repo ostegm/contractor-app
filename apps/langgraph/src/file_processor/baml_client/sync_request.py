@@ -37,29 +37,6 @@ class HttpRequest:
       self.__ctx_manager = ctx_manager
 
     
-    def GenerateEstimate(
-        self,
-        project_name: str,description: str,requirements: List[str],
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.HTTPRequest:
-      __tb__ = baml_options.get("tb", None)
-      if __tb__ is not None:
-        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
-      else:
-        tb = None
-      __cr__ = baml_options.get("client_registry", None)
-
-      return self.__runtime.build_request_sync(
-        "GenerateEstimate",
-        {
-          "project_name": project_name,"description": description,"requirements": requirements,
-        },
-        self.__ctx_manager.get(),
-        tb,
-        __cr__,
-        False,
-      )
-    
     def GenerateProjectEstimate(
         self,
         project_assessment: str,
@@ -85,7 +62,7 @@ class HttpRequest:
     
     def ProcessProjectFiles(
         self,
-        project_info: str,files: List[types.InputFile],
+        project_info: str,files: List[types.InputFile],img: Optional[baml_py.Image],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -98,7 +75,7 @@ class HttpRequest:
       return self.__runtime.build_request_sync(
         "ProcessProjectFiles",
         {
-          "project_info": project_info,"files": files,
+          "project_info": project_info,"files": files,"img": img,
         },
         self.__ctx_manager.get(),
         tb,
@@ -117,29 +94,6 @@ class HttpStreamRequest:
       self.__ctx_manager = ctx_manager
 
     
-    def GenerateEstimate(
-        self,
-        project_name: str,description: str,requirements: List[str],
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.HTTPRequest:
-      __tb__ = baml_options.get("tb", None)
-      if __tb__ is not None:
-        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
-      else:
-        tb = None
-      __cr__ = baml_options.get("client_registry", None)
-
-      return self.__runtime.build_request_sync(
-        "GenerateEstimate",
-        {
-          "project_name": project_name,"description": description,"requirements": requirements,
-        },
-        self.__ctx_manager.get(),
-        tb,
-        __cr__,
-        True,
-      )
-    
     def GenerateProjectEstimate(
         self,
         project_assessment: str,
@@ -165,7 +119,7 @@ class HttpStreamRequest:
     
     def ProcessProjectFiles(
         self,
-        project_info: str,files: List[types.InputFile],
+        project_info: str,files: List[types.InputFile],img: Optional[baml_py.Image],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -178,7 +132,7 @@ class HttpStreamRequest:
       return self.__runtime.build_request_sync(
         "ProcessProjectFiles",
         {
-          "project_info": project_info,"files": files,
+          "project_info": project_info,"files": files,"img": img,
         },
         self.__ctx_manager.get(),
         tb,

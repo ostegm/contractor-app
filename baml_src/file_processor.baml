@@ -37,7 +37,7 @@ class InputFile {
 
 
 
-function ProcessProjectFiles(project_info: string, files: InputFile[]) -> string {
+function ProcessProjectFiles(project_info: string, files: InputFile[], img: image?) -> string {
   client GeminiProcessor
   prompt #"
   You are an AI assistant specialized in analyzing construction project documents and media.
@@ -46,6 +46,8 @@ function ProcessProjectFiles(project_info: string, files: InputFile[]) -> string
 
   Current Project Information:
   {{ project_info }}
+
+  {{img}}
 
   Provided Files:
   {% for file in files %}
@@ -63,6 +65,24 @@ function ProcessProjectFiles(project_info: string, files: InputFile[]) -> string
   "#
 }
 
+test TestProcessProjectFiles {
+  functions [ProcessProjectFiles]
+  args {
+    project_info #"
+      Customer wants to renovate an existing bathroom.
+    "#
+    files [
+      {name "measurements.txt", type "text", description "measurements of the bathroom", content "10x10"},
+      {name "existing_bathroom.jpg", type "image", description "existing bathroom", image_data {
+        file "../apps/langgraph/tests/testdata/dated-bathroom.png"
+      }},
+    ]
+  }
+}
+
+
+
+
 function GenerateProjectEstimate(project_assessment: string) -> ConstructionProjectData {
   client OpenaiFallback
   prompt #"
@@ -76,4 +96,14 @@ function GenerateProjectEstimate(project_assessment: string) -> ConstructionProj
   Adhere strictly to the following format:
   {{ ctx.output_format }}
   "#
+}
+
+
+test TestGenerateProjectEstimate {
+  functions [GenerateProjectEstimate]
+  args {
+    project_assessment #"
+        **Project Assessment Update:**\n\nBased on the provided information, the bathroom renovation project involves updating an existing bathroom with the following details:\n\n*   **Project Goal:** Renovate an existing bathroom.\n*   **Dimensions:** The bathroom measures approximately 10x10 feet (assuming feet as the unit for typical room size).\n*   **Existing Condition & Features (from image):**\n    *   The bathroom appears to be a standard full bathroom containing a toilet, sink with vanity, and a bathtub/shower combination.\n    *   Materials visible include beige/tan square tiles on the walls (up to about chair rail height), wallpaper above the tile, a wood vanity cabinet with a light-colored countertop (possibly laminate or cultured marble), a mirrored medicine cabinet, and patterned vinyl or linoleum flooring.\n    *   Fixtures and finishes appear dated, consistent with a need for renovation.\n    *   A window with blinds and a ceiling ventilation fan are present.\n*   **Scope Implications:** The renovation likely includes replacing or updating floor and wall coverings, vanity, sink, toilet, and tub/shower components. The existing dated materials (tile, wallpaper, flooring, vanity) will likely require removal.\n*   **Potential Considerations (inferred):** Given the age suggested by the style, potential considerations include the condition of the subfloor and walls behind the existing finishes, the state of existing plumbing and electrical systems, and ensuring adequate ventilation.\n\nThis update incorporates the specific dimensions and visual details of the existing space derived from the provided files into the initial project description."
+    "#
+  }
 }
