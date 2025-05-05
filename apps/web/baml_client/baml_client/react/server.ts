@@ -55,18 +55,15 @@ export const GenerateProjectEstimate = async (
  *
  * @param { string } project_info - Input parameter.
  * @param { InputFile[] } files - Input parameter.
- * @param { Image | null } img (optional) - Input parameter.
  *
  * @returns {Promise<string>} A promise that resolves with the result of the action.
  */
 export const ProcessProjectFiles = async (
   project_info: string,
   files: InputFile[],
-  img?: Image | null,
 ): Promise<string> => {
   return b.ProcessProjectFiles(
     project_info,
     files,
-    img,
   );
 };

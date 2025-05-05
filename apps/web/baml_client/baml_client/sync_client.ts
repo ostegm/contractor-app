@@ -109,7 +109,7 @@ export class BamlSyncClient {
   }
   
   ProcessProjectFiles(
-      project_info: string,files: InputFile[],img?: Image | null,
+      project_info: string,files: InputFile[],
       __baml_options__?: BamlCallOptions
   ): string {
     try {
@@ -118,7 +118,7 @@ export class BamlSyncClient {
       const raw = this.runtime.callFunctionSync(
         "ProcessProjectFiles",
         {
-          "project_info": project_info,"files": files,"img": img?? null
+          "project_info": project_info,"files": files
         },
         this.ctxManager.cloneContext(),
         options.tb?.__tb(),

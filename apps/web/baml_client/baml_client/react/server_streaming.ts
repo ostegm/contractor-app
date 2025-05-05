@@ -56,19 +56,16 @@ export const GenerateProjectEstimate = async (
  *
  * @param { string } project_info - Input parameter.
  * @param { InputFile[] } files - Input parameter.
- * @param { Image | null } img (optional) - Input parameter.
  *
  * @returns {ReadableStream<Uint8Array>} A stream that yields incremental updates from the action.
  */
 export const ProcessProjectFiles = async (
   project_info: string,
   files: InputFile[],
-  img?: Image | null,
 ): Promise<ReadableStream<Uint8Array>> => {
   const stream = b.stream.ProcessProjectFiles(
     project_info,
     files,
-    img,
   );
   return Promise.resolve(stream.toStreamable());
 };

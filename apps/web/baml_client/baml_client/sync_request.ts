@@ -52,14 +52,14 @@ export class HttpRequest {
   }
   
   ProcessProjectFiles(
-      project_info: string,files: InputFile[],img?: Image | null,
+      project_info: string,files: InputFile[],
       __baml_options__?: BamlCallOptions
   ): HTTPRequest {
     try {
       return this.runtime.buildRequestSync(
         "ProcessProjectFiles",
         {
-          "project_info": project_info,"files": files,"img": img?? null
+          "project_info": project_info,"files": files
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),
@@ -98,14 +98,14 @@ export class HttpStreamRequest {
   }
   
   ProcessProjectFiles(
-      project_info: string,files: InputFile[],img?: Image | null,
+      project_info: string,files: InputFile[],
       __baml_options__?: BamlCallOptions
   ): HTTPRequest {
     try {
       return this.runtime.buildRequestSync(
         "ProcessProjectFiles",
         {
-          "project_info": project_info,"files": files,"img": img?? null
+          "project_info": project_info,"files": files
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),

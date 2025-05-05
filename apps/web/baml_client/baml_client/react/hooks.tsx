@@ -412,8 +412,6 @@ export function useGenerateProjectEstimate(
  *
  * - files: InputFile[]
  *
- * - img (optional): Image | null
- *
  *
  * **Return Type:**
  * - **Non‑streaming:** string

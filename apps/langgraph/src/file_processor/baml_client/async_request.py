@@ -62,7 +62,7 @@ class AsyncHttpRequest:
     
     async def ProcessProjectFiles(
         self,
-        project_info: str,files: List[types.InputFile],img: Optional[baml_py.Image],
+        project_info: str,files: List[types.InputFile],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -77,7 +77,6 @@ class AsyncHttpRequest:
         {
           "project_info": project_info,
           "files": files,
-          "img": img,
         },
         self.__ctx_manager.get(),
         tb,
@@ -121,7 +120,7 @@ class AsyncHttpStreamRequest:
     
     async def ProcessProjectFiles(
         self,
-        project_info: str,files: List[types.InputFile],img: Optional[baml_py.Image],
+        project_info: str,files: List[types.InputFile],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -136,7 +135,6 @@ class AsyncHttpStreamRequest:
         {
           "project_info": project_info,
           "files": files,
-          "img": img,
         },
         self.__ctx_manager.get(),
         tb,

@@ -62,7 +62,7 @@ class HttpRequest:
     
     def ProcessProjectFiles(
         self,
-        project_info: str,files: List[types.InputFile],img: Optional[baml_py.Image],
+        project_info: str,files: List[types.InputFile],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -75,7 +75,7 @@ class HttpRequest:
       return self.__runtime.build_request_sync(
         "ProcessProjectFiles",
         {
-          "project_info": project_info,"files": files,"img": img,
+          "project_info": project_info,"files": files,
         },
         self.__ctx_manager.get(),
         tb,
@@ -119,7 +119,7 @@ class HttpStreamRequest:
     
     def ProcessProjectFiles(
         self,
-        project_info: str,files: List[types.InputFile],img: Optional[baml_py.Image],
+        project_info: str,files: List[types.InputFile],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -132,7 +132,7 @@ class HttpStreamRequest:
       return self.__runtime.build_request_sync(
         "ProcessProjectFiles",
         {
-          "project_info": project_info,"files": files,"img": img,
+          "project_info": project_info,"files": files,
         },
         self.__ctx_manager.get(),
         tb,

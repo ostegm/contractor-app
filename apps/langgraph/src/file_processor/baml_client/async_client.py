@@ -129,7 +129,7 @@ class BamlAsyncClient:
     
     async def ProcessProjectFiles(
         self,
-        project_info: str,files: List[types.InputFile],img: Optional[baml_py.Image],
+        project_info: str,files: List[types.InputFile],
         baml_options: BamlCallOptions = {},
     ) -> str:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -145,7 +145,7 @@ class BamlAsyncClient:
       raw = await self.__runtime.call_function(
         "ProcessProjectFiles",
         {
-          "project_info": project_info,"files": files,"img": img,
+          "project_info": project_info,"files": files,
         },
         self.__ctx_manager.get(),
         tb,
@@ -201,7 +201,7 @@ class BamlStreamClient:
     
     def ProcessProjectFiles(
         self,
-        project_info: str,files: List[types.InputFile],img: Optional[baml_py.Image],
+        project_info: str,files: List[types.InputFile],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.BamlStream[Optional[str], str]:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -218,7 +218,6 @@ class BamlStreamClient:
         {
           "project_info": project_info,
           "files": files,
-          "img": img,
         },
         None,
         self.__ctx_manager.get(),

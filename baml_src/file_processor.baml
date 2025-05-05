@@ -37,7 +37,7 @@ class InputFile {
 
 
 
-function ProcessProjectFiles(project_info: string, files: InputFile[], img: image?) -> string {
+function ProcessProjectFiles(project_info: string, files: InputFile[]) -> string {
   client GeminiProcessor
   prompt #"
   You are an AI assistant specialized in analyzing construction project documents and media.

@@ -107,7 +107,7 @@ export class BamlAsyncClient {
   }
   
   async ProcessProjectFiles(
-      project_info: string,files: InputFile[],img?: Image | null,
+      project_info: string,files: InputFile[],
       __baml_options__?: BamlCallOptions
   ): Promise<string> {
     try {
@@ -116,7 +116,7 @@ export class BamlAsyncClient {
       const raw = await this.runtime.callFunction(
         "ProcessProjectFiles",
         {
-          "project_info": project_info,"files": files,"img": img?? null
+          "project_info": project_info,"files": files
         },
         this.ctxManager.cloneContext(),
         options.tb?.__tb(),
@@ -173,7 +173,7 @@ class BamlStreamClient {
   }
   
   ProcessProjectFiles(
-      project_info: string,files: InputFile[],img?: Image | null,
+      project_info: string,files: InputFile[],
       __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry, collector?: Collector | Collector[] }
   ): BamlStream<string, string> {
     try {
@@ -182,7 +182,7 @@ class BamlStreamClient {
       const raw = this.runtime.streamFunction(
         "ProcessProjectFiles",
         {
-          "project_info": project_info,"files": files,"img": img ?? null
+          "project_info": project_info,"files": files
         },
         undefined,
         this.ctxManager.cloneContext(),

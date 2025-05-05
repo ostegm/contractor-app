@@ -52,14 +52,14 @@ export class AsyncHttpRequest {
   }
   
   async ProcessProjectFiles(
-      project_info: string,files: InputFile[],img?: Image | null,
+      project_info: string,files: InputFile[],
       __baml_options__?: BamlCallOptions
   ): Promise<HTTPRequest> {
     try {
       return await this.runtime.buildRequest(
         "ProcessProjectFiles",
         {
-          "project_info": project_info,"files": files,"img": img?? null
+          "project_info": project_info,"files": files
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),
@@ -98,14 +98,14 @@ export class AsyncHttpStreamRequest {
   }
   
   async ProcessProjectFiles(
-      project_info: string,files: InputFile[],img?: Image | null,
+      project_info: string,files: InputFile[],
       __baml_options__?: BamlCallOptions
   ): Promise<HTTPRequest> {
     try {
       return await this.runtime.buildRequest(
         "ProcessProjectFiles",
         {
-          "project_info": project_info,"files": files,"img": img?? null
+          "project_info": project_info,"files": files
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),
