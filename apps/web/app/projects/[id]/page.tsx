@@ -1,18 +1,19 @@
 "use client"
 
-import { useState, useEffect, use } from "react"
+import React, { useState, useEffect, use, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Trash2, Upload, File, ArrowLeft, FileText, Play, ChevronDown, ChevronRight, StickyNote, Download, RefreshCw } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { uploadFile, processFiles, updateProjectInfo, clearProjectInfo, clearProjectEstimate } from "./actions"
-import { ConstructionProjectData, InputFile } from "@/baml_client/baml_client/types"
+import { ConstructionProjectData, InputFile, EstimateLineItem } from "@/baml_client/baml_client/types"
 import { toast } from "sonner"
 import Link from "next/link"
 import ReactMarkdown from "react-markdown"
 import * as DialogPrimitive from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import Image from "next/image"
 
 // Storage bucket name used in Supabase URLs
 const STORAGE_BUCKET_NAME = 'contractor-app-dev';
@@ -67,34 +68,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [initialFileCount, setInitialFileCount] = useState(0)
   const supabase = createClient()
 
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true)
-      await Promise.all([fetchFiles(), fetchProject()])
-      setIsLoading(false)
-    }
-    
-    loadData()
-  }, [])
-
-  // Track when files change to mark estimate as outdated
-  useEffect(() => {
-    // Skip the initial render
-    if (isLoading) return
-    
-    // If we haven't set the initial file count yet, set it now
-    if (initialFileCount === 0 && uploadedFiles.length > 0) {
-      setInitialFileCount(uploadedFiles.length)
-      return
-    }
-    
-    // If file count has changed and we have an estimate, mark it as outdated
-    if (initialFileCount !== 0 && uploadedFiles.length !== initialFileCount && aiEstimate) {
-      setIsEstimateOutdated(true)
-    }
-  }, [uploadedFiles, initialFileCount, aiEstimate, isLoading])
-
-  const fetchProject = async () => {
+  // useCallback for fetchProject
+  const fetchProject = useCallback(async () => {
     const { data, error } = await supabase
       .from('projects')
       .select('*')
@@ -120,9 +95,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         console.error('Error parsing AI estimate:', error)
       }
     }
-  }
-
-  const fetchFiles = async () => {
+  }, [id, supabase]);
+  
+  // useCallback for fetchFiles
+  const fetchFiles = useCallback(async () => {
     const { data: files, error } = await supabase
       .from('files')
       .select('*')
@@ -134,7 +110,34 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     }
 
     setUploadedFiles(files || [])
-  }
+  }, [id, supabase]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true)
+      await Promise.all([fetchFiles(), fetchProject()])
+      setIsLoading(false)
+    }
+    
+    loadData()
+  }, [fetchFiles, fetchProject])
+
+  // Track when files change to mark estimate as outdated
+  useEffect(() => {
+    // Skip the initial render
+    if (isLoading) return
+    
+    // If we haven't set the initial file count yet, set it now
+    if (initialFileCount === 0 && uploadedFiles.length > 0) {
+      setInitialFileCount(uploadedFiles.length)
+      return
+    }
+    
+    // If file count has changed and we have an estimate, mark it as outdated
+    if (initialFileCount !== 0 && uploadedFiles.length !== initialFileCount && aiEstimate) {
+      setIsEstimateOutdated(true)
+    }
+  }, [uploadedFiles, initialFileCount, aiEstimate, isLoading])
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
@@ -272,7 +275,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           
           // Show detailed errors for each failed file
           result.failedFiles.forEach((file) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             if ((file as any).error) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               toast.error(`${file.name}: ${(file as any).error}`, {
                 duration: 5000,
               });
@@ -670,7 +675,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         <RefreshCw className="h-5 w-5 text-yellow-400 mr-3 animate-spin" />
                         <div>
                           <h3 className="text-yellow-400 font-medium">Estimate may be outdated</h3>
-                          <p className="text-gray-300 text-sm">Files have been added or removed since this estimate was generated. Click "Regenerate Estimate" above to update.</p>
+                          <p className="text-gray-300 text-sm">Files have been added or removed since this estimate was generated. Click &quot;Regenerate Estimate&quot; above to update.</p>
                         </div>
                       </div>
                     )}
@@ -693,7 +698,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
                           <h4 className="text-sm font-medium text-gray-400 mb-1">Estimated Cost Range</h4>
                           <p className="text-xl font-bold text-green-400">
-                            ${aiEstimate.estimated_total_min.toLocaleString()} - ${aiEstimate.estimated_total_max.toLocaleString()}
+                            ${aiEstimate.estimated_total_min?.toLocaleString() ?? 'N/A'} - ${aiEstimate.estimated_total_max?.toLocaleString() ?? 'N/A'}
                           </p>
                         </div>
                         <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
@@ -715,7 +720,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         <h3 className="text-sm font-medium text-gray-400 mb-2">Key Considerations</h3>
                         <ul className="space-y-1 text-sm">
                           {aiEstimate.key_considerations?.length > 0 ? (
-                            aiEstimate.key_considerations.map((consideration, index) => (
+                            aiEstimate.key_considerations.map((consideration: string | null, index: number) => (
                               <li key={index} className="text-gray-300 flex">
                                 <span className="text-blue-400 mr-2">•</span> {consideration}
                               </li>
@@ -755,7 +760,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                           </thead>
                           <tbody className="divide-y divide-gray-800">
                             {aiEstimate.estimate_items?.length > 0 ? (
-                              aiEstimate.estimate_items.map((item, index) => (
+                              aiEstimate.estimate_items.map((item: EstimateLineItem, index: number) => (
                                 <tr key={index} className="hover:bg-gray-700/20">
                                   <td className="py-3 pr-4">
                                     <div className="font-medium text-gray-200">{item.description}</div>
@@ -789,7 +794,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                             <tr className="border-t border-gray-700">
                               <td colSpan={3} className="py-3 text-right font-medium">Total Estimate</td>
                               <td className="py-3 text-right font-bold text-green-400">
-                                ${aiEstimate.estimated_total_min.toLocaleString()} - ${aiEstimate.estimated_total_max.toLocaleString()}
+                                ${aiEstimate.estimated_total_min?.toLocaleString() ?? 'N/A'} - ${aiEstimate.estimated_total_max?.toLocaleString() ?? 'N/A'}
                               </td>
                             </tr>
                           </tfoot>
@@ -803,7 +808,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         <h2 className="text-lg font-semibold mb-3">Next Steps</h2>
                         <ul className="space-y-2">
                           {aiEstimate.next_steps?.length > 0 ? (
-                            aiEstimate.next_steps.map((step, index) => (
+                            aiEstimate.next_steps.map((step: string | null, index: number) => (
                               <li key={index} className="flex items-start text-sm">
                                 <span className="mr-2 mt-0.5 text-blue-400">{index + 1}.</span>
                                 <span className="text-gray-300">{step}</span>
@@ -819,7 +824,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         <h2 className="text-lg font-semibold mb-3">Key Risks</h2>
                         <ul className="space-y-2">
                           {aiEstimate.key_risks?.length > 0 ? (
-                            aiEstimate.key_risks.map((risk, index) => (
+                            aiEstimate.key_risks.map((risk: string | null, index: number) => (
                               <li key={index} className="flex items-start text-sm">
                                 <span className="mr-2 mt-0.5 text-red-400">•</span>
                                 <span className="text-gray-300">{risk}</span>
@@ -842,7 +847,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         </h2>
                         <ul className="space-y-2">
                           {aiEstimate.missing_information?.length > 0 ? (
-                            aiEstimate.missing_information.map((item, index) => (
+                            aiEstimate.missing_information.map((item: string | null, index: number) => (
                               <li key={index} className="flex items-start text-sm">
                                 <span className="mr-2 mt-0.5 text-yellow-400">•</span>
                                 <span className="text-gray-300">{item}</span>
@@ -863,7 +868,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       </div>
                       <h2 className="text-xl font-semibold mb-2">No Estimate Generated Yet</h2>
                       <p className="text-gray-400 mb-6 max-w-md mx-auto">
-                        Upload your project files and click "Generate Estimate" to create a detailed construction cost estimate.
+                        Upload your project files and click &quot;Generate Estimate&quot; to create a detailed construction cost estimate.
                       </p>
                     </div>
                     
@@ -900,7 +905,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               <form onSubmit={handleSendMessage} className="flex gap-2">
                 <Textarea
                   value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNewMessage(e.target.value)}
                   placeholder="Type your message here..."
                   className="flex-grow bg-gray-700 text-white border-gray-600"
                 />
@@ -942,7 +947,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               <Textarea
                 id="file-description"
                 value={fileDescription}
-                onChange={(e) => setFileDescription(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFileDescription(e.target.value)}
                 placeholder="Describe this file (required)"
                 className="bg-gray-700 text-white border-gray-600"
                 rows={3}
@@ -993,7 +998,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               <Input
                 id="note-title"
                 value={noteTitle}
-                onChange={(e) => setNoteTitle(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNoteTitle(e.target.value)}
                 placeholder="Enter a title for your note"
                 className="bg-gray-700 text-white border-gray-600"
               />
@@ -1005,7 +1010,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               <Textarea
                 id="note-content"
                 value={noteContent}
-                onChange={(e) => setNoteContent(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNoteContent(e.target.value)}
                 placeholder="Write your note here..."
                 className="bg-gray-700 text-white border-gray-600"
                 rows={6}
@@ -1059,9 +1064,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                   <div className="flex justify-center">
                     {previewFile.file_url ? (
                       signedImageUrl ? (
-                        <img 
+                        <Image 
                           src={signedImageUrl} 
                           alt={previewFile.file_name} 
+                          width={800}
+                          height={600}
                           className="max-h-[60vh] object-contain"
                         />
                       ) : (

@@ -183,13 +183,13 @@ export async function processFiles(projectId: string, files: FileToProcess[]) {
 
     // Check if any files failed to load their content
     const failedFiles = processedFiles.filter(file => 
-      (file.type === 'image' && !file.content && (file as any).error) || 
-      (file.type === 'text' && !file.content && (file as any).error)
+      (file.type === 'image' && !file.content && file.error) || 
+      (file.type === 'text' && !file.content && file.error)
     );
 
     if (failedFiles.length > 0) {
       const failedFileNames = failedFiles.map(f => f.name).join(', ');
-      const errors = failedFiles.map(f => `${f.name}: ${(f as any).error}`).join('\n');
+      const errors = failedFiles.map(f => `${f.name}: ${f.error as string}`).join('\n');
       console.error('Failed to fetch content for files:', errors);
       return { 
         error: `Failed to fetch content for ${failedFiles.length} file(s): ${failedFileNames}. Please check the file URLs and try again.`,

@@ -5,6 +5,17 @@ import Link from "next/link"
 import { NewProjectButton } from "@/components/new-project-button"
 import { NewProjectDialog } from "@/components/new-project-dialog"
 
+// Define a type for the project object
+interface ProjectType {
+  id: string;
+  name: string;
+  description: string;
+  ai_estimate: string | null; // Assuming it can be null or stringified JSON
+  created_at: string; // Assuming it's a string timestamp
+  project_info?: string;
+  user_id?: string;
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient()
   
@@ -13,13 +24,25 @@ export default async function DashboardPage() {
     redirect('/login')
   }
 
-  const { data: projects, error: projectsError } = await supabase
+  // Fetch projects and handle potential errors separately
+  const supabaseResult = await supabase
     .from('projects')
-    .select('*')
-    .eq('user_id', user.id)
+    .select<string, ProjectType>('*') // Apply ProjectType here
+    .eq('user_id', user.id);
+
+  const { error: projectsError } = supabaseResult;
+  let { data: projects } = supabaseResult;
 
   if (projectsError) {
-    redirect('/error')
+    // Handle specific error types
+    if (projectsError.code === 'PGRST116') {
+      console.error("Unauthorized access or resource not found.");
+      // Potentially show a user-friendly message about permissions
+    } else {
+      console.error("Error fetching projects:", projectsError);
+    }
+    // Clear projects if there's an error to avoid showing stale data
+    projects = []
   }
 
   return (
@@ -36,8 +59,8 @@ export default async function DashboardPage() {
           {/* New Project Card */}
           <NewProjectButton />
           
-          {/* Existing Projects */}
-          {projects.map((project) => (
+          {/* Existing Projects - Add type to parameter */}
+          {projects && projects.map((project: ProjectType) => (
             <Link href={`/projects/${project.id}`} key={project.id}>
               <div className="rounded-lg bg-gray-800 border border-gray-700 p-6 h-[220px] hover:border-blue-500/50 hover:bg-gray-800/80 transition-all duration-200 flex flex-col">
                 <div className="flex-1">
@@ -54,7 +77,7 @@ export default async function DashboardPage() {
                             try {
                               const estimate = JSON.parse(project.ai_estimate);
                               return `$${estimate.estimated_total_min.toLocaleString()} - $${estimate.estimated_total_max.toLocaleString()}`;
-                            } catch (e) {
+                            } catch {
                               return "Available";
                             }
                           })()}
@@ -75,7 +98,7 @@ export default async function DashboardPage() {
           ))}
         </div>
         
-        {projects.length === 0 && (
+        {projects && projects.length === 0 && (
           <div className="text-center mt-8 p-8 border border-dashed border-gray-700 rounded-lg">
             <p className="text-gray-400 mb-4">No projects yet. Create your first project to get started.</p>
           </div>
