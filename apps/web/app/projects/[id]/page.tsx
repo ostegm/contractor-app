@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Trash2, Upload, File, ArrowLeft, FileText, Play, ChevronDown, ChevronRight, StickyNote, Download, RefreshCw } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { uploadFile, processFiles, updateProjectInfo, clearProjectInfo, clearProjectEstimate } from "./actions"
+import { uploadFile, processFiles, updateProjectInfo, clearProjectInfo, clearProjectEstimate, startEstimateGeneration, checkEstimateStatus } from "./actions"
 import { ConstructionProjectData, InputFile, EstimateLineItem } from "@/baml_client/baml_client/types"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -48,6 +48,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [estimateStatus, setEstimateStatus] = useState<'not_started' | 'processing' | 'completed' | 'failed'>('not_started')
+  const [estimateError, setEstimateError] = useState<string | null>(null)
   const [projectInfo, setProjectInfo] = useState<string>("")
   const [project, setProject] = useState<Project | null>(null)
   const [aiEstimate, setAiEstimate] = useState<ConstructionProjectData | null>(null)
@@ -121,6 +123,45 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     
     loadData()
   }, [fetchFiles, fetchProject])
+  
+  // Initialize estimate status when the page loads
+  useEffect(() => {
+    if (!id || isLoading) return;
+    
+    const checkStatus = async () => {
+      const result = await checkEstimateStatus(id);
+      if (result.status) {
+        setEstimateStatus(result.status);
+        if (result.error) {
+          setEstimateError(result.error);
+        }
+      }
+    };
+    
+    checkStatus();
+  }, [id, isLoading]);
+  
+  // Poll for status updates when processing
+  useEffect(() => {
+    if (estimateStatus !== 'processing') return;
+    
+    const pollInterval = setInterval(async () => {
+      const result = await checkEstimateStatus(id);
+      
+      if (result.status === 'completed') {
+        setEstimateStatus('completed');
+        // Refresh the page to get the updated estimate
+        fetchProject();
+        toast.success('Estimate generation completed');
+      } else if (result.status === 'failed') {
+        setEstimateStatus('failed');
+        setEstimateError(result.error || 'Failed to generate estimate');
+        toast.error(`Estimate generation failed: ${result.error || 'Unknown error'}`);
+      }
+    }, 5000); // Poll every 5 seconds
+    
+    return () => clearInterval(pollInterval);
+  }, [estimateStatus, id, fetchProject]);
 
   // Track when files change to mark estimate as outdated
   useEffect(() => {
@@ -208,6 +249,94 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     }
   }
 
+  const handleGenerateEstimate = async () => {
+    if (uploadedFiles.length === 0) {
+      toast.error('No files to process')
+      return
+    }
+
+    setEstimateStatus('processing');
+    setEstimateError(null);
+    toast.info('Starting estimate generation...');
+    
+    try {
+      // Prepare files for processing using the stored file paths
+      const filesToProcess: FileToProcess[] = uploadedFiles.map((file) => {
+        // For text files
+        if (file.file_name.endsWith('.txt') || file.file_name.endsWith('.md')) {
+          return {
+            type: 'text',
+            name: file.file_name,
+            description: file.description || '',
+            path: file.file_url
+          };
+        }
+        // For images
+        else if (file.file_name.match(/\.(jpeg|jpg|png|gif)$/i)) {
+          return {
+            type: 'image',
+            name: file.file_name,
+            description: file.description || '',
+            path: file.file_url
+          };
+        }
+        // For other file types
+        return {
+          type: 'other',
+          name: file.file_name,
+          description: file.description || ''
+        };
+      });
+      
+      // Check if any files are missing paths
+      const missingPaths = filesToProcess.filter(file => 
+        (file.type === 'image' || file.type === 'text') && !file.path
+      );
+      
+      if (missingPaths.length > 0) {
+        const missingFileNames = missingPaths.map(f => f.name).join(', ');
+        toast.error(`Missing file paths for: ${missingFileNames}. These files may need to be re-uploaded.`);
+        setEstimateStatus('failed');
+        return;
+      }
+
+      // Start the background job
+      const result = await startEstimateGeneration(id, filesToProcess);
+      
+      if (!result.success) {
+        setEstimateStatus('failed');
+        setEstimateError(result.error || 'Failed to start estimate generation');
+        
+        // Show detailed errors for failed files
+        if (result.failedFiles && result.failedFiles.length > 0) {
+          const failedFileNames = result.failedFiles.map((f) => f.name).join(', ');
+          toast.error(`Failed to process files: Could not fetch content for ${failedFileNames}`, {
+            duration: 5000,
+          });
+          
+          // Show individual errors
+          result.failedFiles.forEach((file) => {
+            if ((file as any).error) {
+              toast.error(`${file.name}: ${(file as any).error}`, {
+                duration: 5000,
+              });
+            }
+          });
+        } else {
+          toast.error(`Failed to start processing: ${result.error}`);
+        }
+      } else {
+        toast.success('Estimate generation started');
+      }
+    } catch (error) {
+      console.error('Error starting estimate generation:', error);
+      toast.error(`Failed to start estimate generation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setEstimateStatus('failed');
+      setEstimateError(error instanceof Error ? error.message : 'Unknown error');
+    }
+  };
+  
+  // Keep the original function for backward compatibility during testing
   const handleProcessFiles = async () => {
     if (uploadedFiles.length === 0) {
       toast.error('No files to process')
@@ -537,17 +666,21 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               
               <div className="flex items-center gap-3">
                 <Button 
-                  onClick={handleProcessFiles} 
+                  onClick={handleGenerateEstimate} 
                   className={`${isEstimateOutdated ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700'} flex items-center gap-2`}
-                  disabled={isProcessing || uploadedFiles.length === 0}
+                  disabled={estimateStatus === 'processing' || uploadedFiles.length === 0}
                 >
-                  {isEstimateOutdated && (
+                  {estimateStatus === 'processing' && (
                     <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
                   )}
-                  {!isEstimateOutdated && (
+                  {isEstimateOutdated && estimateStatus !== 'processing' && (
+                    <RefreshCw className="h-4 w-4 mr-1" />
+                  )}
+                  {!isEstimateOutdated && estimateStatus !== 'processing' && (
                     <Play className="h-4 w-4 mr-1" />
                   )}
-                  {isProcessing ? 'Processing...' : isEstimateOutdated ? 'Regenerate Estimate' : 'Generate Estimate'}
+                  {estimateStatus === 'processing' ? 'Processing...' : 
+                   isEstimateOutdated ? 'Regenerate Estimate' : 'Generate Estimate'}
                 </Button>
               </div>
             </div>
@@ -656,7 +789,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
               {/* Right content - AI Estimate */}
               <div className="md:col-span-2 relative">
-                {isProcessing && (
+                {(isProcessing || estimateStatus === 'processing') && (
                   <div className="absolute inset-0 bg-gray-900/70 z-10 flex flex-col items-center justify-center rounded-lg">
                     <div className="animate-spin text-blue-500 mb-4">
                       <RefreshCw className="h-12 w-12" />
@@ -665,6 +798,29 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     <p className="text-gray-400 text-sm max-w-md text-center">
                       Analyzing your files and creating a detailed construction estimate. This may take a minute...
                     </p>
+                  </div>
+                )}
+                
+                {estimateStatus === 'failed' && estimateError && (
+                  <div className="absolute inset-0 bg-gray-900/70 z-10 flex flex-col items-center justify-center rounded-lg">
+                    <div className="text-red-500 mb-4">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <h2 className="text-xl font-semibold text-gray-300 mb-2">Estimate Generation Failed</h2>
+                    <p className="text-red-400 text-sm max-w-md text-center mb-4">
+                      {estimateError}
+                    </p>
+                    <Button
+                      onClick={() => {
+                        setEstimateStatus('not_started');
+                        setEstimateError(null);
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      Try Again
+                    </Button>
                   </div>
                 )}
                 
@@ -874,17 +1030,21 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     
                     <div className="flex justify-center">
                       <Button 
-                        onClick={handleProcessFiles} 
+                        onClick={handleGenerateEstimate} 
                         className={`${isEstimateOutdated ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700'} flex items-center gap-2`}
-                        disabled={isProcessing || uploadedFiles.length === 0}
+                        disabled={estimateStatus === 'processing' || uploadedFiles.length === 0}
                       >
-                        {isEstimateOutdated && (
+                        {estimateStatus === 'processing' && (
                           <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
                         )}
-                        {!isEstimateOutdated && (
+                        {isEstimateOutdated && estimateStatus !== 'processing' && (
+                          <RefreshCw className="h-4 w-4 mr-1" />
+                        )}
+                        {!isEstimateOutdated && estimateStatus !== 'processing' && (
                           <Play className="h-4 w-4 mr-1" />
                         )}
-                        {isProcessing ? 'Processing...' : isEstimateOutdated ? 'Regenerate Estimate' : 'Generate Estimate'}
+                        {estimateStatus === 'processing' ? 'Processing...' : 
+                         isEstimateOutdated ? 'Regenerate Estimate' : 'Generate Estimate'}
                       </Button>
                     </div>
                   </div>

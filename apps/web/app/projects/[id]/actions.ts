@@ -97,9 +97,82 @@ interface FileToProcess extends InputFile {
   bucket?: string;
 }
 
+// Define task job status types
+type TaskJobStatus = 'not_started' | 'pending' | 'processing' | 'completed' | 'failed';
+
 // Re-export the BAML types for use in other files
 export type EstimateItem = EstimateLineItem;
 export type AIEstimate = ConstructionProjectData;
+
+async function processFilesForInput(files: FileToProcess[]): Promise<FileToProcess[]> {
+  // Process files to load their content
+  const processedFiles: FileToProcess[] = await Promise.all(files.map(async (file) => {
+    try {
+      // For images and text files, use Supabase's signed URLs
+      if ((file.type === 'image' || file.type === 'text') && file.path) {
+        console.log(`Processing ${file.type} file: ${file.name} with path: ${file.path}`);
+        
+        // Create a signed URL for the file
+        const bucket = file.bucket || STORAGE_BUCKET;
+        const supabase = await createClient();
+        const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+          .from(bucket)
+          .createSignedUrl(file.path, 3600); // 1 hour expiration
+        
+        if (signedUrlError) {
+          console.error(`Error creating signed URL for file ${file.name}:`, signedUrlError);
+          return {
+            ...file,
+            content: '',
+            error: `Failed to create signed URL: ${signedUrlError.message}`
+          };
+        }
+        
+        // Fetch the content using the signed URL
+        const response = await fetch(signedUrlData.signedUrl);
+        if (!response.ok) {
+          console.error(`Error fetching file ${file.name}: ${response.status} ${response.statusText}`);
+          return {
+            ...file,
+            content: '',
+            error: `Failed to fetch file: ${response.status} ${response.statusText}`
+          };
+        }
+        
+        if (file.type === 'image') {
+          // Convert the response to base64 for images
+          const arrayBuffer = await response.arrayBuffer();
+          const base64 = Buffer.from(arrayBuffer).toString('base64');
+          
+          return {
+            ...file,
+            content: base64
+          };
+        } else {
+          // Convert the response to text for text files
+          const content = await response.text();
+          
+          return {
+            ...file,
+            content
+          };
+        }
+      }
+      
+      // For other file types, just pass through
+      return file;
+    } catch (error) {
+      console.error(`Error processing file ${file.name}:`, error);
+      return {
+        ...file,
+        content: '',
+        error: error instanceof Error ? error.message : 'Unknown error processing file'
+      };
+    }
+  }));
+
+  return processedFiles;
+}
 
 export async function processFiles(projectId: string, files: FileToProcess[]) {
   try {
@@ -117,69 +190,7 @@ export async function processFiles(projectId: string, files: FileToProcess[]) {
     }
 
     // Process files to load their content
-    const processedFiles: FileToProcess[] = await Promise.all(files.map(async (file) => {
-      try {
-        // For images and text files, use Supabase's signed URLs
-        if ((file.type === 'image' || file.type === 'text') && file.path) {
-          console.log(`Processing ${file.type} file: ${file.name} with path: ${file.path}`);
-          
-          // Create a signed URL for the file
-          const bucket = file.bucket || STORAGE_BUCKET;
-          const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-            .from(bucket)
-            .createSignedUrl(file.path, 3600); // 1 hour expiration
-          
-          if (signedUrlError) {
-            console.error(`Error creating signed URL for file ${file.name}:`, signedUrlError);
-            return {
-              ...file,
-              content: '',
-              error: `Failed to create signed URL: ${signedUrlError.message}`
-            };
-          }
-          
-          // Fetch the content using the signed URL
-          const response = await fetch(signedUrlData.signedUrl);
-          if (!response.ok) {
-            console.error(`Error fetching file ${file.name}: ${response.status} ${response.statusText}`);
-            return {
-              ...file,
-              content: '',
-              error: `Failed to fetch file: ${response.status} ${response.statusText}`
-            };
-          }
-          
-          if (file.type === 'image') {
-            // Convert the response to base64 for images
-            const arrayBuffer = await response.arrayBuffer();
-            const base64 = Buffer.from(arrayBuffer).toString('base64');
-            
-            return {
-              ...file,
-              content: base64
-            };
-          } else {
-            // Convert the response to text for text files
-            const content = await response.text();
-            
-            return {
-              ...file,
-              content
-            };
-          }
-        }
-        
-        // For other file types, just pass through
-        return file;
-      } catch (error) {
-        console.error(`Error processing file ${file.name}:`, error);
-        return {
-          ...file,
-          content: '',
-          error: error instanceof Error ? error.message : 'Unknown error processing file'
-        };
-      }
-    }));
+    const processedFiles = await processFilesForInput(files);
 
     // Check if any files failed to load their content
     const failedFiles = processedFiles.filter(file => 
@@ -398,5 +409,289 @@ export async function clearProjectEstimate(projectId: string) {
     console.error('Error clearing project estimate:', error)
     return { error: error instanceof Error ? error.message : 'Unknown error occurred' }
   }
+}
+
+/**
+ * Start asynchronous estimate generation for a project
+ */
+export async function startEstimateGeneration(projectId: string, files: FileToProcess[]) {
+  try {
+    // Get project info from database
+    const supabase = await createClient()
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', projectId)
+      .single()
+
+    if (projectError) {
+      console.error('Error fetching project:', projectError)
+      return { error: 'Failed to fetch project information' }
+    }
+
+    // Process files to load their content
+    const processedFiles = await processFilesForInput(files)
+
+    // Check for failures in processed files
+    const failedFiles = processedFiles.filter(file => 
+      (file.type === 'image' && !file.content && file.error) || 
+      (file.type === 'text' && !file.content && file.error)
+    )
+
+    if (failedFiles.length > 0) {
+      const failedFileNames = failedFiles.map(f => f.name).join(', ')
+      return { 
+        error: `Failed to fetch content for ${failedFiles.length} file(s): ${failedFileNames}.`,
+        failedFiles
+      }
+    }
+
+    // Create a thread
+    const createThreadResponse = await fetch(`${LANGGRAPH_API_URL}/threads`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': LANGGRAPH_API_KEY!,
+      },
+      body: JSON.stringify({})
+    })
+
+    if (!createThreadResponse.ok) {
+      const errorText = await createThreadResponse.text()
+      throw new Error(`Thread creation failed: ${createThreadResponse.status}: ${errorText}`)
+    }
+
+    const threadResult = await createThreadResponse.json() as { thread_id: string }
+    const threadId = threadResult.thread_id
+
+    // Create the input state
+    const inputState = {
+      project_info: project.project_info || `# ${project.name}\n\n${project.description}`,
+      files: processedFiles,
+      updated_project_info: ''
+    }
+
+    // Create a background run
+    const createRunResponse = await fetch(`${LANGGRAPH_API_URL}/threads/${threadId}/runs`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': LANGGRAPH_API_KEY!,
+      },
+      body: JSON.stringify({
+        assistant_id: 'file_processor',
+        input: inputState
+      })
+    })
+
+    if (!createRunResponse.ok) {
+      const errorText = await createRunResponse.text()
+      throw new Error(`Run creation failed: ${createRunResponse.status}: ${errorText}`)
+    }
+
+    const createResult = await createRunResponse.json() as { run_id: string }
+    const runId = createResult.run_id
+
+    // Create a task_job entry in the database
+    const { error: jobError } = await supabase
+      .from('task_jobs')
+      .insert({
+        project_id: projectId,
+        thread_id: threadId,
+        run_id: runId,
+        status: 'processing',
+        job_type: 'estimate_generation'
+      })
+
+    if (jobError) {
+      console.error('Error creating task job:', jobError)
+      return { error: 'Failed to create task tracking' }
+    }
+
+    // Return success with job IDs
+    return { 
+      success: true, 
+      message: 'Estimate generation started',
+      thread_id: threadId,
+      run_id: runId
+    }
+  } catch (error) {
+    console.error('Error starting estimate generation:', error)
+    return { error: error instanceof Error ? error.message : 'Unknown error occurred' }
+  }
+}
+
+/**
+ * Check the status of an estimate generation job
+ */
+export async function checkEstimateStatus(projectId: string) {
+  try {
+    const supabase = await createClient()
+    
+    // Get the most recent task job for this project
+    const { data: taskJob, error: taskJobError } = await supabase
+      .from('task_jobs')
+      .select('*')
+      .eq('project_id', projectId)
+      .eq('job_type', 'estimate_generation')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (taskJobError) {
+      if (taskJobError.code === 'PGRST116') {
+        // No task found
+        return { status: 'not_started' as TaskJobStatus }
+      }
+      console.error('Error fetching task job:', taskJobError)
+      return { error: 'Failed to fetch task status' }
+    }
+
+    // If the task is already completed or failed, just return the status
+    if (taskJob.status === 'completed' || taskJob.status === 'failed') {
+      return { 
+        status: taskJob.status as TaskJobStatus,
+        error: taskJob.error_message
+      }
+    }
+
+    // If the task is still processing, check the actual status from the API
+    const response = await fetch(`${LANGGRAPH_API_URL}/threads/${taskJob.thread_id}/runs/${taskJob.run_id}`, {
+      headers: {
+        'x-api-key': LANGGRAPH_API_KEY!,
+      }
+    })
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        // If the run is not found, it might have been deleted
+        await updateTaskStatus(taskJob.id, 'failed', 'Run not found in LangGraph API')
+        return { status: 'failed' as TaskJobStatus, error: 'Run not found in LangGraph API' }
+      }
+      
+      const errorText = await response.text()
+      console.error(`API request failed: ${response.status}: ${errorText}`)
+      return { error: `API request failed: ${response.status}` }
+    }
+
+    const runStatus = await response.json() as { status: string }
+
+    // Update the database based on the run status
+    switch (runStatus.status) {
+      case 'success':
+        // Get the result and update the database
+        await processCompletedRun(taskJob.thread_id, taskJob.run_id, projectId, taskJob.id)
+        return { status: 'completed' as TaskJobStatus }
+      
+      case 'error':
+      case 'timeout':
+      case 'interrupted':
+        await updateTaskStatus(taskJob.id, 'failed', `Run failed with status: ${runStatus.status}`)
+        return { status: 'failed' as TaskJobStatus, error: `Run failed with status: ${runStatus.status}` }
+      
+      case 'pending':
+      default:
+        // Still in progress
+        return { status: 'processing' as TaskJobStatus }
+    }
+  } catch (error) {
+    console.error('Error checking estimate status:', error)
+    return { error: error instanceof Error ? error.message : 'Unknown error occurred' }
+  }
+}
+
+/**
+ * Process a completed run, extract results, and update the database
+ */
+async function processCompletedRun(threadId: string, runId: string, projectId: string, taskJobId: string) {
+  try {
+    const supabase = await createClient()
+    
+    // Join the run to get the results
+    const joinResponse = await fetch(`${LANGGRAPH_API_URL}/threads/${threadId}/runs/${runId}/join`, {
+      headers: {
+        'x-api-key': LANGGRAPH_API_KEY!,
+      }
+    })
+
+    if (!joinResponse.ok) {
+      const errorText = await joinResponse.text()
+      await updateTaskStatus(taskJobId, 'failed', `Failed to join run: ${joinResponse.status}: ${errorText}`)
+      throw new Error(`Failed to join run: ${joinResponse.status}: ${errorText}`)
+    }
+
+    const result = await joinResponse.json()
+    
+    // Extract updated project info and AI estimate from the response
+    let updatedProjectInfo = extractProjectInfo(result)
+    let aiEstimate = extractAIEstimate(result)
+
+    // Update the project in the database
+    if (updatedProjectInfo) {
+      await updateProjectInfo(projectId, updatedProjectInfo)
+    }
+
+    if (aiEstimate) {
+      await updateProjectEstimate(projectId, aiEstimate)
+    }
+
+    // Update the task status to completed
+    await updateTaskStatus(taskJobId, 'completed')
+    
+    return { success: true }
+  } catch (error) {
+    console.error('Error processing completed run:', error)
+    await updateTaskStatus(taskJobId, 'failed', error instanceof Error ? error.message : 'Unknown error')
+    throw error
+  }
+}
+
+/**
+ * Update the status of a task job
+ */
+async function updateTaskStatus(taskJobId: string, status: string, errorMessage?: string) {
+  const supabase = await createClient()
+  
+  const updateData: any = { status }
+  if (errorMessage) {
+    updateData.error_message = errorMessage
+  }
+  
+  const { error } = await supabase
+    .from('task_jobs')
+    .update(updateData)
+    .eq('id', taskJobId)
+  
+  if (error) {
+    console.error('Error updating task status:', error)
+  }
+}
+
+/**
+ * Helper to extract project info from API response
+ */
+function extractProjectInfo(result: any): string | null {
+  if (result.updated_project_info) {
+    return result.updated_project_info
+  } else if (result.values && result.values.updated_project_info) {
+    return result.values.updated_project_info
+  } else if (result.output && result.output.updated_project_info) {
+    return result.output.updated_project_info
+  }
+  return null
+}
+
+/**
+ * Helper to extract AI estimate from API response
+ */
+function extractAIEstimate(result: any): ConstructionProjectData | null {
+  if (result.ai_estimate) {
+    return result.ai_estimate
+  } else if (result.values && result.values.ai_estimate) {
+    return result.values.ai_estimate
+  } else if (result.output && result.output.ai_estimate) {
+    return result.output.ai_estimate
+  }
+  return null
 }
 
