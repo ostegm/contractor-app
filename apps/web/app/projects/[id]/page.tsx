@@ -96,7 +96,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         setAiEstimate(estimate)
       } catch (error) {
         console.error('Error parsing AI estimate:', error)
+        setAiEstimate(null); // Ensure aiEstimate is null if parsing fails
       }
+    } else {
+      setAiEstimate(null); // Ensure aiEstimate is null if data.ai_estimate is not present
     }
   }, [id, supabase]);
   
@@ -129,7 +132,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   useEffect(() => {
     if (!id || isLoading) return;
     
-    const checkStatus = async () => {
+    const checkStatusAndUpdate = async () => {
       const result = await checkEstimateStatus(id);
       if (result.status) {
         // Map 'pending' from TaskJobStatus to 'processing' for the UI state
@@ -138,11 +141,17 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         if (result.error) {
           setEstimateError(result.error);
         }
+
+        // If the status is 'completed' but we don't have the estimate data in our UI state yet,
+        // fetch it to ensure the UI is up-to-date.
+        if (uiStatus === 'completed' && !aiEstimate) {
+          await fetchProject();
+        }
       }
     };
     
-    checkStatus();
-  }, [id, isLoading]);
+    checkStatusAndUpdate();
+  }, [id, isLoading, fetchProject, aiEstimate]);
   
   // Poll for status updates when processing
   useEffect(() => {
