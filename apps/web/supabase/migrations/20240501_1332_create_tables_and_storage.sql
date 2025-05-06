@@ -36,7 +36,6 @@ CREATE TABLE files (
     file_name TEXT NOT NULL,
     file_url TEXT NOT NULL,
     description TEXT, -- Added from 20240624 migration
-    text_content TEXT,
     uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
@@ -97,7 +96,7 @@ CREATE POLICY "Users can create chat interactions in their projects" ON chat_int
 
 -- Create the storage bucket if it doesn't exist (From 20240224_create_bucket.sql)
 INSERT INTO storage.buckets (id, name, public)
-VALUES ('contractor-app-dev', 'contractor-app-dev', true)
+VALUES ('contractor-app-dev', 'contractor-app-dev', false)
 ON CONFLICT (id) DO NOTHING;
 
 -- Create policies for storage.buckets (From 20240224_storage_policies.sql)

@@ -84,6 +84,12 @@ port = 54324
 enabled = true
 # The maximum file size allowed (e.g. "5MB", "500KB").
 file_size_limit = "50MiB"
+  [storage.buckets.contractor-app-dev]
+    public = false
+    allowed_mime_types = ["image/png", "image/jpeg", "application/zip", "text/plain", "text/plain; charset=utf-8"]
+    # This local path tells Supabase where to find the files to seed into this bucket.
+    objects_path = "./storage_seed_files/contractor-app-dev"
+
 
 # Image transformation API is available to Supabase Pro plan.
 # [storage.image_transformation]
