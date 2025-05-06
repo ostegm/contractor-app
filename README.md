@@ -70,10 +70,12 @@ contractor-monorepo/
 
 
 ## TODOS
-- Modify frontend to rely on baml types
+- Fix mime type
+- Fix missing estimate on click to project page
+- Brainstorm more on how the chat interface should work - what all should it do, what should the UX be.
+- Based on this decide should chat be via langgraph or just direct with baml
 - Add chat interface to frontend which follows 12 factor agents (RespondToUser, UpdateEstimate, ReadFiles).
 - PlanUpdates should include an edits description to return to user.
 - Deploy to vercel/langgraph/supabase
-- Figure out how to use runs/start and not wait - put some in flight task id in the db and periodically check for updates - resilient to server restarts?
 - Audio notes? Video input - video probably needs to be parsed into screenshots
 - Do we really need a two step pipeline - maybe remove langgraph?

@@ -86,7 +86,7 @@ enabled = true
 file_size_limit = "50MiB"
   [storage.buckets.contractor-app-dev]
     public = false
-    allowed_mime_types = ["image/png", "image/jpeg", "application/zip", "text/plain", "text/plain; charset=utf-8"]
+    # allowed_mime_types = ["image/png", "image/jpeg", "application/zip", "text/plain", "text/plain; charset=utf-8"]
     # This local path tells Supabase where to find the files to seed into this bucket.
     objects_path = "./storage_seed_files/contractor-app-dev"
 

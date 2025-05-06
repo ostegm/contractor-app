@@ -111,11 +111,11 @@ BEGIN
     VALUES (user_id_val, 'Bathroom Renovation (Estimated)', '1990s bathroom remodel with modern features, estimate complete.', project1_info, project1_estimate)
     RETURNING id INTO project1_id;
 
-    INSERT INTO files (project_id, file_name, file_url, text_content, description)
+    INSERT INTO files (project_id, file_name, file_url, description)
     VALUES
-        (project1_id, 'client_notes.txt', 'client_notes.txt', NULL, 'Client requirements and budget for bathroom renovation.'),
-        (project1_id, 'current_bathroom.png', 'current_bathroom.png', NULL, file2_description),
-        (project1_id, 'measurements.txt', 'measurements.txt', NULL, 'Bathroom dimensions and layout details.');
+        (project1_id, 'client_notes.txt', 'client_notes.txt', 'Client requirements and budget for bathroom renovation.'),
+        (project1_id, 'current_bathroom.png', 'current_bathroom.png', 'Current bathroom photo.'),
+        (project1_id, 'measurements.txt', 'measurements.txt', 'Bathroom dimensions and layout details.');
 
     -- Mark estimate as complete for Project 1
     INSERT INTO task_jobs (project_id, status, job_type)
@@ -126,12 +126,12 @@ BEGIN
     VALUES (user_id_val, 'Kitchen Refresh (Files Uploaded)', 'Major kitchen refresh project, files uploaded, awaiting estimate.', project2_info, NULL)
     RETURNING id INTO project2_id;
 
-    INSERT INTO files (project_id, file_name, file_url, text_content, description)
+    INSERT INTO files (project_id, file_name, file_url, description)
     VALUES
-        (project2_id, 'client_notes.txt', 'client_notes.txt', NULL, 'Client requirements and budget for kitchen refresh.'),
-        (project2_id, 'current_kitchen.png', 'current_kitchen.png', NULL, 'Current kitchen photo.'),
-        (project2_id, 'desired_kitchen.png', 'desired_kitchen.png', NULL, 'Hypothetical end state showing goal of project.'),
-        (project2_id, 'walkthrough_notes.txt', 'walkthrough_notes.txt', NULL, 'Notes from walkthrough of the kitchen.');
+        (project2_id, 'client_notes.txt', 'client_notes.txt', 'Client requirements and budget for kitchen refresh.'),
+        (project2_id, 'current_kitchen.png', 'current_kitchen.png', 'Current kitchen photo.'),
+        (project2_id, 'desired_kitchen.png', 'desired_kitchen.png', 'Hypothetical end state showing goal of project.'),
+        (project2_id, 'walkthrough_notes.txt', 'walkthrough_notes.txt', 'Notes from walkthrough of the kitchen.');
 
 
     RAISE NOTICE 'Seeding complete. Project 1 ID: %, Project 2 ID: %', project1_id, project2_id;

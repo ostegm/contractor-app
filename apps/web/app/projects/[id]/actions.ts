@@ -604,9 +604,7 @@ export async function checkEstimateStatus(projectId: string) {
  * Process a completed run, extract results, and update the database
  */
 async function processCompletedRun(threadId: string, runId: string, projectId: string, taskJobId: string) {
-  try {
-    const supabase = await createClient()
-    
+  try {    
     // Join the run to get the results
     const joinResponse = await fetch(`${LANGGRAPH_API_URL}/threads/${threadId}/runs/${runId}/join`, {
       headers: {
@@ -623,8 +621,8 @@ async function processCompletedRun(threadId: string, runId: string, projectId: s
     const result = await joinResponse.json()
     
     // Extract updated project info and AI estimate from the response
-    let updatedProjectInfo = extractProjectInfo(result)
-    let aiEstimate = extractAIEstimate(result)
+    const updatedProjectInfo = extractProjectInfo(result)
+    const aiEstimate = extractAIEstimate(result)
 
     // Update the project in the database
     if (updatedProjectInfo) {
@@ -649,10 +647,15 @@ async function processCompletedRun(threadId: string, runId: string, projectId: s
 /**
  * Update the status of a task job
  */
+interface TaskJobUpdate {
+  status: string;
+  error_message?: string;
+}
+
 async function updateTaskStatus(taskJobId: string, status: string, errorMessage?: string) {
   const supabase = await createClient()
   
-  const updateData: any = { status }
+  const updateData: TaskJobUpdate = { status }
   if (errorMessage) {
     updateData.error_message = errorMessage
   }
@@ -670,13 +673,14 @@ async function updateTaskStatus(taskJobId: string, status: string, errorMessage?
 /**
  * Helper to extract project info from API response
  */
-function extractProjectInfo(result: any): string | null {
+interface ApiResponse {
+  updated_project_info?: string;
+  ai_estimate?: ConstructionProjectData;
+}
+
+function extractProjectInfo(result: ApiResponse): string | null {
   if (result.updated_project_info) {
     return result.updated_project_info
-  } else if (result.values && result.values.updated_project_info) {
-    return result.values.updated_project_info
-  } else if (result.output && result.output.updated_project_info) {
-    return result.output.updated_project_info
   }
   return null
 }
@@ -684,13 +688,9 @@ function extractProjectInfo(result: any): string | null {
 /**
  * Helper to extract AI estimate from API response
  */
-function extractAIEstimate(result: any): ConstructionProjectData | null {
+function extractAIEstimate(result: ApiResponse): ConstructionProjectData | null {
   if (result.ai_estimate) {
     return result.ai_estimate
-  } else if (result.values && result.values.ai_estimate) {
-    return result.values.ai_estimate
-  } else if (result.output && result.output.ai_estimate) {
-    return result.output.ai_estimate
   }
   return null
 }

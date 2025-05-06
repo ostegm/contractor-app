@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Trash2, Upload, File, ArrowLeft, FileText, Play, ChevronDown, ChevronRight, StickyNote, Download, RefreshCw } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { uploadFile, processFiles, updateProjectInfo, clearProjectInfo, clearProjectEstimate, startEstimateGeneration, checkEstimateStatus } from "./actions"
+import { uploadFile, clearProjectInfo, clearProjectEstimate, startEstimateGeneration, checkEstimateStatus } from "./actions"
 import { ConstructionProjectData, InputFile, EstimateLineItem } from "@/baml_client/baml_client/types"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -31,6 +31,7 @@ interface UploadedFile {
 // Extended InputFile type for the web application
 interface FileToProcess extends InputFile {
   path?: string
+  error?: string
 }
 
 interface Project {
@@ -47,7 +48,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [newMessage, setNewMessage] = useState("")
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [isUploading, setIsUploading] = useState(false)
-  const [isProcessing, setIsProcessing] = useState(false)
+  const [isProcessing] = useState(false)
   const [estimateStatus, setEstimateStatus] = useState<'not_started' | 'processing' | 'completed' | 'failed'>('not_started')
   const [estimateError, setEstimateError] = useState<string | null>(null)
   const [projectInfo, setProjectInfo] = useState<string>("")
@@ -131,7 +132,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     const checkStatus = async () => {
       const result = await checkEstimateStatus(id);
       if (result.status) {
-        setEstimateStatus(result.status);
+        // Map 'pending' from TaskJobStatus to 'processing' for the UI state
+        const uiStatus = result.status === 'pending' ? 'processing' : result.status as 'not_started' | 'processing' | 'completed' | 'failed';
+        setEstimateStatus(uiStatus);
         if (result.error) {
           setEstimateError(result.error);
         }
@@ -315,9 +318,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           });
           
           // Show individual errors
-          result.failedFiles.forEach((file) => {
-            if ((file as any).error) {
-              toast.error(`${file.name}: ${(file as any).error}`, {
+          result.failedFiles.forEach((file: FileToProcess) => {
+            if (file.error) {
+              toast.error(`${file.name}: ${file.error}`, {
                 duration: 5000,
               });
             }
@@ -336,125 +339,6 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     }
   };
   
-  // Keep the original function for backward compatibility during testing
-  const handleProcessFiles = async () => {
-    if (uploadedFiles.length === 0) {
-      toast.error('No files to process')
-      return
-    }
-
-    setIsProcessing(true)
-    try {
-      toast.info('Preparing files for processing...')
-      
-      // Prepare files for processing using the stored file paths
-      const filesToProcess: FileToProcess[] = uploadedFiles.map((file) => {
-        // For text files
-        if (file.file_name.endsWith('.txt') || file.file_name.endsWith('.md')) {
-          return {
-            type: 'text',
-            name: file.file_name,
-            description: file.description || '',
-            path: file.file_url
-          };
-        }
-        // For images
-        else if (file.file_name.match(/\.(jpeg|jpg|png|gif)$/i)) {
-          return {
-            type: 'image',
-            name: file.file_name,
-            description: file.description || '',
-            path: file.file_url
-          };
-        }
-        // For other file types
-        return {
-          type: 'other',
-          name: file.file_name,
-          description: file.description || ''
-        };
-      });
-      
-      // Check if any files are missing paths
-      const missingPaths = filesToProcess.filter(file => 
-        (file.type === 'image' || file.type === 'text') && !file.path
-      );
-      
-      if (missingPaths.length > 0) {
-        const missingFileNames = missingPaths.map(f => f.name).join(', ');
-        toast.error(`Missing file paths for: ${missingFileNames}. These files may need to be re-uploaded.`);
-        setIsProcessing(false);
-        return;
-      }
-
-      toast.info('Analyzing files and generating construction estimate...')
-      
-      // Process files with LangGraph
-      const result = await processFiles(id, filesToProcess)
-      
-      if (result.error) {
-        console.error('Error from processFiles:', result.error)
-        
-        // Check if there are failed files and display more specific error
-        if (result.failedFiles && result.failedFiles.length > 0) {
-          const failedFileNames = result.failedFiles.map((f) => f.name).join(', ');
-          toast.error(`Failed to process files: Could not fetch content for ${failedFileNames}`, {
-            duration: 5000,
-          });
-          
-          // Show detailed errors for each failed file
-          result.failedFiles.forEach((file) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            if ((file as any).error) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              toast.error(`${file.name}: ${(file as any).error}`, {
-                duration: 5000,
-              });
-            }
-          });
-        } else {
-          toast.error(`Failed to process files: ${result.error}`);
-        }
-      } else {
-        toast.success('Files processed successfully')
-        
-        if (result.updated_project_info) {
-          setProjectInfo(result.updated_project_info)
-          
-          // Update project info in the database
-          const updateResult = await updateProjectInfo(id, result.updated_project_info)
-          
-          if (updateResult.error) {
-            console.warn('Error updating project info in database:', updateResult.error)
-            toast.warning('Project overview generated but could not be saved to database')
-          } else {
-            toast.success('Project overview updated and saved')
-          }
-          
-          // Refresh project data
-          fetchProject()
-        } else {
-          toast.warning('No project overview was generated')
-        }
-        
-        // Handle the AI estimate if it exists
-        if (result.ai_estimate) {
-          setAiEstimate(result.ai_estimate)
-          toast.success('Construction estimate generated')
-          
-          // Reset the outdated state and update the initial file count
-          setIsEstimateOutdated(false)
-          setInitialFileCount(uploadedFiles.length)
-        }
-      }
-    } catch (error) {
-      console.error('Error processing files:', error)
-      toast.error(`Failed to process files: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    } finally {
-      setIsProcessing(false)
-    }
-  }
-
   const handleAddNote = async () => {
     if (!noteTitle.trim() || !noteContent.trim()) return;
 
