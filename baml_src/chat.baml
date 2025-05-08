@@ -26,7 +26,7 @@ class AssisantMessage {
 
 
 class UpdateEstimateRequest {
-    changes_to_make string @description("The changes to make to the estimate")
+    changes_to_make string @description("Detailed description of changes to make to the estimate")
 }
 
 class UpdateEstimateResponse {
