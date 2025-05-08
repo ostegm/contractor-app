@@ -37,9 +37,32 @@ class HttpRequest:
       self.__ctx_manager = ctx_manager
 
     
+    def DetermineNextStep(
+        self,
+        thread: types.BamlChatThread,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "DetermineNextStep",
+        {
+          "thread": thread,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        False,
+      )
+    
     def GenerateProjectEstimate(
         self,
-        project_assessment: str,
+        files: List[types.InputFile],existing_estimate: Optional[types.ConstructionProjectData],requested_changes: Optional[str],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -52,30 +75,7 @@ class HttpRequest:
       return self.__runtime.build_request_sync(
         "GenerateProjectEstimate",
         {
-          "project_assessment": project_assessment,
-        },
-        self.__ctx_manager.get(),
-        tb,
-        __cr__,
-        False,
-      )
-    
-    def ProcessProjectFiles(
-        self,
-        project_info: str,files: List[types.InputFile],
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.HTTPRequest:
-      __tb__ = baml_options.get("tb", None)
-      if __tb__ is not None:
-        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
-      else:
-        tb = None
-      __cr__ = baml_options.get("client_registry", None)
-
-      return self.__runtime.build_request_sync(
-        "ProcessProjectFiles",
-        {
-          "project_info": project_info,"files": files,
+          "files": files,"existing_estimate": existing_estimate,"requested_changes": requested_changes,
         },
         self.__ctx_manager.get(),
         tb,
@@ -94,9 +94,32 @@ class HttpStreamRequest:
       self.__ctx_manager = ctx_manager
 
     
+    def DetermineNextStep(
+        self,
+        thread: types.BamlChatThread,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "DetermineNextStep",
+        {
+          "thread": thread,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        True,
+      )
+    
     def GenerateProjectEstimate(
         self,
-        project_assessment: str,
+        files: List[types.InputFile],existing_estimate: Optional[types.ConstructionProjectData],requested_changes: Optional[str],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -109,30 +132,7 @@ class HttpStreamRequest:
       return self.__runtime.build_request_sync(
         "GenerateProjectEstimate",
         {
-          "project_assessment": project_assessment,
-        },
-        self.__ctx_manager.get(),
-        tb,
-        __cr__,
-        True,
-      )
-    
-    def ProcessProjectFiles(
-        self,
-        project_info: str,files: List[types.InputFile],
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.HTTPRequest:
-      __tb__ = baml_options.get("tb", None)
-      if __tb__ is not None:
-        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
-      else:
-        tb = None
-      __cr__ = baml_options.get("client_registry", None)
-
-      return self.__runtime.build_request_sync(
-        "ProcessProjectFiles",
-        {
-          "project_info": project_info,"files": files,
+          "files": files,"existing_estimate": existing_estimate,"requested_changes": requested_changes,
         },
         self.__ctx_manager.get(),
         tb,

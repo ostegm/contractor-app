@@ -20,7 +20,7 @@ import { toBamlError, BamlStream, type HTTPRequest } from "@boundaryml/baml"
 import type { Checked, Check, RecursivePartialNull as MovedRecursivePartialNull } from "./types"
 import type { partial_types } from "./partial_types"
 import type * as types from "./types"
-import type {ConstructionProjectData, EstimateLineItem, InputFile} from "./types"
+import type {AllowedTypes, AssisantMessage, BamlChatThread, ConstructionProjectData, EstimateLineItem, Event, InputFile, UpdateEstimateRequest, UpdateEstimateResponse, UserInput} from "./types"
 import type TypeBuilder from "./type_builder"
 import { AsyncHttpRequest, AsyncHttpStreamRequest } from "./async_request"
 import { LlmResponseParser, LlmStreamParser } from "./parser"
@@ -83,8 +83,31 @@ export class BamlAsyncClient {
   }
 
   
+  async DetermineNextStep(
+      thread: BamlChatThread,
+      __baml_options__?: BamlCallOptions
+  ): Promise<Event> {
+    try {
+      const options = { ...this.bamlOptions, ...(__baml_options__ || {}) }
+      const collector = options.collector ? (Array.isArray(options.collector) ? options.collector : [options.collector]) : [];
+      const raw = await this.runtime.callFunction(
+        "DetermineNextStep",
+        {
+          "thread": thread
+        },
+        this.ctxManager.cloneContext(),
+        options.tb?.__tb(),
+        options.clientRegistry,
+        collector,
+      )
+      return raw.parsed(false) as Event
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
   async GenerateProjectEstimate(
-      project_assessment: string,
+      files: InputFile[],existing_estimate?: ConstructionProjectData | null,requested_changes?: string | null,
       __baml_options__?: BamlCallOptions
   ): Promise<ConstructionProjectData> {
     try {
@@ -93,7 +116,7 @@ export class BamlAsyncClient {
       const raw = await this.runtime.callFunction(
         "GenerateProjectEstimate",
         {
-          "project_assessment": project_assessment
+          "files": files,"existing_estimate": existing_estimate?? null,"requested_changes": requested_changes?? null
         },
         this.ctxManager.cloneContext(),
         options.tb?.__tb(),
@@ -101,29 +124,6 @@ export class BamlAsyncClient {
         collector,
       )
       return raw.parsed(false) as ConstructionProjectData
-    } catch (error) {
-      throw toBamlError(error);
-    }
-  }
-  
-  async ProcessProjectFiles(
-      project_info: string,files: InputFile[],
-      __baml_options__?: BamlCallOptions
-  ): Promise<string> {
-    try {
-      const options = { ...this.bamlOptions, ...(__baml_options__ || {}) }
-      const collector = options.collector ? (Array.isArray(options.collector) ? options.collector : [options.collector]) : [];
-      const raw = await this.runtime.callFunction(
-        "ProcessProjectFiles",
-        {
-          "project_info": project_info,"files": files
-        },
-        this.ctxManager.cloneContext(),
-        options.tb?.__tb(),
-        options.clientRegistry,
-        collector,
-      )
-      return raw.parsed(false) as string
     } catch (error) {
       throw toBamlError(error);
     }
@@ -143,8 +143,37 @@ class BamlStreamClient {
   }
 
   
+  DetermineNextStep(
+      thread: BamlChatThread,
+      __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry, collector?: Collector | Collector[] }
+  ): BamlStream<partial_types.Event, Event> {
+    try {
+      const options = { ...this.bamlOptions, ...(__baml_options__ || {}) }
+      const collector = options.collector ? (Array.isArray(options.collector) ? options.collector : [options.collector]) : [];
+      const raw = this.runtime.streamFunction(
+        "DetermineNextStep",
+        {
+          "thread": thread
+        },
+        undefined,
+        this.ctxManager.cloneContext(),
+        options.tb?.__tb(),
+        options.clientRegistry,
+        collector,
+      )
+      return new BamlStream<partial_types.Event, Event>(
+        raw,
+        (a): partial_types.Event => a,
+        (a): Event => a,
+        this.ctxManager.cloneContext(),
+      )
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
   GenerateProjectEstimate(
-      project_assessment: string,
+      files: InputFile[],existing_estimate?: ConstructionProjectData | null,requested_changes?: string | null,
       __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry, collector?: Collector | Collector[] }
   ): BamlStream<partial_types.ConstructionProjectData, ConstructionProjectData> {
     try {
@@ -153,7 +182,7 @@ class BamlStreamClient {
       const raw = this.runtime.streamFunction(
         "GenerateProjectEstimate",
         {
-          "project_assessment": project_assessment
+          "files": files,"existing_estimate": existing_estimate ?? null,"requested_changes": requested_changes ?? null
         },
         undefined,
         this.ctxManager.cloneContext(),
@@ -165,35 +194,6 @@ class BamlStreamClient {
         raw,
         (a): partial_types.ConstructionProjectData => a,
         (a): ConstructionProjectData => a,
-        this.ctxManager.cloneContext(),
-      )
-    } catch (error) {
-      throw toBamlError(error);
-    }
-  }
-  
-  ProcessProjectFiles(
-      project_info: string,files: InputFile[],
-      __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry, collector?: Collector | Collector[] }
-  ): BamlStream<string, string> {
-    try {
-      const options = { ...this.bamlOptions, ...(__baml_options__ || {}) }
-      const collector = options.collector ? (Array.isArray(options.collector) ? options.collector : [options.collector]) : [];
-      const raw = this.runtime.streamFunction(
-        "ProcessProjectFiles",
-        {
-          "project_info": project_info,"files": files
-        },
-        undefined,
-        this.ctxManager.cloneContext(),
-        options.tb?.__tb(),
-        options.clientRegistry,
-        collector,
-      )
-      return new BamlStream<string, string>(
-        raw,
-        (a): string => a,
-        (a): string => a,
         this.ctxManager.cloneContext(),
       )
     } catch (error) {

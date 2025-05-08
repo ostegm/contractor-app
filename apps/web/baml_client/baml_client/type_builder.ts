@@ -27,10 +27,10 @@ export default class TypeBuilder {
     constructor() {
         this.tb = new _TypeBuilder({
           classes: new Set([
-            "ConstructionProjectData","EstimateLineItem","InputFile",
+            "AssisantMessage","BamlChatThread","ConstructionProjectData","EstimateLineItem","Event","InputFile","UpdateEstimateRequest","UpdateEstimateResponse","UserInput",
           ]),
           enums: new Set([
-            
+            "AllowedTypes",
           ]),
           runtime: DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIME
         });

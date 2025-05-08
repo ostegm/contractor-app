@@ -19,7 +19,7 @@ import type { BamlRuntime, BamlCtxManager, ClientRegistry, Image, Audio } from "
 import { toBamlError, HTTPRequest } from "@boundaryml/baml"
 import type { Checked, Check } from "./types"
 import type * as types from "./types"
-import type {ConstructionProjectData, EstimateLineItem, InputFile} from "./types"
+import type {AllowedTypes, AssisantMessage, BamlChatThread, ConstructionProjectData, EstimateLineItem, Event, InputFile, UpdateEstimateRequest, UpdateEstimateResponse, UserInput} from "./types"
 import type TypeBuilder from "./type_builder"
 
 type BamlCallOptions = {
@@ -31,15 +31,15 @@ export class HttpRequest {
   constructor(private runtime: BamlRuntime, private ctxManager: BamlCtxManager) {}
 
   
-  GenerateProjectEstimate(
-      project_assessment: string,
+  DetermineNextStep(
+      thread: BamlChatThread,
       __baml_options__?: BamlCallOptions
   ): HTTPRequest {
     try {
       return this.runtime.buildRequestSync(
-        "GenerateProjectEstimate",
+        "DetermineNextStep",
         {
-          "project_assessment": project_assessment
+          "thread": thread
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),
@@ -51,15 +51,15 @@ export class HttpRequest {
     }
   }
   
-  ProcessProjectFiles(
-      project_info: string,files: InputFile[],
+  GenerateProjectEstimate(
+      files: InputFile[],existing_estimate?: ConstructionProjectData | null,requested_changes?: string | null,
       __baml_options__?: BamlCallOptions
   ): HTTPRequest {
     try {
       return this.runtime.buildRequestSync(
-        "ProcessProjectFiles",
+        "GenerateProjectEstimate",
         {
-          "project_info": project_info,"files": files
+          "files": files,"existing_estimate": existing_estimate?? null,"requested_changes": requested_changes?? null
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),
@@ -77,15 +77,15 @@ export class HttpStreamRequest {
   constructor(private runtime: BamlRuntime, private ctxManager: BamlCtxManager) {}
 
   
-  GenerateProjectEstimate(
-      project_assessment: string,
+  DetermineNextStep(
+      thread: BamlChatThread,
       __baml_options__?: BamlCallOptions
   ): HTTPRequest {
     try {
       return this.runtime.buildRequestSync(
-        "GenerateProjectEstimate",
+        "DetermineNextStep",
         {
-          "project_assessment": project_assessment
+          "thread": thread
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),
@@ -97,15 +97,15 @@ export class HttpStreamRequest {
     }
   }
   
-  ProcessProjectFiles(
-      project_info: string,files: InputFile[],
+  GenerateProjectEstimate(
+      files: InputFile[],existing_estimate?: ConstructionProjectData | null,requested_changes?: string | null,
       __baml_options__?: BamlCallOptions
   ): HTTPRequest {
     try {
       return this.runtime.buildRequestSync(
-        "ProcessProjectFiles",
+        "GenerateProjectEstimate",
         {
-          "project_info": project_info,"files": files
+          "files": files,"existing_estimate": existing_estimate?? null,"requested_changes": requested_changes?? null
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),

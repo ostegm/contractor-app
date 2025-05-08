@@ -21,7 +21,7 @@ import { b } from '../index';
 import type { Check, Checked  } from "../types";
 import type { Image, Audio } from "@boundaryml/baml";
 
-import type {  ConstructionProjectData,  EstimateLineItem,  InputFile } from "../types"
+import type {  AllowedTypes,  AssisantMessage,  BamlChatThread,  ConstructionProjectData,  EstimateLineItem,  Event,  InputFile,  UpdateEstimateRequest,  UpdateEstimateResponse,  UserInput } from "../types"
 
 import type * as types from "../types"
 
@@ -30,40 +30,43 @@ import type * as types from "../types"
  */
 
 /**
+ * Executes the "DetermineNextStep" BAML action.
+ *
+ * This server action calls the underlying BAML function "DetermineNextStep"
+ * with the specified parameters.
+ *
+ * @param { BamlChatThread } thread - Input parameter.
+ *
+ * @returns {Promise<Event>} A promise that resolves with the result of the action.
+ */
+export const DetermineNextStep = async (
+  thread: BamlChatThread,
+): Promise<Event> => {
+  return b.DetermineNextStep(
+    thread,
+  );
+};
+
+/**
  * Executes the "GenerateProjectEstimate" BAML action.
  *
  * This server action calls the underlying BAML function "GenerateProjectEstimate"
  * with the specified parameters.
  *
- * @param { string } project_assessment - Input parameter.
+ * @param { InputFile[] } files - Input parameter.
+ * @param { ConstructionProjectData | null } existing_estimate (optional) - Input parameter.
+ * @param { string | null } requested_changes (optional) - Input parameter.
  *
  * @returns {Promise<ConstructionProjectData>} A promise that resolves with the result of the action.
  */
 export const GenerateProjectEstimate = async (
-  project_assessment: string,
+  files: InputFile[],
+  existing_estimate?: ConstructionProjectData | null,
+  requested_changes?: string | null,
 ): Promise<ConstructionProjectData> => {
   return b.GenerateProjectEstimate(
-    project_assessment,
-  );
-};
-
-/**
- * Executes the "ProcessProjectFiles" BAML action.
- *
- * This server action calls the underlying BAML function "ProcessProjectFiles"
- * with the specified parameters.
- *
- * @param { string } project_info - Input parameter.
- * @param { InputFile[] } files - Input parameter.
- *
- * @returns {Promise<string>} A promise that resolves with the result of the action.
- */
-export const ProcessProjectFiles = async (
-  project_info: string,
-  files: InputFile[],
-): Promise<string> => {
-  return b.ProcessProjectFiles(
-    project_info,
     files,
+    existing_estimate,
+    requested_changes,
   );
 };

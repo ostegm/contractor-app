@@ -100,9 +100,36 @@ class BamlAsyncClient:
       return self.__llm_stream_parser
 
     
+    async def DetermineNextStep(
+        self,
+        thread: types.BamlChatThread,
+        baml_options: BamlCallOptions = {},
+    ) -> types.Event:
+      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
+
+      __tb__ = options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = options.get("client_registry", None)
+      collector = options.get("collector", None)
+      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
+      raw = await self.__runtime.call_function(
+        "DetermineNextStep",
+        {
+          "thread": thread,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        collectors,
+      )
+      return cast(types.Event, raw.cast_to(types, types, partial_types, False))
+    
     async def GenerateProjectEstimate(
         self,
-        project_assessment: str,
+        files: List[types.InputFile],existing_estimate: Optional[types.ConstructionProjectData],requested_changes: Optional[str],
         baml_options: BamlCallOptions = {},
     ) -> types.ConstructionProjectData:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -118,7 +145,7 @@ class BamlAsyncClient:
       raw = await self.__runtime.call_function(
         "GenerateProjectEstimate",
         {
-          "project_assessment": project_assessment,
+          "files": files,"existing_estimate": existing_estimate,"requested_changes": requested_changes,
         },
         self.__ctx_manager.get(),
         tb,
@@ -126,33 +153,6 @@ class BamlAsyncClient:
         collectors,
       )
       return cast(types.ConstructionProjectData, raw.cast_to(types, types, partial_types, False))
-    
-    async def ProcessProjectFiles(
-        self,
-        project_info: str,files: List[types.InputFile],
-        baml_options: BamlCallOptions = {},
-    ) -> str:
-      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
-
-      __tb__ = options.get("tb", None)
-      if __tb__ is not None:
-        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
-      else:
-        tb = None
-      __cr__ = options.get("client_registry", None)
-      collector = options.get("collector", None)
-      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
-      raw = await self.__runtime.call_function(
-        "ProcessProjectFiles",
-        {
-          "project_info": project_info,"files": files,
-        },
-        self.__ctx_manager.get(),
-        tb,
-        __cr__,
-        collectors,
-      )
-      return cast(str, raw.cast_to(types, types, partial_types, False))
     
 
 
@@ -166,9 +166,42 @@ class BamlStreamClient:
       self.__baml_options = baml_options or {}
 
     
+    def DetermineNextStep(
+        self,
+        thread: types.BamlChatThread,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.BamlStream[partial_types.Event, types.Event]:
+      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
+      __tb__ = options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = options.get("client_registry", None)
+      collector = options.get("collector", None)
+      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
+      raw = self.__runtime.stream_function(
+        "DetermineNextStep",
+        {
+          "thread": thread,
+        },
+        None,
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        collectors,
+      )
+
+      return baml_py.BamlStream[partial_types.Event, types.Event](
+        raw,
+        lambda x: cast(partial_types.Event, x.cast_to(types, types, partial_types, True)),
+        lambda x: cast(types.Event, x.cast_to(types, types, partial_types, False)),
+        self.__ctx_manager.get(),
+      )
+    
     def GenerateProjectEstimate(
         self,
-        project_assessment: str,
+        files: List[types.InputFile],existing_estimate: Optional[types.ConstructionProjectData],requested_changes: Optional[str],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.BamlStream[partial_types.ConstructionProjectData, types.ConstructionProjectData]:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -183,7 +216,9 @@ class BamlStreamClient:
       raw = self.__runtime.stream_function(
         "GenerateProjectEstimate",
         {
-          "project_assessment": project_assessment,
+          "files": files,
+          "existing_estimate": existing_estimate,
+          "requested_changes": requested_changes,
         },
         None,
         self.__ctx_manager.get(),
@@ -196,40 +231,6 @@ class BamlStreamClient:
         raw,
         lambda x: cast(partial_types.ConstructionProjectData, x.cast_to(types, types, partial_types, True)),
         lambda x: cast(types.ConstructionProjectData, x.cast_to(types, types, partial_types, False)),
-        self.__ctx_manager.get(),
-      )
-    
-    def ProcessProjectFiles(
-        self,
-        project_info: str,files: List[types.InputFile],
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.BamlStream[Optional[str], str]:
-      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
-      __tb__ = options.get("tb", None)
-      if __tb__ is not None:
-        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
-      else:
-        tb = None
-      __cr__ = options.get("client_registry", None)
-      collector = options.get("collector", None)
-      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
-      raw = self.__runtime.stream_function(
-        "ProcessProjectFiles",
-        {
-          "project_info": project_info,
-          "files": files,
-        },
-        None,
-        self.__ctx_manager.get(),
-        tb,
-        __cr__,
-        collectors,
-      )
-
-      return baml_py.BamlStream[Optional[str], str](
-        raw,
-        lambda x: cast(Optional[str], x.cast_to(types, types, partial_types, True)),
-        lambda x: cast(str, x.cast_to(types, types, partial_types, False)),
         self.__ctx_manager.get(),
       )
     

@@ -356,11 +356,63 @@ function useBamlAction<FunctionName extends FunctionNames>(
   } satisfies HookOutput<FunctionName, { stream: typeof props.stream }>
 }
 /**
+ * A specialized hook for the DetermineNextStep BAML function that supports both streaming and non‑streaming responses.
+ *
+ * **Input Types:**
+ *
+ * - thread: BamlChatThread
+ *
+ *
+ * **Return Type:**
+ * - **Non‑streaming:** Event
+ * - **Streaming Partial:** partial_types.Event
+ * - **Streaming Final:** Event
+ *
+ * **Usage Patterns:**
+ * 1. **Non‑streaming (Default)**
+ *    - Best for quick responses and simple UI updates.
+ * 2. **Streaming**
+ *    - Ideal for long‑running operations or real‑time feedback.
+ *
+ * **Edge Cases:**
+ * - Ensure robust error handling via `onError`.
+ * - Handle cases where partial data may be incomplete or missing.
+ *
+ * @example
+ * ```tsx
+ * // Basic non‑streaming usage:
+ * const { data, error, isLoading, mutate } = useDetermineNextStep({ stream: false});
+ *
+ * // Streaming usage:
+ * const { data, streamData, isLoading, error, mutate } = useDetermineNextStep({
+ *   stream: true | undefined,
+ *   onStreamData: (partial) => console.log('Partial update:', partial),
+ *   onFinalData: (final) => console.log('Final result:', final),
+ *   onError: (err) => console.error('Error:', err),
+ * });
+ * ```
+ */
+export function useDetermineNextStep(props: HookInput<'DetermineNextStep', { stream: false }>): HookOutput<'DetermineNextStep', { stream: false }>
+export function useDetermineNextStep(props?: HookInput<'DetermineNextStep', { stream?: true }>): HookOutput<'DetermineNextStep', { stream: true }>
+export function useDetermineNextStep(
+  props: HookInput<'DetermineNextStep', { stream?: boolean }> = {},
+): HookOutput<'DetermineNextStep', { stream: true }> | HookOutput<'DetermineNextStep', { stream: false }> {
+  let action = Actions.DetermineNextStep;
+  if (isStreamingProps(props)) {
+    action = StreamingActions.DetermineNextStep;
+  }
+  return useBamlAction(action, props)
+}
+/**
  * A specialized hook for the GenerateProjectEstimate BAML function that supports both streaming and non‑streaming responses.
  *
  * **Input Types:**
  *
- * - project_assessment: string
+ * - files: InputFile[]
+ *
+ * - existing_estimate (optional): ConstructionProjectData | null
+ *
+ * - requested_changes (optional): string | null
  *
  *
  * **Return Type:**
@@ -400,56 +452,6 @@ export function useGenerateProjectEstimate(
   let action = Actions.GenerateProjectEstimate;
   if (isStreamingProps(props)) {
     action = StreamingActions.GenerateProjectEstimate;
-  }
-  return useBamlAction(action, props)
-}
-/**
- * A specialized hook for the ProcessProjectFiles BAML function that supports both streaming and non‑streaming responses.
- *
- * **Input Types:**
- *
- * - project_info: string
- *
- * - files: InputFile[]
- *
- *
- * **Return Type:**
- * - **Non‑streaming:** string
- * - **Streaming Partial:** string
- * - **Streaming Final:** string
- *
- * **Usage Patterns:**
- * 1. **Non‑streaming (Default)**
- *    - Best for quick responses and simple UI updates.
- * 2. **Streaming**
- *    - Ideal for long‑running operations or real‑time feedback.
- *
- * **Edge Cases:**
- * - Ensure robust error handling via `onError`.
- * - Handle cases where partial data may be incomplete or missing.
- *
- * @example
- * ```tsx
- * // Basic non‑streaming usage:
- * const { data, error, isLoading, mutate } = useProcessProjectFiles({ stream: false});
- *
- * // Streaming usage:
- * const { data, streamData, isLoading, error, mutate } = useProcessProjectFiles({
- *   stream: true | undefined,
- *   onStreamData: (partial) => console.log('Partial update:', partial),
- *   onFinalData: (final) => console.log('Final result:', final),
- *   onError: (err) => console.error('Error:', err),
- * });
- * ```
- */
-export function useProcessProjectFiles(props: HookInput<'ProcessProjectFiles', { stream: false }>): HookOutput<'ProcessProjectFiles', { stream: false }>
-export function useProcessProjectFiles(props?: HookInput<'ProcessProjectFiles', { stream?: true }>): HookOutput<'ProcessProjectFiles', { stream: true }>
-export function useProcessProjectFiles(
-  props: HookInput<'ProcessProjectFiles', { stream?: boolean }> = {},
-): HookOutput<'ProcessProjectFiles', { stream: true }> | HookOutput<'ProcessProjectFiles', { stream: false }> {
-  let action = Actions.ProcessProjectFiles;
-  if (isStreamingProps(props)) {
-    action = StreamingActions.ProcessProjectFiles;
   }
   return useBamlAction(action, props)
 }

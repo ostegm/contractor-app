@@ -46,6 +46,23 @@ export function all_succeeded<CheckName extends string>(checks: Record<CheckName
 export function get_checks<CheckName extends string>(checks: Record<CheckName, Check>): Check[] {
     return Object.values(checks)
 }
+export enum AllowedTypes {
+  UserInput = "UserInput",
+  AssisantMessage = "AssisantMessage",
+  UpdateEstimateRequest = "UpdateEstimateRequest",
+  UpdateEstimateResponse = "UpdateEstimateResponse",
+}
+
+export interface AssisantMessage {
+  message: string
+  
+}
+
+export interface BamlChatThread {
+  events: Event[]
+  
+}
+
 export interface ConstructionProjectData {
   project_description: string
   estimated_total_min?: number | null
@@ -74,6 +91,12 @@ export interface EstimateLineItem {
   
 }
 
+export interface Event {
+  type: AllowedTypes
+  data: UserInput | AssisantMessage | UpdateEstimateRequest | UpdateEstimateResponse
+  
+}
+
 export interface InputFile {
   name: string
   type: string
@@ -81,5 +104,19 @@ export interface InputFile {
   content?: string | null
   download_url?: string | null
   image_data?: Image | null
+  
+}
+
+export interface UpdateEstimateRequest {
+  changes_to_make: string
+  
+}
+
+export interface UpdateEstimateResponse {
+  
+}
+
+export interface UserInput {
+  message: string
   
 }

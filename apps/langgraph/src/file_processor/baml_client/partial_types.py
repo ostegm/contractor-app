@@ -35,6 +35,12 @@ class StreamState(BaseModel, Generic[T]):
     state: Literal["Pending", "Incomplete", "Complete"]
 
 
+class AssisantMessage(BaseModel):
+    message: Optional[str] = None
+
+class BamlChatThread(BaseModel):
+    events: List["Event"]
+
 class ConstructionProjectData(BaseModel):
     project_description: Optional[str] = None
     estimated_total_min: Optional[float] = None
@@ -59,6 +65,10 @@ class EstimateLineItem(BaseModel):
     confidence_score: Optional[str] = None
     notes: Optional[str] = None
 
+class Event(BaseModel):
+    type: Optional[types.AllowedTypes] = None
+    data: Optional[Union["UserInput", "AssisantMessage", "UpdateEstimateRequest", "UpdateEstimateResponse"]] = None
+
 class InputFile(BaseModel):
     name: Optional[str] = None
     type: Optional[str] = None
@@ -66,3 +76,11 @@ class InputFile(BaseModel):
     content: Optional[str] = None
     download_url: Optional[str] = None
     image_data: Optional[baml_py.Image] = None
+
+class UpdateEstimateRequest(BaseModel):
+    changes_to_make: Optional[str] = None
+
+class UpdateEstimateResponse(BaseModel):pass
+
+class UserInput(BaseModel):
+    message: Optional[str] = None

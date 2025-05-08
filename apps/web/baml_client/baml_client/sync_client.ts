@@ -19,7 +19,7 @@ import type { BamlRuntime, FunctionResult, BamlCtxManager, Image, Audio, ClientR
 import { toBamlError, type HTTPRequest } from "@boundaryml/baml"
 import type { Checked, Check, RecursivePartialNull as MovedRecursivePartialNull } from "./types"
 import type * as types from "./types"
-import type {ConstructionProjectData, EstimateLineItem, InputFile} from "./types"
+import type {AllowedTypes, AssisantMessage, BamlChatThread, ConstructionProjectData, EstimateLineItem, Event, InputFile, UpdateEstimateRequest, UpdateEstimateResponse, UserInput} from "./types"
 import type TypeBuilder from "./type_builder"
 import { HttpRequest, HttpStreamRequest } from "./sync_request"
 import { LlmResponseParser, LlmStreamParser } from "./parser"
@@ -85,8 +85,31 @@ export class BamlSyncClient {
   }
 
   
+  DetermineNextStep(
+      thread: BamlChatThread,
+      __baml_options__?: BamlCallOptions
+  ): Event {
+    try {
+      const options = { ...this.bamlOptions, ...(__baml_options__ || {}) }
+      const collector = options.collector ? (Array.isArray(options.collector) ? options.collector : [options.collector]) : [];
+      const raw = this.runtime.callFunctionSync(
+        "DetermineNextStep",
+        {
+          "thread": thread
+        },
+        this.ctxManager.cloneContext(),
+        options.tb?.__tb(),
+        options.clientRegistry,
+        collector,
+      )
+      return raw.parsed(false) as Event
+    } catch (error: any) {
+      throw toBamlError(error);
+    }
+  }
+  
   GenerateProjectEstimate(
-      project_assessment: string,
+      files: InputFile[],existing_estimate?: ConstructionProjectData | null,requested_changes?: string | null,
       __baml_options__?: BamlCallOptions
   ): ConstructionProjectData {
     try {
@@ -95,7 +118,7 @@ export class BamlSyncClient {
       const raw = this.runtime.callFunctionSync(
         "GenerateProjectEstimate",
         {
-          "project_assessment": project_assessment
+          "files": files,"existing_estimate": existing_estimate?? null,"requested_changes": requested_changes?? null
         },
         this.ctxManager.cloneContext(),
         options.tb?.__tb(),
@@ -103,29 +126,6 @@ export class BamlSyncClient {
         collector,
       )
       return raw.parsed(false) as ConstructionProjectData
-    } catch (error: any) {
-      throw toBamlError(error);
-    }
-  }
-  
-  ProcessProjectFiles(
-      project_info: string,files: InputFile[],
-      __baml_options__?: BamlCallOptions
-  ): string {
-    try {
-      const options = { ...this.bamlOptions, ...(__baml_options__ || {}) }
-      const collector = options.collector ? (Array.isArray(options.collector) ? options.collector : [options.collector]) : [];
-      const raw = this.runtime.callFunctionSync(
-        "ProcessProjectFiles",
-        {
-          "project_info": project_info,"files": files
-        },
-        this.ctxManager.cloneContext(),
-        options.tb?.__tb(),
-        options.clientRegistry,
-        collector,
-      )
-      return raw.parsed(false) as string
     } catch (error: any) {
       throw toBamlError(error);
     }

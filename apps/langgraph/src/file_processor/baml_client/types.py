@@ -40,6 +40,19 @@ def all_succeeded(checks: Dict[CheckName, Check]) -> bool:
 
 
 
+class AllowedTypes(str, Enum):
+    
+    UserInput = "UserInput"
+    AssisantMessage = "AssisantMessage"
+    UpdateEstimateRequest = "UpdateEstimateRequest"
+    UpdateEstimateResponse = "UpdateEstimateResponse"
+
+class AssisantMessage(BaseModel):
+    message: str
+
+class BamlChatThread(BaseModel):
+    events: List["Event"]
+
 class ConstructionProjectData(BaseModel):
     project_description: str
     estimated_total_min: Optional[float] = None
@@ -64,6 +77,10 @@ class EstimateLineItem(BaseModel):
     confidence_score: Optional[str] = None
     notes: Optional[str] = None
 
+class Event(BaseModel):
+    type: "AllowedTypes"
+    data: Union["UserInput", "AssisantMessage", "UpdateEstimateRequest", "UpdateEstimateResponse"]
+
 class InputFile(BaseModel):
     name: str
     type: str
@@ -71,3 +88,11 @@ class InputFile(BaseModel):
     content: Optional[str] = None
     download_url: Optional[str] = None
     image_data: Optional[baml_py.Image] = None
+
+class UpdateEstimateRequest(BaseModel):
+    changes_to_make: str
+
+class UpdateEstimateResponse(BaseModel):pass
+
+class UserInput(BaseModel):
+    message: str
