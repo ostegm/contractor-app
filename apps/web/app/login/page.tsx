@@ -9,7 +9,11 @@ export const metadata: Metadata = {
   description: "Login to your account",
 };
 
-export default function LoginPage() {
+export default function LoginPage({ searchParams }: { searchParams: { error?: string } }) {
+  const errorMessage = searchParams.error === 'AuthenticationFailed'
+    ? "Invalid email or password. Please try again."
+    : null;
+
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8 rounded-lg bg-gray-800 p-8 shadow-xl border border-gray-700">
@@ -20,6 +24,12 @@ export default function LoginPage() {
           </h2>
         </div>
         
+        {errorMessage && (
+          <div className="rounded-md bg-red-900/30 border border-red-500/50 p-3 text-center">
+            <p className="text-sm text-red-400">{errorMessage}</p>
+          </div>
+        )}
+
         <form className="space-y-6">
           <div className="space-y-4">
             <div className="space-y-2">
