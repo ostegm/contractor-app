@@ -1,17 +1,18 @@
 "use client"
 
 import React, { useState, useEffect, use, useCallback } from "react"
+import { useView } from "../../app-client-shell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Trash2, Upload, File, ArrowLeft, FileText, Play, ChevronDown, ChevronRight, StickyNote, Download, RefreshCw } from "lucide-react"
+import { Trash2, Upload, File, ArrowLeft, FileText, Play, ChevronDown, ChevronRight, StickyNote, Download, RefreshCw, LayoutDashboard, FolderOpen, TriangleAlert } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { uploadFile, clearProjectInfo, clearProjectEstimate, startEstimateGeneration, checkEstimateStatus } from "./actions"
 import { ConstructionProjectData, InputFile, EstimateLineItem } from "@/baml_client/baml_client/types"
 import { toast } from "sonner"
 import Link from "next/link"
 import ReactMarkdown from "react-markdown"
-import * as DialogPrimitive from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import Image from "next/image"
 
@@ -44,11 +45,12 @@ interface Project {
 
 export default function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const { currentProjectView } = useView()
   const [chatMessages, setChatMessages] = useState<string[]>([])
   const [newMessage, setNewMessage] = useState("")
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [isUploading, setIsUploading] = useState(false)
-  const [isProcessing] = useState(false)
+  const [isProcessingState, setIsProcessingState] = useState(false)
   const [estimateStatus, setEstimateStatus] = useState<'not_started' | 'processing' | 'completed' | 'failed'>('not_started')
   const [estimateError, setEstimateError] = useState<string | null>(null)
   const [projectInfo, setProjectInfo] = useState<string>("")
@@ -528,688 +530,448 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-128px)]">
+        <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
+        <p className="ml-2 text-lg">Loading project data...</p>
+      </div>
+    );
+  }
+
+  // Main component render
   return (
-    <div className="max-w-6xl mx-auto">
-      <div className="flex flex-col">
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center min-h-[60vh]">
-            <div className="animate-spin text-blue-500 mb-4">
-              <RefreshCw className="h-12 w-12" />
-            </div>
-            <h2 className="text-xl font-semibold text-gray-300">Loading project data...</h2>
-          </div>
-        ) : (
-          <>
-            {/* Project header */}
-            <div className="flex justify-between items-center mb-8">
-              <div>
-                <div className="flex items-center mb-2">
-                  <Link 
-                    href="/dashboard" 
-                    className="text-gray-400 hover:text-blue-400 mr-2"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                  </Link>
-                  <h1 className="text-2xl font-bold">{project?.name || 'Project Details'}</h1>
-                </div>
-                {project && (
-                  <p className="text-gray-400 text-sm">{project.description}</p>
-                )}
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <Button 
-                  onClick={handleGenerateEstimate} 
-                  className={`${isEstimateOutdated ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700'} flex items-center gap-2`}
-                  disabled={estimateStatus === 'processing' || uploadedFiles.length === 0}
-                >
-                  {estimateStatus === 'processing' && (
-                    <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
-                  )}
-                  {isEstimateOutdated && estimateStatus !== 'processing' && (
-                    <RefreshCw className="h-4 w-4 mr-1" />
-                  )}
-                  {!isEstimateOutdated && estimateStatus !== 'processing' && (
-                    <Play className="h-4 w-4 mr-1" />
-                  )}
-                  {estimateStatus === 'processing' ? 'Processing...' : 
-                   isEstimateOutdated ? 'Regenerate Estimate' : 'Generate Estimate'}
-                </Button>
-              </div>
-            </div>
-
-            {/* Main content */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Left sidebar - File Management */}
-              <div className="md:col-span-1">
-                <div className="bg-gray-800 rounded-lg p-5 border border-gray-700 mb-6">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-lg font-semibold">Files</h2>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-gray-600 text-gray-300 hover:bg-gray-700"
-                        onClick={() => setNoteDialogOpen(true)}
-                      >
-                        <StickyNote className="h-3.5 w-3.5 mr-1" />
-                        Note
-                      </Button>
-                      <Input 
-                        type="file" 
-                        onChange={handleFileSelect} 
-                        className="hidden"
-                        id="file-upload"
-                        disabled={isUploading}
-                      />
-                      <Button 
-                        size="sm"
-                        variant="outline"
-                        className="border-gray-600 text-gray-300 hover:bg-gray-700" 
-                        disabled={isUploading}
-                        onClick={() => {
-                          const fileInput = document.getElementById('file-upload');
-                          if (fileInput) {
-                            fileInput.click();
-                          }
-                        }}
-                      >
-                        {isUploading ? (
-                          <span className="animate-spin">⟳</span>
-                        ) : (
-                          <Upload className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-                    {uploadedFiles.length === 0 ? (
-                      <div className="text-gray-400 text-center py-8 border border-dashed border-gray-700 rounded-lg">
-                        <p className="text-sm mb-2">No files yet</p>
-                        <p className="text-xs">Upload files or add notes to get started</p>
-                      </div>
-                    ) : (
-                      uploadedFiles.map((file) => (
-                        <div key={file.id} className="flex items-center justify-between bg-gray-700/30 hover:bg-gray-700/50 p-3 rounded">
-                          <div className="flex items-center overflow-hidden">
-                            {isMarkdownFile(file.file_name) && file.description === 'Project note' ? (
-                              <StickyNote className="mr-2 h-4 w-4 text-yellow-400 flex-shrink-0" />
-                            ) : (
-                              <File className="mr-2 h-4 w-4 text-blue-400 flex-shrink-0" />
-                            )}
-                            <button 
-                              onClick={(e) => handleFileClick(file, e)}
-                              className="text-gray-200 hover:text-blue-400 bg-transparent border-0 p-0 cursor-pointer truncate"
-                            >
-                              {file.file_name}
-                            </button>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteFile(file.id)}
-                            className="text-red-400 hover:text-red-300 hover:bg-red-900/20 ml-1 p-0 h-auto"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                {/* Project Info */}
-                {projectInfo && (
-                  <div className="bg-gray-800 rounded-lg p-5 border border-gray-700 mb-6">
-                    <div className="flex justify-between items-center mb-4">
-                      <h2 className="text-lg font-semibold">Project Overview</h2>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleClearProjectInfo}
-                        className="text-gray-400 hover:text-red-400 p-0 h-auto"
-                      >
-                        <RefreshCw className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                    <div className="prose prose-invert max-w-none prose-sm max-h-[300px] overflow-y-auto pr-1">
-                      <CollapsibleMarkdown content={projectInfo} />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Right content - AI Estimate */}
-              <div className="md:col-span-2 relative">
-                {(isProcessing || estimateStatus === 'processing') && (
-                  <div className="absolute inset-0 bg-gray-900/70 z-10 flex flex-col items-center justify-center rounded-lg">
-                    <div className="animate-spin text-blue-500 mb-4">
-                      <RefreshCw className="h-12 w-12" />
-                    </div>
-                    <h2 className="text-xl font-semibold text-gray-300 mb-2">Generating Estimate</h2>
-                    <p className="text-gray-400 text-sm max-w-md text-center">
-                      Analyzing your files and creating a detailed construction estimate. This may take a minute...
-                    </p>
-                  </div>
-                )}
-                
-                {estimateStatus === 'failed' && estimateError && (
-                  <div className="absolute inset-0 bg-gray-900/70 z-10 flex flex-col items-center justify-center rounded-lg">
-                    <div className="text-red-500 mb-4">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                    </div>
-                    <h2 className="text-xl font-semibold text-gray-300 mb-2">Estimate Generation Failed</h2>
-                    <p className="text-red-400 text-sm max-w-md text-center mb-4">
-                      {estimateError}
-                    </p>
-                    <Button
-                      onClick={() => {
-                        setEstimateStatus('not_started');
-                        setEstimateError(null);
-                      }}
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
-                      Try Again
-                    </Button>
-                  </div>
-                )}
-                
-                {aiEstimate ? (
-                  <div className="space-y-5">
-                    {isEstimateOutdated && (
-                      <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 flex items-center">
-                        <RefreshCw className="h-5 w-5 text-yellow-400 mr-3 animate-spin" />
-                        <div>
-                          <h3 className="text-yellow-400 font-medium">Estimate may be outdated</h3>
-                          <p className="text-gray-300 text-sm">Files have been added or removed since this estimate was generated. Click &quot;Regenerate Estimate&quot; above to update.</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Estimate Overview */}
-                    <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
-                      <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-lg font-semibold">Estimate Overview</h2>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleClearProjectEstimate}
-                          className="text-gray-400 hover:text-red-400 p-0 h-auto"
-                        >
-                          <RefreshCw className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4 mb-5">
-                        <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
-                          <h4 className="text-sm font-medium text-gray-400 mb-1">Estimated Cost Range</h4>
-                          <p className="text-xl font-bold text-green-400">
-                            ${aiEstimate.estimated_total_min?.toLocaleString() ?? 'N/A'} - ${aiEstimate.estimated_total_max?.toLocaleString() ?? 'N/A'}
-                          </p>
-                        </div>
-                        <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
-                          <h4 className="text-sm font-medium text-gray-400 mb-1">Estimated Timeline</h4>
-                          <p className="text-xl font-bold text-blue-400">
-                            {aiEstimate.estimated_timeline_days ? `${aiEstimate.estimated_timeline_days} days` : 'Not specified'}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mb-4">
-                        <h3 className="text-sm font-medium text-gray-400 mb-2">Project Description</h3>
-                        <p className="text-gray-300 bg-gray-900/30 p-3 rounded-lg border border-gray-700 text-sm">
-                          {aiEstimate.project_description}
-                        </p>
-                      </div>
-                      
-                      <div className="mb-4">
-                        <h3 className="text-sm font-medium text-gray-400 mb-2">Key Considerations</h3>
-                        <ul className="space-y-1 text-sm">
-                          {aiEstimate.key_considerations?.length > 0 ? (
-                            aiEstimate.key_considerations.map((consideration: string | null, index: number) => (
-                              <li key={index} className="text-gray-300 flex">
-                                <span className="text-blue-400 mr-2">•</span> {consideration}
-                              </li>
-                            ))
-                          ) : (
-                            <li className="text-gray-500">No key considerations provided</li>
-                          )}
-                        </ul>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <h3 className="text-sm font-medium text-gray-400 mb-2">Confidence Level</h3>
-                          <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                            ${aiEstimate.confidence_level.includes('High') ? 'bg-green-900/50 text-green-400' : 
-                              aiEstimate.confidence_level.includes('Medium') ? 'bg-yellow-900/50 text-yellow-400' : 
-                              'bg-red-900/50 text-red-400'}`}>
-                            {aiEstimate.confidence_level}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Estimate Details */}
-                    <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
-                      <h2 className="text-lg font-semibold mb-4">Estimate Details</h2>
-                      
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-gray-700">
-                              <th className="text-left pb-3 text-gray-400 font-medium">Item</th>
-                              <th className="text-left pb-3 text-gray-400 font-medium">Category</th>
-                              <th className="text-right pb-3 text-gray-400 font-medium">Quantity</th>
-                              <th className="text-right pb-3 text-gray-400 font-medium">Cost Range</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-800">
-                            {aiEstimate.estimate_items?.length > 0 ? (
-                              aiEstimate.estimate_items.map((item: EstimateLineItem, index: number) => (
-                                <tr key={index} className="hover:bg-gray-700/20">
-                                  <td className="py-3 pr-4">
-                                    <div className="font-medium text-gray-200">{item.description}</div>
-                                    {item.notes && (
-                                      <div className="text-xs text-gray-400 mt-1">{item.notes}</div>
-                                    )}
-                                  </td>
-                                  <td className="py-3 text-gray-400">
-                                    {item.category}
-                                    {item.subcategory && (
-                                      <span className="text-xs block text-gray-500">{item.subcategory}</span>
-                                    )}
-                                  </td>
-                                  <td className="py-3 text-right text-gray-300">
-                                    {item.quantity ? `${item.quantity} ${item.unit || ''}` : '-'}
-                                  </td>
-                                  <td className="py-3 text-right font-medium text-green-400">
-                                    ${item.cost_range_min.toLocaleString()} - ${item.cost_range_max.toLocaleString()}
-                                  </td>
-                                </tr>
-                              ))
-                            ) : (
-                              <tr>
-                                <td colSpan={4} className="py-4 text-center text-gray-500">
-                                  No estimate items available
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                          <tfoot>
-                            <tr className="border-t border-gray-700">
-                              <td colSpan={3} className="py-3 text-right font-medium">Total Estimate</td>
-                              <td className="py-3 text-right font-bold text-green-400">
-                                ${aiEstimate.estimated_total_min?.toLocaleString() ?? 'N/A'} - ${aiEstimate.estimated_total_max?.toLocaleString() ?? 'N/A'}
-                              </td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    </div>
-
-                    {/* Next Steps and Risks */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                      <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
-                        <h2 className="text-lg font-semibold mb-3">Next Steps</h2>
-                        <ul className="space-y-2">
-                          {aiEstimate.next_steps?.length > 0 ? (
-                            aiEstimate.next_steps.map((step: string | null, index: number) => (
-                              <li key={index} className="flex items-start text-sm">
-                                <span className="mr-2 mt-0.5 text-blue-400">{index + 1}.</span>
-                                <span className="text-gray-300">{step}</span>
-                              </li>
-                            ))
-                          ) : (
-                            <li className="text-gray-500">No next steps provided</li>
-                          )}
-                        </ul>
-                      </div>
-                      
-                      <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
-                        <h2 className="text-lg font-semibold mb-3">Key Risks</h2>
-                        <ul className="space-y-2">
-                          {aiEstimate.key_risks?.length > 0 ? (
-                            aiEstimate.key_risks.map((risk: string | null, index: number) => (
-                              <li key={index} className="flex items-start text-sm">
-                                <span className="mr-2 mt-0.5 text-red-400">•</span>
-                                <span className="text-gray-300">{risk}</span>
-                              </li>
-                            ))
-                          ) : (
-                            <li className="text-gray-500">No key risks identified</li>
-                          )}
-                        </ul>
-                      </div>
-                      
-                      <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
-                        <h2 className="text-lg font-semibold mb-3 flex items-center">
-                          <span>Missing Information</span>
-                          {aiEstimate.missing_information?.length > 0 && (
-                            <span className="ml-2 bg-yellow-900/50 text-yellow-400 text-xs px-2 py-0.5 rounded-full">
-                              {aiEstimate.missing_information.length} items
-                            </span>
-                          )}
-                        </h2>
-                        <ul className="space-y-2">
-                          {aiEstimate.missing_information?.length > 0 ? (
-                            aiEstimate.missing_information.map((item: string | null, index: number) => (
-                              <li key={index} className="flex items-start text-sm">
-                                <span className="mr-2 mt-0.5 text-yellow-400">•</span>
-                                <span className="text-gray-300">{item}</span>
-                              </li>
-                            ))
-                          ) : (
-                            <li className="text-gray-500">No missing information identified</li>
-                          )}
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-gray-800 rounded-lg p-8 border border-gray-700 border-dashed text-center">
-                    <div className="mb-4">
-                      <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-900/20 mb-4">
-                        <FileText className="h-6 w-6 text-blue-400" />
-                      </div>
-                      <h2 className="text-xl font-semibold mb-2">No Estimate Generated Yet</h2>
-                      <p className="text-gray-400 mb-6 max-w-md mx-auto">
-                        Upload your project files and click &quot;Generate Estimate&quot; to create a detailed construction cost estimate.
-                      </p>
-                    </div>
-                    
-                    <div className="flex justify-center">
-                      <Button 
-                        onClick={handleGenerateEstimate} 
-                        className={`${isEstimateOutdated ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700'} flex items-center gap-2`}
-                        disabled={estimateStatus === 'processing' || uploadedFiles.length === 0}
-                      >
-                        {estimateStatus === 'processing' && (
-                          <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
-                        )}
-                        {isEstimateOutdated && estimateStatus !== 'processing' && (
-                          <RefreshCw className="h-4 w-4 mr-1" />
-                        )}
-                        {!isEstimateOutdated && estimateStatus !== 'processing' && (
-                          <Play className="h-4 w-4 mr-1" />
-                        )}
-                        {estimateStatus === 'processing' ? 'Processing...' : 
-                         isEstimateOutdated ? 'Regenerate Estimate' : 'Generate Estimate'}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Future work: Chat section - currently hidden */}
-            <div className="hidden">
-              <h3 className="text-xl font-semibold mb-2 text-gray-200">Project Chat</h3>
-              <div className="border border-gray-700 rounded-lg p-4 h-64 overflow-y-auto mb-4 bg-gray-800">
-                {chatMessages.map((message, index) => (
-                  <p key={index} className="mb-2 text-gray-300">
-                    {message}
-                  </p>
-                ))}
-              </div>
-              <form onSubmit={handleSendMessage} className="flex gap-2">
-                <Textarea
-                  value={newMessage}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNewMessage(e.target.value)}
-                  placeholder="Type your message here..."
-                  className="flex-grow bg-gray-700 text-white border-gray-600"
-                />
-                <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-                  Send
-                </Button>
-              </form>
-            </div>
-          </>
-        )}
+    <div className="container mx-auto p-0 md:p-4 max-w-none">
+      {/* Top Bar Controls - Include Project Name and Generate Estimate Button */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div className="flex items-center">
+          <Link href="/dashboard" className="mr-4 p-2 rounded-md hover:bg-gray-700">
+            <ArrowLeft className="h-6 w-6" />
+          </Link>
+          <h1 className="text-3xl font-bold text-white">{project?.name || "Project Details"}</h1>
+        </div>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full md:w-auto">
+          <Button 
+            onClick={handleGenerateEstimate} 
+            disabled={estimateStatus === 'processing' || uploadedFiles.length === 0}
+            className={`w-full sm:w-auto text-white transition-all duration-150 ease-in-out transform active:scale-95 flex items-center justify-center py-3 px-6 rounded-lg shadow-md whitespace-nowrap ${isEstimateOutdated ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700'}`}
+          >
+            {estimateStatus === 'processing' ? (
+              <><RefreshCw className="mr-2 h-5 w-5 animate-spin" />Processing...</>
+            ) : isEstimateOutdated ? (
+              <><RefreshCw className="mr-2 h-5 w-5" />Regenerate Estimate</>
+            ) : (
+              <><Play className="mr-2 h-5 w-5" />Generate Estimate</>
+            )}
+          </Button>
+        </div>
       </div>
 
-      {/* File Upload Dialog */}
-      <DialogPrimitive.Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-        <DialogPrimitive.DialogContent className="bg-gray-800 text-white border-gray-700">
-          <DialogPrimitive.DialogHeader>
-            <DialogPrimitive.DialogTitle>Add File Description</DialogPrimitive.DialogTitle>
-          </DialogPrimitive.DialogHeader>
-          <div className="py-4">
-            <div className="mb-4">
-              <Label htmlFor="file-name" className="text-gray-300 mb-2 block">Selected File</Label>
-              <div className="flex items-center bg-gray-700 p-2 rounded">
-                <FileText className="mr-2 h-4 w-4 text-blue-400" />
-                <span>{fileToUpload?.name}</span>
-              </div>
-              <p className="text-xs text-gray-400 mt-1">
-                File size: {fileToUpload ? (fileToUpload.size / (1024 * 1024)).toFixed(2) : 0} MB
-                {fileToUpload && fileToUpload.size / (1024 * 1024) > 8 && (
-                  <span className="text-red-400 ml-2">
-                    (Exceeds 8MB limit)
-                  </span>
-                )}
-              </p>
+      {currentProjectView === 'estimate' && (
+        <div className="estimate-view space-y-6">
+          {/* Estimate Generation Status Overlays */}
+          {(isProcessingState || estimateStatus === 'processing') && (
+            <div className="fixed inset-0 bg-gray-900/80 z-40 flex flex-col items-center justify-center">
+              <RefreshCw className="h-12 w-12 animate-spin text-blue-500 mb-4" />
+              <h2 className="text-xl font-semibold text-gray-200 mb-2">Generating Estimate</h2>
+              <p className="text-gray-300 text-sm max-w-md text-center">Analyzing files... This may take a moment.</p>
             </div>
-            <div>
-              <Label htmlFor="file-description" className="text-gray-300 mb-2 block">
-                Description <span className="text-red-400">*</span>
-              </Label>
-              <Textarea
-                id="file-description"
-                value={fileDescription}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFileDescription(e.target.value)}
-                placeholder="Describe this file (required)"
-                className="bg-gray-700 text-white border-gray-600"
-                rows={3}
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Provide a detailed description of the file to help the AI understand its content.
-              </p>
+          )}
+          {estimateStatus === 'failed' && estimateError && (
+            <div className="fixed inset-0 bg-gray-900/80 z-40 flex flex-col items-center justify-center p-4">
+              <div className="text-red-500 mb-4"><TriangleAlert className="h-12 w-12" /></div>
+              <h2 className="text-xl font-semibold text-gray-200 mb-2">Estimate Generation Failed</h2>
+              <p className="text-red-400 text-sm max-w-md text-center mb-4">{estimateError}</p>
+              <Button onClick={() => { setEstimateStatus('not_started'); setEstimateError(null); }} className="bg-blue-600 hover:bg-blue-700">
+                Try Again
+              </Button>
             </div>
-          </div>
-          <DialogPrimitive.DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setUploadDialogOpen(false);
-                setFileToUpload(null);
-                setFileDescription("");
-              }}
-              className="border-gray-600 text-gray-300 hover:bg-gray-700"
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleFileUpload} 
-              className="bg-blue-600 hover:bg-blue-700"
-              disabled={
-                isUploading || 
-                !fileDescription.trim() || 
-                (fileToUpload ? fileToUpload.size / (1024 * 1024) > 8 : false)
-              }
-            >
-              {isUploading ? 'Uploading...' : 'Upload'}
-            </Button>
-          </DialogPrimitive.DialogFooter>
-        </DialogPrimitive.DialogContent>
-      </DialogPrimitive.Dialog>
+          )}
 
-      {/* Note Dialog */}
-      <DialogPrimitive.Dialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen}>
-        <DialogPrimitive.DialogContent className="bg-gray-800 text-white border-gray-700">
-          <DialogPrimitive.DialogHeader>
-            <DialogPrimitive.DialogTitle>Add Project Note</DialogPrimitive.DialogTitle>
-          </DialogPrimitive.DialogHeader>
-          <div className="py-4">
-            <div className="mb-4">
-              <Label htmlFor="note-title" className="text-gray-300 mb-2 block">
-                Note Title <span className="text-red-400">*</span>
-              </Label>
-              <Input
-                id="note-title"
-                value={noteTitle}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNoteTitle(e.target.value)}
-                placeholder="Enter a title for your note"
-                className="bg-gray-700 text-white border-gray-600"
-              />
-            </div>
-            <div>
-              <Label htmlFor="note-content" className="text-gray-300 mb-2 block">
-                Note Content <span className="text-red-400">*</span>
-              </Label>
-              <Textarea
-                id="note-content"
-                value={noteContent}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNoteContent(e.target.value)}
-                placeholder="Write your note here..."
-                className="bg-gray-700 text-white border-gray-600"
-                rows={6}
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                You can use Markdown formatting in your notes.
-              </p>
-            </div>
-          </div>
-          <DialogPrimitive.DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setNoteDialogOpen(false);
-                setNoteTitle("");
-                setNoteContent("");
-              }}
-              className="border-gray-600 text-gray-300 hover:bg-gray-700"
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleAddNote} 
-              className="bg-blue-600 hover:bg-blue-700"
-              disabled={isAddingNote || !noteTitle.trim() || !noteContent.trim()}
-            >
-              {isAddingNote ? 'Adding Note...' : 'Add Note'}
-            </Button>
-          </DialogPrimitive.DialogFooter>
-        </DialogPrimitive.DialogContent>
-      </DialogPrimitive.Dialog>
-
-      {/* File Preview Dialog */}
-      <DialogPrimitive.Dialog open={filePreviewDialogOpen} onOpenChange={setFilePreviewDialogOpen}>
-        <DialogPrimitive.DialogContent className="bg-gray-800 text-white border-gray-700 max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
-          <DialogPrimitive.DialogHeader>
-            <DialogPrimitive.DialogTitle className="flex items-center">
-              <FileText className="mr-2 h-5 w-5 text-blue-400" />
-              {previewFile?.file_name}
-            </DialogPrimitive.DialogTitle>
-          </DialogPrimitive.DialogHeader>
-          <div className="py-4 flex-grow overflow-auto">
-            {isLoadingPreview ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="animate-spin mr-2">⟳</div>
-                <span>Loading file content...</span>
-              </div>
-            ) : (
-              <>
-                {previewFile && isImageFile(previewFile.file_name) ? (
-                  <div className="flex justify-center">
-                    {previewFile.file_url ? (
-                      signedImageUrl ? (
-                        <Image 
-                          src={signedImageUrl} 
-                          alt={previewFile.file_name} 
-                          width={800}
-                          height={600}
-                          className="max-h-[60vh] object-contain"
-                        />
-                      ) : (
-                        <div className="text-center text-gray-400">
-                          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2" />
-                          Loading image...
-                        </div>
-                      )
+          {/* AI Estimate Display */}
+          {aiEstimate ? (
+            <div className="space-y-5">
+              {isEstimateOutdated && (
+                <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 flex items-center">
+                  <RefreshCw className="h-5 w-5 text-yellow-400 mr-3 animate-spin" />
+                  <div>
+                    <h3 className="text-yellow-400 font-medium">Estimate may be outdated</h3>
+                    <p className="text-gray-300 text-sm">Files have changed. Regenerate estimate for updates.</p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Estimate Overview Section from original component */}
+              <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold">Estimate Overview</h2>
+                  <Button variant="ghost" size="sm" onClick={handleClearProjectEstimate} className="text-gray-400 hover:text-red-400 p-0 h-auto">
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                  <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                    <h4 className="text-sm font-medium text-gray-400 mb-1">Estimated Cost Range</h4>
+                    <p className="text-xl font-bold text-green-400">
+                      ${aiEstimate.estimated_total_min?.toLocaleString() ?? 'N/A'} - ${aiEstimate.estimated_total_max?.toLocaleString() ?? 'N/A'}
+                    </p>
+                  </div>
+                  <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                    <h4 className="text-sm font-medium text-gray-400 mb-1">Estimated Timeline</h4>
+                    <p className="text-xl font-bold text-blue-400">
+                      {aiEstimate.estimated_timeline_days ? `${aiEstimate.estimated_timeline_days} days` : 'Not specified'}
+                    </p>
+                  </div>
+                </div>
+                <div className="mb-4">
+                  <h3 className="text-sm font-medium text-gray-400 mb-2">Project Description</h3>
+                  <div className="text-gray-300 bg-gray-900/30 p-3 rounded-lg border border-gray-700 text-sm prose prose-sm prose-invert max-w-none">
+                     <ReactMarkdown>{aiEstimate.project_description}</ReactMarkdown>
+                  </div>
+                </div>
+                <div className="mb-4">
+                  <h3 className="text-sm font-medium text-gray-400 mb-2">Key Considerations</h3>
+                  <ul className="space-y-1 text-sm list-disc list-inside pl-1">
+                    {aiEstimate.key_considerations?.length > 0 ? (
+                      aiEstimate.key_considerations.map((consideration: string | null, index: number) => (
+                        <li key={index} className="text-gray-300">{consideration}</li>
+                      ))
                     ) : (
-                      <div className="text-center text-gray-400">
-                        Image path not available. This file may need to be re-uploaded.
-                      </div>
+                      <li className="text-gray-500">No key considerations provided</li>
                     )}
+                  </ul>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-400 mb-2">Confidence Level</h3>
+                  <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${aiEstimate.confidence_level.includes('High') ? 'bg-green-900/50 text-green-400' : aiEstimate.confidence_level.includes('Medium') ? 'bg-yellow-900/50 text-yellow-400' : 'bg-red-900/50 text-red-400'}`}>
+                    {aiEstimate.confidence_level}
                   </div>
-                ) : previewFile && isTextFile(previewFile.file_name) ? (
-                  fileContent ? (
-                    <div className="bg-gray-900 p-4 rounded overflow-auto max-h-[60vh]">
-                      {isMarkdownFile(previewFile.file_name) ? (
-                        <div className="prose prose-invert max-w-none">
-                          <ReactMarkdown>{fileContent}</ReactMarkdown>
-                        </div>
+                </div>
+              </div>
+
+              {/* Estimate Details Table from original component */}
+              <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
+                <h2 className="text-lg font-semibold mb-4">Estimate Details</h2>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-700">
+                        <th className="text-left pb-3 text-gray-400 font-medium">Item</th>
+                        <th className="text-left pb-3 text-gray-400 font-medium">Category</th>
+                        <th className="text-right pb-3 text-gray-400 font-medium">Quantity</th>
+                        <th className="text-right pb-3 text-gray-400 font-medium">Cost Range</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-800">
+                      {aiEstimate.estimate_items?.length > 0 ? (
+                        aiEstimate.estimate_items.map((item: EstimateLineItem, index: number) => (
+                          <tr key={index} className="hover:bg-gray-700/20">
+                            <td className="py-3 pr-4">
+                              <div className="font-medium text-gray-200">{item.description}</div>
+                              {item.notes && <div className="text-xs text-gray-400 mt-1 prose prose-xs prose-invert max-w-none"><ReactMarkdown>{item.notes}</ReactMarkdown></div>}
+                            </td>
+                            <td className="py-3 text-gray-400">
+                              {item.category}
+                              {item.subcategory && <span className="text-xs block text-gray-500">{item.subcategory}</span>}
+                            </td>
+                            <td className="py-3 text-right text-gray-300">
+                              {item.quantity ? `${item.quantity} ${item.unit || ''}` : '-'}
+                            </td>
+                            <td className="py-3 text-right font-medium text-green-400">
+                              ${item.cost_range_min.toLocaleString()} - ${item.cost_range_max.toLocaleString()}
+                            </td>
+                          </tr>
+                        ))
                       ) : (
-                        <pre className="whitespace-pre-wrap break-words text-sm text-gray-300">
-                          {fileContent}
-                        </pre>
+                        <tr><td colSpan={4} className="py-4 text-center text-gray-500">No estimate items available</td></tr>
                       )}
-                    </div>
-                  ) : (
-                    <div className="text-center text-gray-400">
-                      Failed to load file content
-                    </div>
-                  )
-                ) : (
-                  <div className="text-center text-gray-400">
-                    This file type cannot be previewed directly.
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-          <DialogPrimitive.DialogFooter className="flex justify-between items-center">
-            <div>
-              {previewFile && previewFile.file_url && (
-                <Button
-                  variant="outline"
-                  onClick={async () => {
-                    if (previewFile && previewFile.file_url) {
-                      try {
-                        // Create a signed URL with download option enabled
-                        const { data, error } = await supabase.storage
-                          .from(STORAGE_BUCKET_NAME)
-                          .createSignedUrl(previewFile.file_url, 60, {
-                            download: true,
-                          });
-                          
-                        if (error) {
-                          console.error('Error creating download URL:', error);
-                          toast.error('Failed to generate download link');
-                          return;
-                        }
-                        
-                        // Open the signed URL in a new tab or trigger download
-                        window.open(data.signedUrl, '_blank');
-                        toast.success('File download initiated');
-                      } catch (error) {
-                        console.error('Error downloading file:', error);
-                        toast.error('Failed to download file');
-                      }
-                    }
-                  }}
-                  className="inline-flex items-center text-blue-400 hover:text-blue-300 mr-4"
-                >
-                  <Download className="h-4 w-4 mr-1" />
-                  Download
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-gray-700">
+                        <td colSpan={3} className="py-3 text-right font-medium">Total Estimate</td>
+                        <td className="py-3 text-right font-bold text-green-400">
+                          ${aiEstimate.estimated_total_min?.toLocaleString() ?? 'N/A'} - ${aiEstimate.estimated_total_max?.toLocaleString() ?? 'N/A'}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+              {/* Other sections like Next Steps, Risks, Missing Info from original component */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
+                  <h2 className="text-lg font-semibold mb-3">Next Steps</h2>
+                  <ul className="space-y-2 list-decimal list-inside pl-1">
+                    {aiEstimate.next_steps?.length > 0 ? aiEstimate.next_steps.map((step: string | null, index: number) => (<li key={index} className="text-sm text-gray-300">{step}</li>)) : <li className="text-gray-500">No next steps.</li>}
+                  </ul>
+                </div>
+                <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
+                  <h2 className="text-lg font-semibold mb-3">Key Risks</h2>
+                  <ul className="space-y-2 list-disc list-inside pl-1">
+                    {aiEstimate.key_risks?.length > 0 ? aiEstimate.key_risks.map((risk: string | null, index: number) => (<li key={index} className="text-sm text-gray-300">{risk}</li>)) : <li className="text-gray-500">No risks identified.</li>}
+                  </ul>
+                </div>
+                <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
+                  <h2 className="text-lg font-semibold mb-3 flex items-center">
+                    <span>Missing Information</span>
+                    {aiEstimate.missing_information?.length > 0 && <span className="ml-2 bg-yellow-900/50 text-yellow-400 text-xs px-2 py-0.5 rounded-full">{aiEstimate.missing_information.length} items</span>}
+                  </h2>
+                  <ul className="space-y-2 list-disc list-inside pl-1">
+                    {aiEstimate.missing_information?.length > 0 ? aiEstimate.missing_information.map((item: string | null, index: number) => (<li key={index} className="text-sm text-gray-300">{item}</li>)) : <li className="text-gray-500">No missing info.</li>}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          ) : estimateStatus !== 'processing' && estimateStatus !== 'failed' && (
+            <div className="bg-gray-800 rounded-lg p-8 border border-gray-700 border-dashed text-center min-h-[400px] flex flex-col justify-center items-center">
+              <FileText className="h-12 w-12 text-blue-400 mb-4" />
+              <h2 className="text-xl font-semibold mb-2">No Estimate Generated Yet</h2>
+              <p className="text-gray-400 mb-6 max-w-md mx-auto">Upload project files and click "Generate Estimate".</p>
+              <Button onClick={handleGenerateEstimate} className={`text-white ${isEstimateOutdated ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700'}`} disabled={uploadedFiles.length === 0}>
+                <Play className="mr-2 h-4 w-4" /> Generate Estimate
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {currentProjectView === 'files' && (
+        <div className="files-view">
+          {/* File Management Section from original component */}
+          <div className="bg-gray-800 rounded-lg p-5 border border-gray-700 mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Project Files</h2>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="border-gray-600 text-gray-300 hover:bg-gray-700" onClick={() => setNoteDialogOpen(true)}>
+                  <StickyNote className="h-3.5 w-3.5 mr-1.5" /> Add Note
                 </Button>
+                <Input type="file" onChange={handleFileSelect} className="hidden" id="file-upload-input-main" disabled={isUploading} />
+                <Button size="sm" variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-700" disabled={isUploading} onClick={() => document.getElementById('file-upload-input-main')?.click()}>
+                  {isUploading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />} Upload File
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-1">
+              {uploadedFiles.length === 0 ? (
+                <div className="text-gray-400 text-center py-8 border border-dashed border-gray-700 rounded-lg">
+                  <p className="text-sm mb-2">No files uploaded for this project.</p>
+                  <p className="text-xs">Upload construction plans, images, or notes.</p>
+                </div>
+              ) : (
+                uploadedFiles.map((file) => (
+                  <div key={file.id} className="flex items-center justify-between bg-gray-700/30 hover:bg-gray-700/50 p-3 rounded-md transition-colors">
+                    <div className="flex items-center overflow-hidden">
+                      {isMarkdownFile(file.file_name) && file.description === 'Project note' ? <StickyNote className="mr-2 h-4 w-4 text-yellow-400 flex-shrink-0" /> : <File className="mr-2 h-4 w-4 text-blue-400 flex-shrink-0" />}
+                      <button onClick={(e) => handleFileClick(file, e)} className="text-gray-200 hover:text-blue-400 bg-transparent border-0 p-0 cursor-pointer truncate text-sm">
+                        {file.file_name}
+                      </button>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => handleDeleteFile(file.id)} className="text-red-400 hover:text-red-300 hover:bg-red-900/20 ml-1 p-1 h-auto">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))
               )}
             </div>
-            <Button 
-              onClick={() => setFilePreviewDialogOpen(false)}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              Close
+          </div>
+        </div>
+      )}
+
+      {/* Upload File Dialog - Corrected Usage */}
+      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <DialogContent className="bg-gray-800 text-white border-gray-700">
+          <DialogHeader>
+            <DialogTitle>Upload File</DialogTitle>
+            <DialogDescription>
+              Select a file and add an optional description.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="file-upload-input" className="text-right">
+                File
+              </Label>
+              <Input 
+                id="file-upload-input" 
+                type="file" 
+                onChange={(e) => setFileToUpload(e.target.files ? e.target.files[0] : null)} 
+                className="col-span-3 bg-gray-700 border-gray-600 file:text-white"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="file-description" className="text-right">
+                Description
+              </Label>
+              <Textarea 
+                id="file-description" 
+                value={fileDescription} 
+                onChange={(e) => setFileDescription(e.target.value)} 
+                placeholder="Optional: Describe the file content" 
+                className="col-span-3 bg-gray-700 border-gray-600"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUploadDialogOpen(false)} className="text-gray-300 border-gray-600 hover:bg-gray-700">Cancel</Button>
+            <Button onClick={handleFileUpload} disabled={isUploading || !fileToUpload} className="bg-blue-600 hover:bg-blue-700">
+              {isUploading ? 'Uploading...' : 'Upload'}
             </Button>
-          </DialogPrimitive.DialogFooter>
-        </DialogPrimitive.DialogContent>
-      </DialogPrimitive.Dialog>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Note Dialog - Corrected Usage */}
+      <Dialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen}>
+        <DialogContent className="bg-gray-800 text-white border-gray-700">
+          <DialogHeader>
+            <DialogTitle>Add a Note</DialogTitle>
+            <DialogDescription>
+              Create a quick note. It will be saved as a Markdown file.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="note-title" className="text-right">
+                Title
+              </Label>
+              <Input 
+                id="note-title" 
+                value={noteTitle} 
+                onChange={(e) => setNoteTitle(e.target.value)} 
+                placeholder="Note Title (e.g., Initial Measurements)" 
+                className="col-span-3 bg-gray-700 border-gray-600"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="note-content" className="text-right">
+                Content
+              </Label>
+              <Textarea 
+                id="note-content" 
+                value={noteContent} 
+                onChange={(e) => setNoteContent(e.target.value)} 
+                placeholder="Write your note here... Supports Markdown." 
+                className="col-span-3 bg-gray-700 border-gray-600 h-32"
+                rows={6}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNoteDialogOpen(false)} className="text-gray-300 border-gray-600 hover:bg-gray-700">Cancel</Button>
+            <Button onClick={handleAddNote} disabled={isAddingNote || !noteTitle.trim() || !noteContent.trim()} className="bg-blue-600 hover:bg-blue-700">
+              {isAddingNote ? 'Adding Note...' : 'Add Note'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* File Preview Dialog - Corrected Usage */}
+      {previewFile && (
+        <Dialog open={filePreviewDialogOpen} onOpenChange={setFilePreviewDialogOpen}>
+          <DialogContent className="bg-gray-800 text-white border-gray-700 max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center">
+                <FileText className="mr-2 h-5 w-5 text-blue-400" />
+                {previewFile?.file_name}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-4 flex-grow overflow-auto">
+              {isLoadingPreview ? (
+                <div className="flex items-center justify-center h-full">
+                  <RefreshCw className="animate-spin mr-2 h-6 w-6" /> 
+                  <span>Loading file content...</span>
+                </div>
+              ) : (
+                <>
+                  {previewFile && isImageFile(previewFile.file_name) ? (
+                    <div className="flex justify-center">
+                      {previewFile.file_url ? (
+                        signedImageUrl ? (
+                          <Image 
+                            src={signedImageUrl} 
+                            alt={previewFile.file_name} 
+                            width={800}
+                            height={600}
+                            className="max-h-[60vh] object-contain"
+                            unoptimized // if using external Supabase URLs without Next.js image optimization configured for them
+                          />
+                        ) : (
+                          <div className="text-center text-gray-400">
+                            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2" />
+                            Loading image...
+                          </div>
+                        )
+                      ) : (
+                        <div className="text-center text-gray-400">
+                          Image path not available. This file may need to be re-uploaded.
+                        </div>
+                      )}
+                    </div>
+                  ) : previewFile && isTextFile(previewFile.file_name) ? (
+                    fileContent ? (
+                      <div className="bg-gray-900 p-4 rounded overflow-auto max-h-[60vh]">
+                        {isMarkdownFile(previewFile.file_name) ? (
+                          <div className="prose prose-invert max-w-none">
+                            <ReactMarkdown>{fileContent}</ReactMarkdown>
+                          </div>
+                        ) : (
+                          <pre className="whitespace-pre-wrap break-words text-sm text-gray-300">
+                            {fileContent}
+                          </pre>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center text-gray-400">
+                        Failed to load file content or content is empty.
+                      </div>
+                    )
+                  ) : (
+                    <div className="text-center text-gray-400">
+                      This file type cannot be previewed directly. You can download it to view.
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            <DialogFooter className="flex justify-between items-center pt-4 border-t border-gray-700">
+              <div>
+                {previewFile && previewFile.file_url && (
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      if (previewFile && previewFile.file_url) {
+                        try {
+                          const { data, error } = await supabase.storage
+                            .from(STORAGE_BUCKET_NAME)
+                            .createSignedUrl(previewFile.file_url, 60, { download: true });
+                          if (error) throw error;
+                          window.open(data.signedUrl, '_blank');
+                          toast.success('File download initiated');
+                        } catch (err) {
+                          console.error('Error downloading file:', err);
+                          toast.error('Failed to download file');
+                        }
+                      }
+                    }}
+                    className="inline-flex items-center text-blue-400 hover:text-blue-300 border-blue-400/50 hover:border-blue-400/80 mr-4"
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    Download
+                  </Button>
+                )}
+              </div>
+              <Button 
+                onClick={() => setFilePreviewDialogOpen(false)}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
-  )
+  );
 }
 
 function CollapsibleMarkdown({ content }: { content: string }) {
