@@ -12,6 +12,17 @@ const STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET
 const LANGGRAPH_API_URL = process.env.LANGGRAPH_API_URL
 const LANGGRAPH_API_KEY = process.env.LANGGRAPH_API_KEY
 
+// Add UploadedFile interface, mirroring the one in page.tsx for clarity
+interface UploadedFile {
+  id: string;
+  file_name: string;
+  description?: string;
+  content?: string; // This might not be used directly here after changes
+  type?: string; // This might not be used directly here after changes
+  file_url: string;
+  uploaded_at: string;
+}
+
 
 function sanitizeFileName(fileName: string): string {
   // Replace spaces and special characters with underscores
@@ -93,7 +104,7 @@ export async function uploadFile(formData: FormData, projectId: string) {
 // Extended InputFile type to add fields needed for our web application
 interface FileToProcess extends InputFile {
   error?: string;
-  path?: string;
+  path?: string; // This will hold the file_url from UploadedFile
   bucket?: string;
 }
 
@@ -286,10 +297,27 @@ export async function clearProjectEstimate(projectId: string) {
 /**
  * Start asynchronous estimate generation for a project
  */
-export async function startEstimateGeneration(projectId: string, files: FileToProcess[], requested_changes?: string) {
+export async function startEstimateGeneration(projectId: string, requested_changes?: string) {
   try {
-    // Get project info from database
     const supabase = await createClient()
+
+    // Fetch uploaded files from the database
+    const { data: uploadedFiles, error: filesError } = await supabase
+      .from('files')
+      .select('*') // Select all columns, assuming they match UploadedFile structure
+      .eq('project_id', projectId);
+
+    if (filesError) {
+      console.error('Error fetching files for project:', filesError);
+      return { error: `Failed to fetch files: ${filesError.message}` };
+    }
+
+    if (!uploadedFiles || uploadedFiles.length === 0) {
+      return { error: 'No files found for this project to process.' };
+    }
+    
+    // Get project info from database
+    // const supabase = await createClient() // Supabase client already initialized
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select('*')
@@ -301,8 +329,51 @@ export async function startEstimateGeneration(projectId: string, files: FileToPr
       return { error: 'Failed to fetch project information' }
     }
 
+    // Map UploadedFile to FileToProcess
+    const filesToProcess: FileToProcess[] = uploadedFiles.map((file) => {
+      // For text files
+      if (file.file_name.endsWith('.txt') || file.file_name.endsWith('.md')) {
+        return {
+          type: 'text',
+          name: file.file_name,
+          description: file.description || '',
+          path: file.file_url // Use file_url here
+        };
+      }
+      // For images
+      else if (file.file_name.match(/\.(jpeg|jpg|png|gif)$/i)) {
+        return {
+          type: 'image',
+          name: file.file_name,
+          description: file.description || '',
+          path: file.file_url // Use file_url here
+        };
+      }
+      // For other file types
+      return {
+        type: 'other',
+        name: file.file_name,
+        description: file.description || ''
+        // No path needed for 'other' as per original logic, content won't be fetched
+      };
+    });
+
+    // Check if any files are missing paths (for types that require it)
+    const missingPaths = filesToProcess.filter(file =>
+      (file.type === 'image' || file.type === 'text') && !file.path
+    );
+
+    if (missingPaths.length > 0) {
+      const missingFileNames = missingPaths.map(f => f.name).join(', ');
+      // It's better to return an error that the frontend can display meaningfully
+      return {
+        error: `Missing file paths for: ${missingFileNames}. These files may need to be re-uploaded.`,
+        failedFiles: missingPaths // Optionally return the files that failed
+      };
+    }
+
     // Process files to load their content
-    const processedFiles = await processFilesForInput(files)
+    const processedFiles = await processFilesForInput(filesToProcess) // Pass the newly mapped files
 
     // Check for failures in processed files
     const failedFiles = processedFiles.filter(file => 
@@ -340,7 +411,7 @@ export async function startEstimateGeneration(projectId: string, files: FileToPr
     const inputState = {
       files: processedFiles,
       existing_estimate: project.ai_estimate ? JSON.parse(project.ai_estimate) : null,
-      requested_changes: "Make it all one line item."
+      requested_changes: requested_changes
     }
 
     // Create a background run
@@ -540,6 +611,7 @@ async function updateTaskStatus(taskJobId: string, status: string, errorMessage?
  * Helper to extract project info from API response
  */
 interface ApiResponse {
+  // project_info?: string; // Assuming this might be part of the API response structure
   ai_estimate?: ConstructionProjectData;
 }
 

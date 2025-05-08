@@ -29,12 +29,6 @@ interface UploadedFile {
   uploaded_at: string
 }
 
-// Extended InputFile type for the web application
-interface FileToProcess extends InputFile {
-  path?: string
-  error?: string
-}
-
 interface Project {
   id: string
   name: string
@@ -274,48 +268,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     toast.info('Starting estimate generation...');
     
     try {
-      // Prepare files for processing using the stored file paths
-      const filesToProcess: FileToProcess[] = uploadedFiles.map((file) => {
-        // For text files
-        if (file.file_name.endsWith('.txt') || file.file_name.endsWith('.md')) {
-          return {
-            type: 'text',
-            name: file.file_name,
-            description: file.description || '',
-            path: file.file_url
-          };
-        }
-        // For images
-        else if (file.file_name.match(/\.(jpeg|jpg|png|gif)$/i)) {
-          return {
-            type: 'image',
-            name: file.file_name,
-            description: file.description || '',
-            path: file.file_url
-          };
-        }
-        // For other file types
-        return {
-          type: 'other',
-          name: file.file_name,
-          description: file.description || ''
-        };
-      });
-      
-      // Check if any files are missing paths
-      const missingPaths = filesToProcess.filter(file => 
-        (file.type === 'image' || file.type === 'text') && !file.path
-      );
-      
-      if (missingPaths.length > 0) {
-        const missingFileNames = missingPaths.map(f => f.name).join(', ');
-        toast.error(`Missing file paths for: ${missingFileNames}. These files may need to be re-uploaded.`);
-        setEstimateStatus('failed');
-        return;
-      }
-
       // Start the background job
-      const result = await startEstimateGeneration(id, filesToProcess);
+      const result = await startEstimateGeneration(id);
       
       if (!result.success) {
         setEstimateStatus('failed');
@@ -323,13 +277,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         
         // Show detailed errors for failed files
         if (result.failedFiles && result.failedFiles.length > 0) {
-          const failedFileNames = result.failedFiles.map((f) => f.name).join(', ');
+          // It seems result.failedFiles is FileToProcess[], ensure name exists.
+          const failedFileNames = result.failedFiles.map((f: any) => f.name).join(', ');
           toast.error(`Failed to process files: Could not fetch content for ${failedFileNames}`, {
             duration: 5000,
           });
           
           // Show individual errors
-          result.failedFiles.forEach((file: FileToProcess) => {
+          result.failedFiles.forEach((file: any) => {
             if (file.error) {
               toast.error(`${file.name}: ${file.error}`, {
                 duration: 5000,
