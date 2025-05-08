@@ -10,6 +10,8 @@
     "test:integration": "vitest tests/integration/"
   },
   "dependencies": {
+    "@boundaryml/baml": "0.86.1",
+    "@boundaryml/baml-nextjs-plugin": "^0.1.0",
     "@radix-ui/react-dialog": "^1.1.6",
     "@radix-ui/react-label": "^2.1.2",
     "@radix-ui/react-slot": "^1.1.2",
