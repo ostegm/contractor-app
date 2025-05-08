@@ -7,6 +7,7 @@ CREATE TABLE task_jobs (
     status TEXT NOT NULL CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
     job_type TEXT NOT NULL, -- e.g., 'estimate_generation'
     error_message TEXT,
+    originating_chat_thread_id UUID,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
