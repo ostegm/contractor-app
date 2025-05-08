@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const { withBaml } = require('@boundaryml/baml-nextjs-plugin');
+
 const nextConfig = {
   reactStrictMode: true,
   images: {
@@ -25,4 +27,4 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig 
+module.exports = withBaml()(nextConfig)

@@ -2,7 +2,19 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { ConstructionProjectData, EstimateLineItem, InputFile } from '@/baml_client/baml_client/types'
+import { b } from '@/baml_client/baml_client'
+import {
+  AllowedTypes,
+  type UserInput as BamlUserInput,
+  type AssisantMessage as BamlAssistantMessage,
+  type UpdateEstimateRequest as BamlUpdateEstimateRequest,
+  type UpdateEstimateResponse as BamlUpdateEstimateResponse,
+  type Event as BamlEvent,
+  type BamlChatThread,
+  type ConstructionProjectData,
+  type EstimateLineItem,
+  type InputFile
+} from '@/baml_client/baml_client/types'
 
 if (!process.env.SUPABASE_STORAGE_BUCKET) {
   throw new Error('Missing SUPABASE_STORAGE_BUCKET environment variable')
@@ -23,6 +35,13 @@ interface UploadedFile {
   uploaded_at: string;
 }
 
+// ADDED: Define a richer event type for UI display and DB interactions (II.A)
+export interface DisplayableBamlEvent {
+  id: string; // Database ID for the event, useful for React keys
+  type: AllowedTypes;
+  data: BamlUserInput | BamlAssistantMessage | BamlUpdateEstimateRequest | BamlUpdateEstimateResponse;
+  createdAt: string; // ISO string timestamp from the database
+}
 
 function sanitizeFileName(fileName: string): string {
   // Replace spaces and special characters with underscores
@@ -34,8 +53,6 @@ function sanitizeFileName(fileName: string): string {
   const baseName = name.split('.').slice(0, -1).join('.')
   return `${baseName}_${timestamp}.${ext}`
 }
-
-
 
 export async function uploadFile(formData: FormData, projectId: string) {
   const supabase = await createClient()
@@ -71,8 +88,6 @@ export async function uploadFile(formData: FormData, projectId: string) {
       return { error: `Failed to upload file: ${uploadError.message}` }
     }
 
-
-
     console.log(`File path: ${filePath}`);
 
     // Try to insert with description and file path
@@ -81,7 +96,6 @@ export async function uploadFile(formData: FormData, projectId: string) {
       .insert({
         project_id: projectId,
         file_name: file.name,
-
         file_url: filePath,
         description: description,
       })
@@ -294,10 +308,220 @@ export async function clearProjectEstimate(projectId: string) {
   }
 }
 
+// ADDED: New Server Action: getOrCreateChatThread (II.B)
+export async function getOrCreateChatThread(projectId: string): Promise<{ threadId: string; events: DisplayableBamlEvent[]; name: string }> {
+  const supabase = await createClient();
+  let { data: thread, error: threadError } = await supabase
+    .from('chat_threads')
+    .select('id, name')
+    .eq('project_id', projectId)
+    .single();
+
+  if (threadError && threadError.code !== 'PGRST116') { // PGRST116: No rows found
+    console.error('Error fetching chat thread:', threadError);
+    throw new Error('Failed to fetch chat thread.');
+  }
+
+  if (!thread) {
+    const now = new Date();
+    const defaultName = `Chat - ${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    const { data: newThread, error: newThreadError } = await supabase
+      .from('chat_threads')
+      .insert({ project_id: projectId, name: defaultName })
+      .select('id, name')
+      .single();
+    if (newThreadError || !newThread) {
+      console.error('Error creating chat thread:', newThreadError);
+      throw new Error('Failed to create chat thread.');
+    }
+    thread = newThread;
+    return { threadId: thread.id, events: [], name: thread.name };
+  }
+
+  // Fetch existing events for the thread
+  const { data: dbEvents, error: eventsError } = await supabase
+    .from('chat_events')
+    .select('id, event_type, data, created_at')
+    .eq('thread_id', thread.id)
+    .order('created_at', { ascending: true });
+
+  if (eventsError) {
+    console.error('Error fetching chat events:', eventsError);
+    throw new Error('Failed to fetch chat events.');
+  }
+
+  const displayableEvents: DisplayableBamlEvent[] = (dbEvents || []).map(e => ({
+    id: e.id,
+    type: e.event_type as AllowedTypes,
+    data: e.data as any,
+    createdAt: e.created_at,
+  }));
+
+  return { threadId: thread.id, events: displayableEvents, name: thread.name };
+}
+
+// ADDED: New Server Action: postChatMessage (II.C)
+interface PostChatMessageResult {
+  userInputDisplayEvent: DisplayableBamlEvent; // The user's message as saved
+  assistantResponseDisplayEvent?: DisplayableBamlEvent; // BAML's response as saved
+  updateTriggered: boolean;
+  error?: string;
+}
+
+export async function postChatMessage(
+  threadId: string,
+  projectId: string, // Required for startEstimateGeneration if triggered
+  userInput: BamlUserInput // From baml_client/types
+): Promise<PostChatMessageResult> {
+  const supabase = await createClient();
+  const now = new Date().toISOString();
+
+  // 1. Save UserInput event
+  const userInputToSave = {
+    thread_id: threadId,
+    event_type: 'UserInput',
+    data: userInput,
+    created_at: now,
+  };
+  const { data: savedUserInput, error: userInputSaveError } = await supabase
+    .from('chat_events')
+    .insert(userInputToSave)
+    .select('id, created_at') // Get id and actual created_at from DB
+    .single();
+
+  if (userInputSaveError || !savedUserInput) {
+    console.error('Error saving user input event:', userInputSaveError);
+    return {
+      userInputDisplayEvent: { id: 'temp-error', type: "UserInput" as AllowedTypes, data: userInput, createdAt: now },
+      updateTriggered: false,
+      error: 'Failed to save user message.'
+    };
+  }
+
+  const userInputDisplayEvent: DisplayableBamlEvent = {
+    id: savedUserInput.id,
+    type: "UserInput" as AllowedTypes,
+    data: userInput,
+    createdAt: savedUserInput.created_at
+  };
+
+  // 2. Fetch all events for the current threadId to construct BamlChatThread input
+  const { data: dbEvents, error: eventsFetchError } = await supabase
+    .from('chat_events')
+    .select('event_type, data') // Select only fields needed for BamlEvent
+    .eq('thread_id', threadId)
+    .order('created_at', { ascending: true });
+
+  if (eventsFetchError) {
+    console.error('Error fetching events for BAML:', eventsFetchError);
+    return { userInputDisplayEvent, updateTriggered: false, error: 'Failed to fetch conversation history.' };
+  }
+
+  const bamlEventsForProcessing: BamlEvent[] = (dbEvents || []).map(dbEvent => ({
+    type: dbEvent.event_type as AllowedTypes,
+    data: dbEvent.data as any,
+  }));
+
+  const currentThreadState: BamlChatThread = { events: bamlEventsForProcessing };
+
+  // 3. Call b.DetermineNextStep
+  let nextBamlEventOutput: BamlEvent;
+  try {
+    // Ensure 'b' is accessible here; it should be if imported correctly at the top level
+    nextBamlEventOutput = await b.DetermineNextStep(currentThreadState);
+  } catch (bamlError) {
+    console.error('BAML DetermineNextStep error:', bamlError);
+    return { userInputDisplayEvent, updateTriggered: false, error: 'AI failed to determine next step.' };
+  }
+
+  // 4. Save the event returned by BAML
+  const bamlEventToSave = {
+    thread_id: threadId,
+    event_type: nextBamlEventOutput.type,
+    data: nextBamlEventOutput.data,
+  };
+  const { data: savedBamlEvent, error: bamlEventSaveError } = await supabase
+    .from('chat_events')
+    .insert(bamlEventToSave)
+    .select('id, created_at')
+    .single();
+
+  if (bamlEventSaveError || !savedBamlEvent) {
+    console.error('Error saving BAML event:', bamlEventSaveError);
+     return {
+      userInputDisplayEvent,
+      assistantResponseDisplayEvent: { id: 'temp-baml-error', type: nextBamlEventOutput.type, data: nextBamlEventOutput.data, createdAt: new Date().toISOString() },
+      updateTriggered: false,
+      error: 'AI response generated but failed to save.'
+    };
+  }
+
+  const assistantResponseDisplayEvent: DisplayableBamlEvent = {
+    id: savedBamlEvent.id,
+    type: nextBamlEventOutput.type,
+    data: nextBamlEventOutput.data,
+    createdAt: savedBamlEvent.created_at
+  };
+
+  let updateTriggered = false;
+  // 5. If UpdateEstimateRequest, trigger estimate generation
+  if (nextBamlEventOutput.type === "UpdateEstimateRequest") {
+    const requestData = nextBamlEventOutput.data as BamlUpdateEstimateRequest;
+    // Assuming startEstimateGeneration is defined elsewhere in this file and modified as per plan
+    const estimateResult = await startEstimateGeneration(projectId, requestData.changes_to_make, threadId);
+    if (estimateResult.error) {
+      console.error('Error starting estimate generation from chat:', estimateResult.error);
+      // An UpdateEstimateResponse (failure) event will be added by the modified checkEstimateStatus/processCompletedRun logic.
+    } else {
+      updateTriggered = true;
+    }
+  }
+
+  return {
+    userInputDisplayEvent,
+    assistantResponseDisplayEvent,
+    updateTriggered,
+  };
+}
+
+// ADDED: Server Action: getChatEvents (for polling updates) (II.F)
+export async function getChatEvents(threadId: string, sinceIsoTimestamp?: string): Promise<DisplayableBamlEvent[]> {
+  const supabase = await createClient();
+  let query = supabase
+    .from('chat_events')
+    .select('id, event_type, data, created_at')
+    .eq('thread_id', threadId);
+
+  if (sinceIsoTimestamp) {
+    query = query.gt('created_at', sinceIsoTimestamp);
+  }
+  query = query.order('created_at', { ascending: true });
+
+  const { data: dbEvents, error } = await query;
+
+  if (error) {
+    console.error('Error fetching chat events:', error);
+    throw new Error('Failed to fetch chat events.');
+  }
+
+  return (dbEvents || []).map(e => ({
+    id: e.id,
+    type: e.event_type as AllowedTypes,
+    data: e.data as any,
+    createdAt: e.created_at,
+  }));
+}
+
 /**
  * Start asynchronous estimate generation for a project
  */
-export async function startEstimateGeneration(projectId: string, requested_changes?: string) {
+// MODIFIED: startEstimateGeneration (II.D)
+export async function startEstimateGeneration(
+  projectId: string,
+  requested_changes?: string,
+  originatingChatThreadId?: string // New parameter
+) {
   try {
     const supabase = await createClient()
 
@@ -436,15 +660,29 @@ export async function startEstimateGeneration(projectId: string, requested_chang
     const runId = createResult.run_id
 
     // Create a task_job entry in the database
+    // MODIFIED: task_job insertion to include originatingChatThreadId
+    const taskJobInsertData: {
+        project_id: string;
+        thread_id: string; // LangGraph thread_id
+        run_id: string;
+        status: string;
+        job_type: string;
+        originating_chat_thread_id?: string; // Optional
+    } = {
+        project_id: projectId,
+        thread_id: threadId, // This is LangGraph thread_id from context
+        run_id: runId, // This is LangGraph run_id from context
+        status: 'processing',
+        job_type: 'estimate_generation',
+    };
+
+    if (originatingChatThreadId) {
+        taskJobInsertData.originating_chat_thread_id = originatingChatThreadId;
+    }
+
     const { error: jobError } = await supabase
       .from('task_jobs')
-      .insert({
-        project_id: projectId,
-        thread_id: threadId,
-        run_id: runId,
-        status: 'processing',
-        job_type: 'estimate_generation'
-      })
+      .insert(taskJobInsertData);
 
     if (jobError) {
       console.error('Error creating task job:', jobError)
@@ -464,120 +702,180 @@ export async function startEstimateGeneration(projectId: string, requested_chang
   }
 }
 
-/**
- * Check the status of an estimate generation job
- */
-export async function checkEstimateStatus(projectId: string) {
-  try {
-    const supabase = await createClient()
-    
-    // Get the most recent task job for this project
-    const { data: taskJob, error: taskJobError } = await supabase
-      .from('task_jobs')
-      .select('*')
-      .eq('project_id', projectId)
-      .eq('job_type', 'estimate_generation')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
+// ADDED: Helper function for recording chat estimate update response (II.E)
+async function recordChatEstimateUpdateResponse(
+  originatingChatThreadId: string,
+  success: boolean,
+  errorMessage?: string // Optional error message
+) {
+  const supabase = await createClient();
+  const responseData: BamlUpdateEstimateResponse = {
+    success,
+    error_message: success ? '' : (errorMessage || 'Estimate update failed due to an unknown reason.'),
+  };
 
-    if (taskJobError) {
-      if (taskJobError.code === 'PGRST116') {
-        // No task found
-        return { status: 'not_started' as TaskJobStatus }
-      }
-      console.error('Error fetching task job:', taskJobError)
-      return { error: 'Failed to fetch task status' }
-    }
+  const { error } = await supabase.from('chat_events').insert({
+    thread_id: originatingChatThreadId,
+    event_type: 'UpdateEstimateResponse',
+    data: responseData,
+  });
 
-    // If the task is already completed or failed, just return the status
-    if (taskJob.status === 'completed' || taskJob.status === 'failed') {
-      return { 
-        status: taskJob.status as TaskJobStatus,
-        error: taskJob.error_message
-      }
-    }
-
-    // If the task is still processing, check the actual status from the API
-    const response = await fetch(`${LANGGRAPH_API_URL}/threads/${taskJob.thread_id}/runs/${taskJob.run_id}`, {
-      headers: {
-        'x-api-key': LANGGRAPH_API_KEY!,
-      }
-    })
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        // If the run is not found, it might have been deleted
-        await updateTaskStatus(taskJob.id, 'failed', 'Run not found in LangGraph API')
-        return { status: 'failed' as TaskJobStatus, error: 'Run not found in LangGraph API' }
-      }
-      
-      const errorText = await response.text()
-      console.error(`API request failed: ${response.status}: ${errorText}`)
-      return { error: `API request failed: ${response.status}` }
-    }
-
-    const runStatus = await response.json() as { status: string }
-
-    // Update the database based on the run status
-    switch (runStatus.status) {
-      case 'success':
-        // Get the result and update the database
-        await processCompletedRun(taskJob.thread_id, taskJob.run_id, projectId, taskJob.id)
-        return { status: 'completed' as TaskJobStatus }
-      
-      case 'error':
-      case 'timeout':
-      case 'interrupted':
-        await updateTaskStatus(taskJob.id, 'failed', `Run failed with status: ${runStatus.status}`)
-        return { status: 'failed' as TaskJobStatus, error: `Run failed with status: ${runStatus.status}` }
-      
-      case 'pending':
-      default:
-        // Still in progress
-        return { status: 'processing' as TaskJobStatus }
-    }
-  } catch (error) {
-    console.error('Error checking estimate status:', error)
-    return { error: error instanceof Error ? error.message : 'Unknown error occurred' }
+  if (error) {
+    console.error('Error recording UpdateEstimateResponse to chat:', error);
   }
 }
 
 /**
  * Process a completed run, extract results, and update the database
  */
+// REPLACED: processCompletedRun (II.E)
 async function processCompletedRun(threadId: string, runId: string, projectId: string, taskJobId: string) {
-  try {    
+  let success = false;
+  let detailedErrorMessage: string | undefined;
+  try {
+    const supabase = await createClient(); // Ensure client is available
+
     // Join the run to get the results
     const joinResponse = await fetch(`${LANGGRAPH_API_URL}/threads/${threadId}/runs/${runId}/join`, {
       headers: {
         'x-api-key': LANGGRAPH_API_KEY!,
       }
-    })
+    });
 
-    if (!joinResponse.ok) {
-      const errorText = await joinResponse.text()
-      await updateTaskStatus(taskJobId, 'failed', `Failed to join run: ${joinResponse.status}: ${errorText}`)
-      throw new Error(`Failed to join run: ${joinResponse.status}: ${errorText}`)
+    if (joinResponse.ok) {
+        const result = await joinResponse.json();
+        const aiEstimate = extractAIEstimate(result); // Assumes extractAIEstimate is defined
+        if (aiEstimate) {
+            // Assumes updateProjectEstimate is defined
+            const updateResult = await updateProjectEstimate(projectId, aiEstimate);
+            if (updateResult.error) {
+                detailedErrorMessage = `Failed to update project estimate: ${updateResult.error}`;
+                // success remains false
+            } else {
+                success = true;
+            }
+        } else {
+            detailedErrorMessage = "AI estimate not found in LangGraph response.";
+            // success remains false
+        }
+    } else {
+        const errorText = await joinResponse.text();
+        detailedErrorMessage = `Failed to join run: ${joinResponse.status}: ${errorText}`;
+        // success remains false
     }
 
-    const result = await joinResponse.json()
-    
-    // Extract updated project info and AI estimate from the response
-    const aiEstimate = extractAIEstimate(result)
-
-    if (aiEstimate) {
-      await updateProjectEstimate(projectId, aiEstimate)
+    if (success) {
+        await updateTaskStatus(taskJobId, 'completed'); // Assumes updateTaskStatus is defined
+    } else {
+        await updateTaskStatus(taskJobId, 'failed', detailedErrorMessage || 'Processing completed but resulted in an error.');
     }
 
-    // Update the task status to completed
-    await updateTaskStatus(taskJobId, 'completed')
-    
-    return { success: true }
   } catch (error) {
-    console.error('Error processing completed run:', error)
-    await updateTaskStatus(taskJobId, 'failed', error instanceof Error ? error.message : 'Unknown error')
-    throw error
+    console.error('Error processing completed run:', error);
+    detailedErrorMessage = error instanceof Error ? error.message : 'Unknown error during run processing.';
+    await updateTaskStatus(taskJobId, 'failed', detailedErrorMessage);
+    // success remains false
+  }
+
+  // After processing, check if it originated from chat
+  const supabase = await createClient(); // Re-initialize or ensure it's available
+  const { data: taskJob, error: jobFetchError } = await supabase
+    .from('task_jobs')
+    .select('originating_chat_thread_id')
+    .eq('id', taskJobId)
+    .single();
+
+  if (jobFetchError) {
+    console.error("Failed to fetch task job for chat update:", jobFetchError);
+  } else if (taskJob?.originating_chat_thread_id) {
+    await recordChatEstimateUpdateResponse(taskJob.originating_chat_thread_id, success, detailedErrorMessage);
+  }
+}
+
+/**
+ * Check the status of an estimate generation job
+ */
+// REPLACED: checkEstimateStatus (II.E)
+export async function checkEstimateStatus(projectId: string) {
+  const supabase = await createClient();
+  try {
+    const { data: taskJob, error: taskJobError } = await supabase
+      .from('task_jobs')
+      .select('*') // Select all columns as per existing logic
+      .eq('project_id', projectId)
+      .eq('job_type', 'estimate_generation')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (taskJobError) {
+      if (taskJobError.code === 'PGRST116') { // No rows found
+        return { status: 'not_started' as TaskJobStatus };
+      }
+      console.error('Error fetching task job:', taskJobError);
+      return { error: 'Failed to fetch task status' };
+    }
+
+    if (taskJob.status === 'completed' || taskJob.status === 'failed') {
+      return {
+        status: taskJob.status as TaskJobStatus,
+        error: taskJob.error_message // This is the error_message from task_jobs table
+      };
+    }
+
+    // If the task is still processing, check the actual status from the API
+    // Using existing fetch URL structure
+    const response = await fetch(`${LANGGRAPH_API_URL}/threads/${taskJob.thread_id}/runs/${taskJob.run_id}`, {
+      headers: {
+        'x-api-key': LANGGRAPH_API_KEY!,
+      }
+    });
+
+     if (!response.ok) {
+      const apiErrorMsgBase = `LangGraph API request failed: ${response.status}`;
+      const errorText = await response.text();
+      const apiErrorMsg = `${apiErrorMsgBase} - ${errorText}`;
+      
+      // It's important to mark the job as failed in our DB if the API call fails definitively
+      // The plan specifically handles 404, but other errors should also be considered terminal for the run.
+      // For simplicity, treating non-OK responses (that are not transient) as failures.
+      await updateTaskStatus(taskJob.id, 'failed', apiErrorMsg);
+      if (taskJob.originating_chat_thread_id) {
+        await recordChatEstimateUpdateResponse(taskJob.originating_chat_thread_id, false, apiErrorMsg);
+      }
+      // The original code returned { error: `API request failed: ${response.status}` } for non-404 errors
+      // Returning status 'failed' is more consistent with the overall flow.
+      return { status: 'failed' as TaskJobStatus, error: apiErrorMsg };
+    }
+
+    const runStatus = await response.json() as { status: string }; // Assuming this is the shape
+
+    switch (runStatus.status) {
+      case 'success':
+        // processCompletedRun will handle updating task status and chat.
+        await processCompletedRun(taskJob.thread_id, taskJob.run_id, projectId, taskJob.id);
+        return { status: 'completed' as TaskJobStatus };
+      
+      case 'error':
+      case 'timeout':
+      case 'interrupted':
+        const failureMessage = `Run failed with status: ${runStatus.status}`;
+        await updateTaskStatus(taskJob.id, 'failed', failureMessage);
+        if (taskJob.originating_chat_thread_id) {
+          await recordChatEstimateUpdateResponse(taskJob.originating_chat_thread_id, false, failureMessage);
+        }
+        return { status: 'failed' as TaskJobStatus, error: failureMessage };
+      
+      case 'pending': // Explicitly handle pending
+      default: // Includes other states like 'processing' if any
+        return { status: 'processing' as TaskJobStatus }; // Or map to your TaskJobStatus appropriately
+    }
+  } catch (error) {
+    console.error('Error checking estimate status:', error);
+    // Attempt to update task status to failed if an unexpected error occurs, and if we have a taskJob.id
+    // This part is tricky as taskJob might not be defined if error happens before its fetch.
+    // For now, sticking to the plan's simpler error return.
+    return { error: error instanceof Error ? error.message : 'Unknown error occurred' };
   }
 }
 

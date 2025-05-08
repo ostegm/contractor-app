@@ -15,6 +15,7 @@ This table will store individual chat conversations.
 CREATE TABLE chat_threads (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
@@ -43,18 +44,10 @@ This table will store all events within a chat thread (user messages, assistant 
 
 **Migration SQL (append to `YYYYMMDD_HHMM_add_chat_tables.sql`):**
 ```sql
--- Define chat_event_type enum based on BAML AllowedTypes
-CREATE TYPE chat_event_type AS ENUM (
-    'UserInput',
-    'AssisantMessage',
-    'UpdateEstimateRequest',
-    'UpdateEstimateResponse'
-);
-
 CREATE TABLE chat_events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     thread_id UUID NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE,
-    event_type chat_event_type NOT NULL,
+    event_type TEXT NOT NULL,
     -- Store structured event data based on BAML types
     -- UserInput: { message: string }
     -- AssisantMessage: { message: string }
@@ -130,11 +123,11 @@ export interface DisplayableBamlEvent {
 ### B. New Server Action: `getOrCreateChatThread`
 To fetch or create a chat thread for a project, along with its events.
 ```typescript
-export async function getOrCreateChatThread(projectId: string): Promise<{ threadId: string; events: DisplayableBamlEvent[] }> {
+export async function getOrCreateChatThread(projectId: string): Promise<{ threadId: string; events: DisplayableBamlEvent[]; name: string }> {
   const supabase = await createClient();
   let { data: thread, error: threadError } = await supabase
     .from('chat_threads')
-    .select('id')
+    .select('id, name')
     .eq('project_id', projectId)
     .single();
 
@@ -144,17 +137,20 @@ export async function getOrCreateChatThread(projectId: string): Promise<{ thread
   }
 
   if (!thread) {
+    const now = new Date();
+    const defaultName = `Chat - ${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
     const { data: newThread, error: newThreadError } = await supabase
       .from('chat_threads')
-      .insert({ project_id: projectId })
-      .select('id')
+      .insert({ project_id: projectId, name: defaultName })
+      .select('id, name')
       .single();
     if (newThreadError || !newThread) {
       console.error('Error creating chat thread:', newThreadError);
       throw new Error('Failed to create chat thread.');
     }
     thread = newThread;
-    return { threadId: thread.id, events: [] }; // No events for a new thread
+    return { threadId: thread.id, events: [], name: thread.name };
   }
 
   // Fetch existing events for the thread
@@ -171,12 +167,12 @@ export async function getOrCreateChatThread(projectId: string): Promise<{ thread
 
   const displayableEvents: DisplayableBamlEvent[] = (dbEvents || []).map(e => ({
     id: e.id,
-    type: e.event_type as AllowedTypes, // DB enum must match Baml AllowedTypes
-    data: e.data as any, // Data structure in DB must match Baml event data types
+    type: e.event_type as AllowedTypes,
+    data: e.data as any,
     createdAt: e.created_at,
   }));
 
-  return { threadId: thread.id, events: displayableEvents };
+  return { threadId: thread.id, events: displayableEvents, name: thread.name };
 }
 ```
 
@@ -203,7 +199,7 @@ export async function postChatMessage(
   // 1. Save UserInput event
   const userInputToSave = {
     thread_id: threadId,
-    event_type: 'UserInput' as AllowedTypes,
+    event_type: 'UserInput',
     data: userInput,
     created_at: now,
   };
@@ -261,7 +257,7 @@ export async function postChatMessage(
   // 4. Save the event returned by BAML
   const bamlEventToSave = {
     thread_id: threadId,
-    event_type: nextBamlEventOutput.type as AllowedTypes,
+    event_type: nextBamlEventOutput.type,
     data: nextBamlEventOutput.data,
   };
   const { data: savedBamlEvent, error: bamlEventSaveError } = await supabase
@@ -389,7 +385,7 @@ async function recordChatEstimateUpdateResponse(
 
   const { error } = await supabase.from('chat_events').insert({
     thread_id: originatingChatThreadId,
-    event_type: 'UpdateEstimateResponse' as AllowedTypes, // Match DB enum/check
+    event_type: 'UpdateEstimateResponse',
     data: responseData,
   });
 
@@ -584,13 +580,14 @@ Example Location: `apps/web/app/projects/[id]/components/ChatInterface.tsx`
 
 *   **State:**
     *   `threadId: string | null`
+    *   `threadName: string | null`
     *   `events: DisplayableBamlEvent[]`
     *   `newMessage: string` (for input field)
     *   `isSending: boolean` (for user message submission)
     *   `isAssistantUpdatingEstimate: boolean` (tracks if an `UpdateEstimateRequest` is active and not yet responded to by `UpdateEstimateResponse`)
     *   `error: string | null` (for displaying errors)
 *   **Effects:**
-    *   On mount/`projectId` change: Call `getOrCreateChatThread` to load/initialize.
+    *   On mount/`projectId` change: Call `getOrCreateChatThread` to load/initialize. Sets `threadId`, `events`, and `threadName`.
     *   Polling: Use `useEffect` with `setInterval` (or a library like SWR/React Query) to call `getChatEvents` periodically, passing the `createdAt` timestamp of the latest event to fetch only new ones. Merge new events into the `events` state.
 *   **Functions:**
     *   `handleSendMessage`:
@@ -614,6 +611,7 @@ Example Location: `apps/web/app/projects/[id]/components/ChatInterface.tsx`
 
 *   The main project estimate display (outside the chat component) will continue to update based on its existing polling of `checkEstimateStatus`.
 *   The chat provides a conversational interface and an additional way to trigger these updates. The `UpdateEstimateResponse` in the chat log confirms the outcome of the chat-initiated request.
+*   Any existing mock chat UI or data will need to be removed or refactored to integrate with the new chat system.
 
 ## IV. BAML Client Usage
 

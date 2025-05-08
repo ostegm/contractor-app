@@ -15,6 +15,7 @@ import ReactMarkdown from "react-markdown"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import Image from "next/image"
+import ChatInterface from "./components/ChatInterface"
 
 // Storage bucket name used in Supabase URLs
 const STORAGE_BUCKET_NAME = 'contractor-app-dev';
@@ -40,8 +41,6 @@ interface Project {
 export default function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const { currentProjectView } = useView()
-  const [chatMessages, setChatMessages] = useState<string[]>([])
-  const [newMessage, setNewMessage] = useState("")
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [isProcessingState, setIsProcessingState] = useState(false)
@@ -183,7 +182,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     }
     
     // If file count has changed and we have an estimate, mark it as outdated
-    if (initialFileCount !== 0 && uploadedFiles.length !== initialFileCount && aiEstimate) {
+    if (initialFileCount > 0 && uploadedFiles.length !== initialFileCount && aiEstimate) {
       setIsEstimateOutdated(true)
     }
   }, [uploadedFiles, initialFileCount, aiEstimate, isLoading])
@@ -246,14 +245,6 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     // Mark estimate as outdated if it exists
     if (aiEstimate) {
       setIsEstimateOutdated(true)
-    }
-  }
-
-  const handleSendMessage = (event: React.FormEvent) => {
-    event.preventDefault()
-    if (newMessage.trim()) {
-      setChatMessages([...chatMessages, newMessage])
-      setNewMessage("")
     }
   }
 
@@ -522,215 +513,228 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         </div>
       </div>
 
-      {currentProjectView === 'estimate' && (
-        <div className="estimate-view space-y-6">
-          {/* Estimate Generation Status Overlays */}
-          {(isProcessingState || estimateStatus === 'processing') && (
-            <div className="fixed inset-0 bg-gray-900/80 z-40 flex flex-col items-center justify-center">
-              <RefreshCw className="h-12 w-12 animate-spin text-blue-500 mb-4" />
-              <h2 className="text-xl font-semibold text-gray-200 mb-2">Generating Estimate</h2>
-              <p className="text-gray-300 text-sm max-w-md text-center">Analyzing files... This may take a moment.</p>
-            </div>
-          )}
-          {estimateStatus === 'failed' && estimateError && (
-            <div className="fixed inset-0 bg-gray-900/80 z-40 flex flex-col items-center justify-center p-4">
-              <div className="text-red-500 mb-4"><TriangleAlert className="h-12 w-12" /></div>
-              <h2 className="text-xl font-semibold text-gray-200 mb-2">Estimate Generation Failed</h2>
-              <p className="text-red-400 text-sm max-w-md text-center mb-4">{estimateError}</p>
-              <Button onClick={() => { setEstimateStatus('not_started'); setEstimateError(null); }} className="bg-blue-600 hover:bg-blue-700">
-                Try Again
-              </Button>
-            </div>
-          )}
-
-          {/* AI Estimate Display */}
-          {aiEstimate ? (
-            <div className="space-y-5">
-              {isEstimateOutdated && (
-                <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 flex items-center">
-                  <RefreshCw className="h-5 w-5 text-yellow-400 mr-3 animate-spin" />
-                  <div>
-                    <h3 className="text-yellow-400 font-medium">Estimate may be outdated</h3>
-                    <p className="text-gray-300 text-sm">Files have changed. Regenerate estimate for updates.</p>
-                  </div>
+      {/* ADDED: Main content area with ChatInterface (example placement) */}
+      {/* You might want to adjust this to a two-column layout or integrate into existing views */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2">
+          {/* Existing view logic based on currentProjectView */}
+          {currentProjectView === 'estimate' && (
+            <div className="estimate-view space-y-6">
+              {/* Estimate Generation Status Overlays */}
+              {(isProcessingState || estimateStatus === 'processing') && (
+                <div className="fixed inset-0 bg-gray-900/80 z-40 flex flex-col items-center justify-center">
+                  <RefreshCw className="h-12 w-12 animate-spin text-blue-500 mb-4" />
+                  <h2 className="text-xl font-semibold text-gray-200 mb-2">Generating Estimate</h2>
+                  <p className="text-gray-300 text-sm max-w-md text-center">Analyzing files... This may take a moment.</p>
                 </div>
               )}
-              
-              {/* Estimate Overview Section from original component */}
-              <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-lg font-semibold">Estimate Overview</h2>
-                  <Button variant="ghost" size="sm" onClick={handleClearProjectEstimate} className="text-gray-400 hover:text-red-400 p-0 h-auto">
-                    <RefreshCw className="h-3.5 w-3.5" />
+              {estimateStatus === 'failed' && estimateError && (
+                <div className="fixed inset-0 bg-gray-900/80 z-40 flex flex-col items-center justify-center p-4">
+                  <div className="text-red-500 mb-4"><TriangleAlert className="h-12 w-12" /></div>
+                  <h2 className="text-xl font-semibold text-gray-200 mb-2">Estimate Generation Failed</h2>
+                  <p className="text-red-400 text-sm max-w-md text-center mb-4">{estimateError}</p>
+                  <Button onClick={() => { setEstimateStatus('not_started'); setEstimateError(null); }} className="bg-blue-600 hover:bg-blue-700">
+                    Try Again
                   </Button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
-                  <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
-                    <h4 className="text-sm font-medium text-gray-400 mb-1">Estimated Cost Range</h4>
-                    <p className="text-xl font-bold text-green-400">
-                      ${aiEstimate.estimated_total_min?.toLocaleString() ?? 'N/A'} - ${aiEstimate.estimated_total_max?.toLocaleString() ?? 'N/A'}
-                    </p>
-                  </div>
-                  <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
-                    <h4 className="text-sm font-medium text-gray-400 mb-1">Estimated Timeline</h4>
-                    <p className="text-xl font-bold text-blue-400">
-                      {aiEstimate.estimated_timeline_days ? `${aiEstimate.estimated_timeline_days} days` : 'Not specified'}
-                    </p>
-                  </div>
-                </div>
-                <div className="mb-4">
-                  <h3 className="text-sm font-medium text-gray-400 mb-2">Project Description</h3>
-                  <div className="text-gray-300 bg-gray-900/30 p-3 rounded-lg border border-gray-700 text-sm prose prose-sm prose-invert max-w-none">
-                     <ReactMarkdown>{aiEstimate.project_description}</ReactMarkdown>
-                  </div>
-                </div>
-                <div className="mb-4">
-                  <h3 className="text-sm font-medium text-gray-400 mb-2">Key Considerations</h3>
-                  <ul className="space-y-1 text-sm list-disc list-inside pl-1">
-                    {aiEstimate.key_considerations?.length > 0 ? (
-                      aiEstimate.key_considerations.map((consideration: string | null, index: number) => (
-                        <li key={index} className="text-gray-300">{consideration}</li>
-                      ))
-                    ) : (
-                      <li className="text-gray-500">No key considerations provided</li>
-                    )}
-                  </ul>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-gray-400 mb-2">Confidence Level</h3>
-                  <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${aiEstimate.confidence_level.includes('High') ? 'bg-green-900/50 text-green-400' : aiEstimate.confidence_level.includes('Medium') ? 'bg-yellow-900/50 text-yellow-400' : 'bg-red-900/50 text-red-400'}`}>
-                    {aiEstimate.confidence_level}
-                  </div>
-                </div>
-              </div>
+              )}
 
-              {/* Estimate Details Table from original component */}
-              <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
-                <h2 className="text-lg font-semibold mb-4">Estimate Details</h2>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-700">
-                        <th className="text-left pb-3 text-gray-400 font-medium">Item</th>
-                        <th className="text-left pb-3 text-gray-400 font-medium">Category</th>
-                        <th className="text-right pb-3 text-gray-400 font-medium">Quantity</th>
-                        <th className="text-right pb-3 text-gray-400 font-medium">Cost Range</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-800">
-                      {aiEstimate.estimate_items?.length > 0 ? (
-                        aiEstimate.estimate_items.map((item: EstimateLineItem, index: number) => (
-                          <tr key={index} className="hover:bg-gray-700/20">
-                            <td className="py-3 pr-4">
-                              <div className="font-medium text-gray-200">{item.description}</div>
-                              {item.notes && <div className="text-xs text-gray-400 mt-1 prose prose-xs prose-invert max-w-none"><ReactMarkdown>{item.notes}</ReactMarkdown></div>}
-                            </td>
-                            <td className="py-3 text-gray-400">
-                              {item.category}
-                              {item.subcategory && <span className="text-xs block text-gray-500">{item.subcategory}</span>}
-                            </td>
-                            <td className="py-3 text-right text-gray-300">
-                              {item.quantity ? `${item.quantity} ${item.unit || ''}` : '-'}
-                            </td>
-                            <td className="py-3 text-right font-medium text-green-400">
-                              ${item.cost_range_min.toLocaleString()} - ${item.cost_range_max.toLocaleString()}
+              {/* AI Estimate Display */}
+              {aiEstimate ? (
+                <div className="space-y-5">
+                  {isEstimateOutdated && (
+                    <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 flex items-center">
+                      <RefreshCw className="h-5 w-5 text-yellow-400 mr-3 animate-spin" />
+                      <div>
+                        <h3 className="text-yellow-400 font-medium">Estimate may be outdated</h3>
+                        <p className="text-gray-300 text-sm">Files have changed. Regenerate estimate for updates.</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Estimate Overview Section from original component */}
+                  <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
+                    <div className="flex justify-between items-center mb-4">
+                      <h2 className="text-lg font-semibold">Estimate Overview</h2>
+                      <Button variant="ghost" size="sm" onClick={handleClearProjectEstimate} className="text-gray-400 hover:text-red-400 p-0 h-auto">
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                      <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                        <h4 className="text-sm font-medium text-gray-400 mb-1">Estimated Cost Range</h4>
+                        <p className="text-xl font-bold text-green-400">
+                          ${aiEstimate.estimated_total_min?.toLocaleString() ?? 'N/A'} - ${aiEstimate.estimated_total_max?.toLocaleString() ?? 'N/A'}
+                        </p>
+                      </div>
+                      <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                        <h4 className="text-sm font-medium text-gray-400 mb-1">Estimated Timeline</h4>
+                        <p className="text-xl font-bold text-blue-400">
+                          {aiEstimate.estimated_timeline_days ? `${aiEstimate.estimated_timeline_days} days` : 'Not specified'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mb-4">
+                      <h3 className="text-sm font-medium text-gray-400 mb-2">Project Description</h3>
+                      <div className="text-gray-300 bg-gray-900/30 p-3 rounded-lg border border-gray-700 text-sm prose prose-sm prose-invert max-w-none">
+                         <ReactMarkdown>{aiEstimate.project_description}</ReactMarkdown>
+                      </div>
+                    </div>
+                    <div className="mb-4">
+                      <h3 className="text-sm font-medium text-gray-400 mb-2">Key Considerations</h3>
+                      <ul className="space-y-1 text-sm list-disc list-inside pl-1">
+                        {aiEstimate.key_considerations?.length > 0 ? (
+                          aiEstimate.key_considerations.map((consideration: string | null, index: number) => (
+                            <li key={index} className="text-gray-300">{consideration}</li>
+                          ))
+                        ) : (
+                          <li className="text-gray-500">No key considerations provided</li>
+                        )}
+                      </ul>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-400 mb-2">Confidence Level</h3>
+                      <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${aiEstimate.confidence_level.includes('High') ? 'bg-green-900/50 text-green-400' : aiEstimate.confidence_level.includes('Medium') ? 'bg-yellow-900/50 text-yellow-400' : 'bg-red-900/50 text-red-400'}`}>
+                        {aiEstimate.confidence_level}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Estimate Details Table from original component */}
+                  <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
+                    <h2 className="text-lg font-semibold mb-4">Estimate Details</h2>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-700">
+                            <th className="text-left pb-3 text-gray-400 font-medium">Item</th>
+                            <th className="text-left pb-3 text-gray-400 font-medium">Category</th>
+                            <th className="text-right pb-3 text-gray-400 font-medium">Quantity</th>
+                            <th className="text-right pb-3 text-gray-400 font-medium">Cost Range</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-800">
+                          {aiEstimate.estimate_items?.length > 0 ? (
+                            aiEstimate.estimate_items.map((item: EstimateLineItem, index: number) => (
+                              <tr key={index} className="hover:bg-gray-700/20">
+                                <td className="py-3 pr-4">
+                                  <div className="font-medium text-gray-200">{item.description}</div>
+                                  {item.notes && <div className="text-xs text-gray-400 mt-1 prose prose-xs prose-invert max-w-none"><ReactMarkdown>{item.notes}</ReactMarkdown></div>}
+                                </td>
+                                <td className="py-3 text-gray-400">
+                                  {item.category}
+                                  {item.subcategory && <span className="text-xs block text-gray-500">{item.subcategory}</span>}
+                                </td>
+                                <td className="py-3 text-right text-gray-300">
+                                  {item.quantity ? `${item.quantity} ${item.unit || ''}` : '-'}
+                                </td>
+                                <td className="py-3 text-right font-medium text-green-400">
+                                  ${item.cost_range_min.toLocaleString()} - ${item.cost_range_max.toLocaleString()}
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr><td colSpan={4} className="py-4 text-center text-gray-500">No estimate items available</td></tr>
+                          )}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t border-gray-700">
+                            <td colSpan={3} className="py-3 text-right font-medium">Total Estimate</td>
+                            <td className="py-3 text-right font-bold text-green-400">
+                              ${aiEstimate.estimated_total_min?.toLocaleString() ?? 'N/A'} - ${aiEstimate.estimated_total_max?.toLocaleString() ?? 'N/A'}
                             </td>
                           </tr>
-                        ))
-                      ) : (
-                        <tr><td colSpan={4} className="py-4 text-center text-gray-500">No estimate items available</td></tr>
-                      )}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border-t border-gray-700">
-                        <td colSpan={3} className="py-3 text-right font-medium">Total Estimate</td>
-                        <td className="py-3 text-right font-bold text-green-400">
-                          ${aiEstimate.estimated_total_min?.toLocaleString() ?? 'N/A'} - ${aiEstimate.estimated_total_max?.toLocaleString() ?? 'N/A'}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                  {/* Other sections like Next Steps, Risks, Missing Info from original component */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                    <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
+                      <h2 className="text-lg font-semibold mb-3">Next Steps</h2>
+                      <ul className="space-y-2 list-decimal list-inside pl-1">
+                        {aiEstimate.next_steps?.length > 0 ? aiEstimate.next_steps.map((step: string | null, index: number) => (<li key={index} className="text-sm text-gray-300">{step}</li>)) : <li className="text-gray-500">No next steps.</li>}
+                      </ul>
+                    </div>
+                    <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
+                      <h2 className="text-lg font-semibold mb-3">Key Risks</h2>
+                      <ul className="space-y-2 list-disc list-inside pl-1">
+                        {aiEstimate.key_risks?.length > 0 ? aiEstimate.key_risks.map((risk: string | null, index: number) => (<li key={index} className="text-sm text-gray-300">{risk}</li>)) : <li className="text-gray-500">No risks identified.</li>}
+                      </ul>
+                    </div>
+                    <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
+                      <h2 className="text-lg font-semibold mb-3 flex items-center">
+                        <span>Missing Information</span>
+                        {aiEstimate.missing_information?.length > 0 && <span className="ml-2 bg-yellow-900/50 text-yellow-400 text-xs px-2 py-0.5 rounded-full">{aiEstimate.missing_information.length} items</span>}
+                      </h2>
+                      <ul className="space-y-2 list-disc list-inside pl-1">
+                        {aiEstimate.missing_information?.length > 0 ? aiEstimate.missing_information.map((item: string | null, index: number) => (<li key={index} className="text-sm text-gray-300">{item}</li>)) : <li className="text-gray-500">No missing info.</li>}
+                      </ul>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              {/* Other sections like Next Steps, Risks, Missing Info from original component */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
-                  <h2 className="text-lg font-semibold mb-3">Next Steps</h2>
-                  <ul className="space-y-2 list-decimal list-inside pl-1">
-                    {aiEstimate.next_steps?.length > 0 ? aiEstimate.next_steps.map((step: string | null, index: number) => (<li key={index} className="text-sm text-gray-300">{step}</li>)) : <li className="text-gray-500">No next steps.</li>}
-                  </ul>
+              ) : estimateStatus !== 'processing' && estimateStatus !== 'failed' && (
+                <div className="bg-gray-800 rounded-lg p-8 border border-gray-700 border-dashed text-center min-h-[400px] flex flex-col justify-center items-center">
+                  <FileText className="h-12 w-12 text-blue-400 mb-4" />
+                  <h2 className="text-xl font-semibold mb-2">No Estimate Generated Yet</h2>
+                  <p className="text-gray-400 mb-6 max-w-md mx-auto">Upload project files and click "Generate Estimate".</p>
+                  <Button onClick={handleGenerateEstimate} className={`text-white ${isEstimateOutdated ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700'}`} disabled={uploadedFiles.length === 0}>
+                    <Play className="mr-2 h-4 w-4" /> Generate Estimate
+                  </Button>
                 </div>
-                <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
-                  <h2 className="text-lg font-semibold mb-3">Key Risks</h2>
-                  <ul className="space-y-2 list-disc list-inside pl-1">
-                    {aiEstimate.key_risks?.length > 0 ? aiEstimate.key_risks.map((risk: string | null, index: number) => (<li key={index} className="text-sm text-gray-300">{risk}</li>)) : <li className="text-gray-500">No risks identified.</li>}
-                  </ul>
-                </div>
-                <div className="bg-gray-800 rounded-lg p-5 border border-gray-700">
-                  <h2 className="text-lg font-semibold mb-3 flex items-center">
-                    <span>Missing Information</span>
-                    {aiEstimate.missing_information?.length > 0 && <span className="ml-2 bg-yellow-900/50 text-yellow-400 text-xs px-2 py-0.5 rounded-full">{aiEstimate.missing_information.length} items</span>}
-                  </h2>
-                  <ul className="space-y-2 list-disc list-inside pl-1">
-                    {aiEstimate.missing_information?.length > 0 ? aiEstimate.missing_information.map((item: string | null, index: number) => (<li key={index} className="text-sm text-gray-300">{item}</li>)) : <li className="text-gray-500">No missing info.</li>}
-                  </ul>
-                </div>
-              </div>
+              )}
             </div>
-          ) : estimateStatus !== 'processing' && estimateStatus !== 'failed' && (
-            <div className="bg-gray-800 rounded-lg p-8 border border-gray-700 border-dashed text-center min-h-[400px] flex flex-col justify-center items-center">
-              <FileText className="h-12 w-12 text-blue-400 mb-4" />
-              <h2 className="text-xl font-semibold mb-2">No Estimate Generated Yet</h2>
-              <p className="text-gray-400 mb-6 max-w-md mx-auto">Upload project files and click "Generate Estimate".</p>
-              <Button onClick={handleGenerateEstimate} className={`text-white ${isEstimateOutdated ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700'}`} disabled={uploadedFiles.length === 0}>
-                <Play className="mr-2 h-4 w-4" /> Generate Estimate
-              </Button>
+          )}
+
+          {currentProjectView === 'files' && (
+            <div className="files-view">
+              {/* File Management Section from original component */}
+              <div className="bg-gray-800 rounded-lg p-5 border border-gray-700 mb-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold">Project Files</h2>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" className="border-gray-600 text-gray-300 hover:bg-gray-700" onClick={() => setNoteDialogOpen(true)}>
+                      <StickyNote className="h-3.5 w-3.5 mr-1.5" /> Add Note
+                    </Button>
+                    <Input type="file" onChange={handleFileSelect} className="hidden" id="file-upload-input-main" disabled={isUploading} />
+                    <Button size="sm" variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-700" disabled={isUploading} onClick={() => document.getElementById('file-upload-input-main')?.click()}>
+                      {isUploading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />} Upload File
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-1">
+                  {uploadedFiles.length === 0 ? (
+                    <div className="text-gray-400 text-center py-8 border border-dashed border-gray-700 rounded-lg">
+                      <p className="text-sm mb-2">No files uploaded for this project.</p>
+                      <p className="text-xs">Upload construction plans, images, or notes.</p>
+                    </div>
+                  ) : (
+                    uploadedFiles.map((file) => (
+                      <div key={file.id} className="flex items-center justify-between bg-gray-700/30 hover:bg-gray-700/50 p-3 rounded-md transition-colors">
+                        <div className="flex items-center overflow-hidden">
+                          {isMarkdownFile(file.file_name) && file.description === 'Project note' ? <StickyNote className="mr-2 h-4 w-4 text-yellow-400 flex-shrink-0" /> : <File className="mr-2 h-4 w-4 text-blue-400 flex-shrink-0" />}
+                          <button onClick={(e) => handleFileClick(file, e)} className="text-gray-200 hover:text-blue-400 bg-transparent border-0 p-0 cursor-pointer truncate text-sm">
+                            {file.file_name}
+                          </button>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => handleDeleteFile(file.id)} className="text-red-400 hover:text-red-300 hover:bg-red-900/20 ml-1 p-1 h-auto">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>
-      )}
 
-      {currentProjectView === 'files' && (
-        <div className="files-view">
-          {/* File Management Section from original component */}
-          <div className="bg-gray-800 rounded-lg p-5 border border-gray-700 mb-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Project Files</h2>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="border-gray-600 text-gray-300 hover:bg-gray-700" onClick={() => setNoteDialogOpen(true)}>
-                  <StickyNote className="h-3.5 w-3.5 mr-1.5" /> Add Note
-                </Button>
-                <Input type="file" onChange={handleFileSelect} className="hidden" id="file-upload-input-main" disabled={isUploading} />
-                <Button size="sm" variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-700" disabled={isUploading} onClick={() => document.getElementById('file-upload-input-main')?.click()}>
-                  {isUploading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />} Upload File
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-1">
-              {uploadedFiles.length === 0 ? (
-                <div className="text-gray-400 text-center py-8 border border-dashed border-gray-700 rounded-lg">
-                  <p className="text-sm mb-2">No files uploaded for this project.</p>
-                  <p className="text-xs">Upload construction plans, images, or notes.</p>
-                </div>
-              ) : (
-                uploadedFiles.map((file) => (
-                  <div key={file.id} className="flex items-center justify-between bg-gray-700/30 hover:bg-gray-700/50 p-3 rounded-md transition-colors">
-                    <div className="flex items-center overflow-hidden">
-                      {isMarkdownFile(file.file_name) && file.description === 'Project note' ? <StickyNote className="mr-2 h-4 w-4 text-yellow-400 flex-shrink-0" /> : <File className="mr-2 h-4 w-4 text-blue-400 flex-shrink-0" />}
-                      <button onClick={(e) => handleFileClick(file, e)} className="text-gray-200 hover:text-blue-400 bg-transparent border-0 p-0 cursor-pointer truncate text-sm">
-                        {file.file_name}
-                      </button>
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={() => handleDeleteFile(file.id)} className="text-red-400 hover:text-red-300 hover:bg-red-900/20 ml-1 p-1 h-auto">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+        {/* Chat Interface Column */}
+        <div className="md:col-span-1">
+          {/* Ensure id is available before rendering */}
+          {id && <ChatInterface projectId={id} />}
         </div>
-      )}
+      </div>
 
       {/* Upload File Dialog - Corrected Usage */}
       <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
