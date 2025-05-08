@@ -113,6 +113,8 @@ export interface UpdateEstimateRequest {
 }
 
 export interface UpdateEstimateResponse {
+  success: boolean
+  error_message: string
   
 }
 

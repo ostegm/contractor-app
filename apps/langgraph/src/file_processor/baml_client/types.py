@@ -92,7 +92,9 @@ class InputFile(BaseModel):
 class UpdateEstimateRequest(BaseModel):
     changes_to_make: str
 
-class UpdateEstimateResponse(BaseModel):pass
+class UpdateEstimateResponse(BaseModel):
+    success: bool
+    error_message: str
 
 class UserInput(BaseModel):
     message: str

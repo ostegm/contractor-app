@@ -30,6 +30,8 @@ class UpdateEstimateRequest {
 }
 
 class UpdateEstimateResponse {
+    success bool @description("Whether the update was successful")
+    error_message string @description("The error message if the update was not successful")
 }
 
 

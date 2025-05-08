@@ -87,6 +87,8 @@ export namespace partial_types {
     }
     
     export interface UpdateEstimateResponse {
+        success?: (boolean | null)
+        error_message?: (string | null)
     }
     
     export interface UserInput {

@@ -80,7 +80,9 @@ class InputFile(BaseModel):
 class UpdateEstimateRequest(BaseModel):
     changes_to_make: Optional[str] = None
 
-class UpdateEstimateResponse(BaseModel):pass
+class UpdateEstimateResponse(BaseModel):
+    success: Optional[bool] = None
+    error_message: Optional[str] = None
 
 class UserInput(BaseModel):
     message: Optional[str] = None
