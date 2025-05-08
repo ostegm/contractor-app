@@ -3,6 +3,7 @@
 # Standard library imports
 import base64
 import logging
+import os
 from typing import Any, Dict
 
 # Third-party imports
@@ -17,6 +18,7 @@ from .state import Configuration, State
 
 # Set up logging
 logger = logging.getLogger(__name__)
+
 
 
 async def download_from_url(url: str) -> str:
@@ -55,6 +57,7 @@ async def download_from_url(url: str) -> str:
 async def process_files(state: State, config: RunnableConfig) -> Dict[str, Any]:
     """Process the files using BAML and update the project information."""
     logger.info("Processing files using BAML...")
+    logger.info("OPENAI_API_KEY: %s", os.getenv("OPENAI_API_KEY"))
     processed_files: list[InputFile] = []
     for file_data in state.files:
         # Ensure file_data is an InputFile instance
@@ -109,22 +112,7 @@ async def process_files(state: State, config: RunnableConfig) -> Dict[str, Any]:
         # TODO Add audio and video processing.
 
     # Call BAML function
-    try:
-        logger.info("Making BAML call to ProcessProjectFiles...")
-        # collector = Collector(name="my-collector")
-        updated_project_info = await b.ProcessProjectFiles(
-            project_info=state.project_info,
-            files=processed_files, # Use the processed list
-            # baml_options={"collector": collector}
-        )
-        logger.info("Successfully processed files using BAML.")
-        # Return the updated state fields that were modified
-        return {"files": processed_files, "updated_project_info": updated_project_info}
-    except Exception as e:
-        # logging.info(collector.last.calls[0])
-        error_msg = f"BAML ProcessProjectFiles failed: {str(e)}"
-        logger.error(error_msg)
-        raise Exception(error_msg)
+    return {"files": processed_files}
 
 
 async def generate_estimate(state: State, config: RunnableConfig) -> Dict[str, Any]:
@@ -136,7 +124,9 @@ async def generate_estimate(state: State, config: RunnableConfig) -> Dict[str, A
     try:
         logger.info("Making BAML call to GenerateProjectEstimate...")
         response: ConstructionProjectData = await b.GenerateProjectEstimate(
-            project_assessment=state.updated_project_info
+            files=state.files,
+            existing_estimate=state.ai_estimate,
+            requested_changes=state.requested_changes
         )
         logger.info("Successfully generated construction estimate using BAML.")
         # BAML function already returns the structured data

@@ -18,15 +18,12 @@ class State:
     for more information.
     """
 
-    # Current project information in markdown format
-    project_info: str = ""
-    
     # List of files to process (could be videos, text, pictures, voice recordings)
     files: List[Union[InputFile]] = field(default_factory=list)
     
-    # Updated project information after processing
-    updated_project_info: str = ""
-    
+    # The user's requested changes to the estimate
+    requested_changes: Optional[str] = None
+
     # AI-generated construction estimate in JSON format
     ai_estimate: Optional[ConstructionProjectData] = None
 

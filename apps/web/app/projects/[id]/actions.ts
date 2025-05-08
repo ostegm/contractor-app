@@ -286,7 +286,7 @@ export async function clearProjectEstimate(projectId: string) {
 /**
  * Start asynchronous estimate generation for a project
  */
-export async function startEstimateGeneration(projectId: string, files: FileToProcess[]) {
+export async function startEstimateGeneration(projectId: string, files: FileToProcess[], requested_changes?: string) {
   try {
     // Get project info from database
     const supabase = await createClient()
@@ -338,9 +338,9 @@ export async function startEstimateGeneration(projectId: string, files: FileToPr
 
     // Create the input state
     const inputState = {
-      project_info: project.project_info || `# ${project.name}\n\n${project.description}`,
       files: processedFiles,
-      updated_project_info: ''
+      existing_estimate: project.ai_estimate ? JSON.parse(project.ai_estimate) : null,
+      requested_changes: "Make it all one line item."
     }
 
     // Create a background run
@@ -493,13 +493,7 @@ async function processCompletedRun(threadId: string, runId: string, projectId: s
     const result = await joinResponse.json()
     
     // Extract updated project info and AI estimate from the response
-    const updatedProjectInfo = extractProjectInfo(result)
     const aiEstimate = extractAIEstimate(result)
-
-    // Update the project in the database
-    if (updatedProjectInfo) {
-      await updateProjectInfo(projectId, updatedProjectInfo)
-    }
 
     if (aiEstimate) {
       await updateProjectEstimate(projectId, aiEstimate)
@@ -546,15 +540,7 @@ async function updateTaskStatus(taskJobId: string, status: string, errorMessage?
  * Helper to extract project info from API response
  */
 interface ApiResponse {
-  updated_project_info?: string;
   ai_estimate?: ConstructionProjectData;
-}
-
-function extractProjectInfo(result: ApiResponse): string | null {
-  if (result.updated_project_info) {
-    return result.updated_project_info
-  }
-  return null
 }
 
 /**
