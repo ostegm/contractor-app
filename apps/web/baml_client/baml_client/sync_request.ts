@@ -32,14 +32,14 @@ export class HttpRequest {
 
   
   DetermineNextStep(
-      thread: BamlChatThread,
+      thread: BamlChatThread,current_estimate: ConstructionProjectData,
       __baml_options__?: BamlCallOptions
   ): HTTPRequest {
     try {
       return this.runtime.buildRequestSync(
         "DetermineNextStep",
         {
-          "thread": thread
+          "thread": thread,"current_estimate": current_estimate
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),
@@ -78,14 +78,14 @@ export class HttpStreamRequest {
 
   
   DetermineNextStep(
-      thread: BamlChatThread,
+      thread: BamlChatThread,current_estimate: ConstructionProjectData,
       __baml_options__?: BamlCallOptions
   ): HTTPRequest {
     try {
       return this.runtime.buildRequestSync(
         "DetermineNextStep",
         {
-          "thread": thread
+          "thread": thread,"current_estimate": current_estimate
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),

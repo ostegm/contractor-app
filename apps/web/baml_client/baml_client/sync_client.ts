@@ -86,7 +86,7 @@ export class BamlSyncClient {
 
   
   DetermineNextStep(
-      thread: BamlChatThread,
+      thread: BamlChatThread,current_estimate: ConstructionProjectData,
       __baml_options__?: BamlCallOptions
   ): Event {
     try {
@@ -95,7 +95,7 @@ export class BamlSyncClient {
       const raw = this.runtime.callFunctionSync(
         "DetermineNextStep",
         {
-          "thread": thread
+          "thread": thread,"current_estimate": current_estimate
         },
         this.ctxManager.cloneContext(),
         options.tb?.__tb(),

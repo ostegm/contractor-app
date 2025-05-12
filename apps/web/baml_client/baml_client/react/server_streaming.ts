@@ -36,14 +36,17 @@ import type * as types from "../types"
  * BAML stream function. The returned stream yields incremental updates.
  *
  * @param { BamlChatThread } thread - Input parameter.
+ * @param { ConstructionProjectData } current_estimate - Input parameter.
  *
  * @returns {ReadableStream<Uint8Array>} A stream that yields incremental updates from the action.
  */
 export const DetermineNextStep = async (
   thread: BamlChatThread,
+  current_estimate: ConstructionProjectData,
 ): Promise<ReadableStream<Uint8Array>> => {
   const stream = b.stream.DetermineNextStep(
     thread,
+    current_estimate,
   );
   return Promise.resolve(stream.toStreamable());
 };

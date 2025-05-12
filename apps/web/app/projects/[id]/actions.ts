@@ -469,11 +469,40 @@ export async function createChatThreadAndPostMessage(
       createdAt: savedUserInput.created_at
     };
 
-    // 3. Call b.DetermineNextStep with only the first user message
-    const firstThreadState: BamlChatThread = { events: [{ type: 'UserInput' as AllowedTypes, data: userInput }] };
-    const nextBamlEventOutput = await b.DetermineNextStep(firstThreadState);
+    // 3. Fetch current estimate
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('ai_estimate')
+      .eq('id', projectId)
+      .single();
 
-    // 4. Handle BAML response using helper function
+    if (projectError) {
+      console.error('Error fetching project estimate for chat:', projectError);
+      // Attempt cleanup: Delete the created thread and saved message
+      await supabase.from('chat_events').delete().eq('id', savedUserInput.id);
+      await supabase.from('chat_threads').delete().eq('id', newThreadId);
+      throw new Error('Failed to fetch project estimate for chat.');
+    }
+
+    let currentEstimate: ConstructionProjectData | null = null;
+    if (project?.ai_estimate) {
+      try {
+        currentEstimate = JSON.parse(project.ai_estimate as string);
+      } catch (parseError) {
+        console.error('Error parsing current estimate JSON:', parseError);
+         // Decide how to handle - proceed without estimate? Return error?
+        // For now, proceeding without, but logging the error.
+      }
+    }
+
+    // 4. Call b.DetermineNextStep with the first user message and estimate
+    const firstThreadState: BamlChatThread = { events: [{ type: 'UserInput' as AllowedTypes, data: userInput }] };
+    // Ensure currentEstimate is not null before passing, BAML might require it
+    // If BAML function definition makes current_estimate mandatory, handle null case appropriately.
+    // Assuming for now BAML handles null or we pass an empty object if needed.
+    const nextBamlEventOutput = await b.DetermineNextStep(firstThreadState, currentEstimate ?? {} as ConstructionProjectData);
+
+    // 5. Handle BAML response using helper function
     const { assistantResponseDisplayEvent, updateTriggered, error: bamlHandleError } = await _handleBamlResponse(
       newThreadId,
       projectId,
@@ -583,6 +612,29 @@ export async function postChatMessage(
       return { userInputDisplayEvent, updateTriggered: false, error: 'Failed to fetch conversation history.' };
     }
 
+    // 2.5 Fetch current estimate
+     const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('ai_estimate')
+      .eq('id', projectId)
+      .single();
+
+    if (projectError) {
+      console.error('Error fetching project estimate for chat:', projectError);
+      return { userInputDisplayEvent, updateTriggered: false, error: 'Failed to fetch project estimate for chat.' };
+    }
+
+    let currentEstimate: ConstructionProjectData | null = null;
+    if (project?.ai_estimate) {
+      try {
+        currentEstimate = JSON.parse(project.ai_estimate as string);
+      } catch (parseError) {
+        console.error('Error parsing current estimate JSON:', parseError);
+         // Decide how to handle - proceed without estimate? Return error?
+        // For now, proceeding without, but logging the error.
+      }
+    }
+
     const bamlEventsForProcessing: BamlEvent[] = (dbEvents || []).map(dbEvent => ({
       type: dbEvent.event_type as AllowedTypes,
       data: dbEvent.data as any,
@@ -593,7 +645,9 @@ export async function postChatMessage(
     // 3. Call BAML
     let nextBamlEventOutput: BamlEvent;
     try {
-        nextBamlEventOutput = await b.DetermineNextStep(currentThreadState);
+        // Ensure currentEstimate is not null before passing, BAML might require it
+        // Assuming BAML handles null or we pass an empty object if needed.
+        nextBamlEventOutput = await b.DetermineNextStep(currentThreadState, currentEstimate ?? {} as ConstructionProjectData);
     } catch (bamlError) {
         console.error('BAML DetermineNextStep error:', bamlError);
         return { userInputDisplayEvent, updateTriggered: false, error: 'AI failed to determine next step.' };

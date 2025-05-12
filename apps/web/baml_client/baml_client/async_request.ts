@@ -32,14 +32,14 @@ export class AsyncHttpRequest {
 
   
   async DetermineNextStep(
-      thread: BamlChatThread,
+      thread: BamlChatThread,current_estimate: ConstructionProjectData,
       __baml_options__?: BamlCallOptions
   ): Promise<HTTPRequest> {
     try {
       return await this.runtime.buildRequest(
         "DetermineNextStep",
         {
-          "thread": thread
+          "thread": thread,"current_estimate": current_estimate
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),
@@ -78,14 +78,14 @@ export class AsyncHttpStreamRequest {
 
   
   async DetermineNextStep(
-      thread: BamlChatThread,
+      thread: BamlChatThread,current_estimate: ConstructionProjectData,
       __baml_options__?: BamlCallOptions
   ): Promise<HTTPRequest> {
     try {
       return await this.runtime.buildRequest(
         "DetermineNextStep",
         {
-          "thread": thread
+          "thread": thread,"current_estimate": current_estimate
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),

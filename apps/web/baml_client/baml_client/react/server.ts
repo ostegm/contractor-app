@@ -36,14 +36,17 @@ import type * as types from "../types"
  * with the specified parameters.
  *
  * @param { BamlChatThread } thread - Input parameter.
+ * @param { ConstructionProjectData } current_estimate - Input parameter.
  *
  * @returns {Promise<Event>} A promise that resolves with the result of the action.
  */
 export const DetermineNextStep = async (
   thread: BamlChatThread,
+  current_estimate: ConstructionProjectData,
 ): Promise<Event> => {
   return b.DetermineNextStep(
     thread,
+    current_estimate,
   );
 };
 

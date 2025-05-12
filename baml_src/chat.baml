@@ -35,19 +35,23 @@ class UpdateEstimateResponse {
 }
 
 
-function DetermineNextStep(thread: BamlChatThread) -> Event {
+function DetermineNextStep(thread: BamlChatThread, current_estimate: ConstructionProjectData) -> Event {
     client OpenaiFallback
     prompt #"
-    You are a helpful assistant that is given a list of events.
-    You need to determine the next step in the conversation.
+    You're a construction estimator working with a client. Help the client with any questions including updating the estimate as needed.
+    Use the current estimate and the conversation history to determine the next step.
 
-    Here's a conversation history:
+    <current_estimate>
+    {{ current_estimate }}
+    </current_estimate>
+
+    <conversation_history>
     {% for event in thread.events %}
     <{{ event.type }}>
     {{ event.data }}
     </{{ event.type }}>
     {% endfor %}
-
+    </conversation_history>
     {{ ctx.output_format }}
     "#
     

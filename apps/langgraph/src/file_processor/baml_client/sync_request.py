@@ -39,7 +39,7 @@ class HttpRequest:
     
     def DetermineNextStep(
         self,
-        thread: types.BamlChatThread,
+        thread: types.BamlChatThread,current_estimate: types.ConstructionProjectData,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -52,7 +52,7 @@ class HttpRequest:
       return self.__runtime.build_request_sync(
         "DetermineNextStep",
         {
-          "thread": thread,
+          "thread": thread,"current_estimate": current_estimate,
         },
         self.__ctx_manager.get(),
         tb,
@@ -96,7 +96,7 @@ class HttpStreamRequest:
     
     def DetermineNextStep(
         self,
-        thread: types.BamlChatThread,
+        thread: types.BamlChatThread,current_estimate: types.ConstructionProjectData,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -109,7 +109,7 @@ class HttpStreamRequest:
       return self.__runtime.build_request_sync(
         "DetermineNextStep",
         {
-          "thread": thread,
+          "thread": thread,"current_estimate": current_estimate,
         },
         self.__ctx_manager.get(),
         tb,

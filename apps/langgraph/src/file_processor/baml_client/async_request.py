@@ -39,7 +39,7 @@ class AsyncHttpRequest:
     
     async def DetermineNextStep(
         self,
-        thread: types.BamlChatThread,
+        thread: types.BamlChatThread,current_estimate: types.ConstructionProjectData,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -53,6 +53,7 @@ class AsyncHttpRequest:
         "DetermineNextStep",
         {
           "thread": thread,
+          "current_estimate": current_estimate,
         },
         self.__ctx_manager.get(),
         tb,
@@ -98,7 +99,7 @@ class AsyncHttpStreamRequest:
     
     async def DetermineNextStep(
         self,
-        thread: types.BamlChatThread,
+        thread: types.BamlChatThread,current_estimate: types.ConstructionProjectData,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -112,6 +113,7 @@ class AsyncHttpStreamRequest:
         "DetermineNextStep",
         {
           "thread": thread,
+          "current_estimate": current_estimate,
         },
         self.__ctx_manager.get(),
         tb,

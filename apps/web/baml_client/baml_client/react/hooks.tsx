@@ -362,6 +362,8 @@ function useBamlAction<FunctionName extends FunctionNames>(
  *
  * - thread: BamlChatThread
  *
+ * - current_estimate: ConstructionProjectData
+ *
  *
  * **Return Type:**
  * - **Non‑streaming:** Event
