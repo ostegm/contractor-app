@@ -308,34 +308,22 @@ export async function clearProjectEstimate(projectId: string) {
   }
 }
 
-export async function getOrCreateChatThread(projectId: string): Promise<{ threadId: string; events: DisplayableBamlEvent[]; name: string }> {
+// RENAMED and MODIFIED: Only fetches existing thread, doesn't create
+export async function getChatThreadDetails(threadId: string): Promise<{ events: DisplayableBamlEvent[]; name: string } | null> {
   const supabase = await createClient();
+  // Fetch the specific thread by ID
   let { data: thread, error: threadError } = await supabase
     .from('chat_threads')
     .select('id, name')
-    .eq('project_id', projectId)
+    .eq('id', threadId)
     .single();
 
-  if (threadError && threadError.code !== 'PGRST116') { // PGRST116: No rows found
-    console.error('Error fetching chat thread:', threadError);
-    throw new Error('Failed to fetch chat thread.');
-  }
-
-  if (!thread) {
-    const now = new Date();
-    const defaultName = `Chat - ${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-    const { data: newThread, error: newThreadError } = await supabase
-      .from('chat_threads')
-      .insert({ project_id: projectId, name: defaultName })
-      .select('id, name')
-      .single();
-    if (newThreadError || !newThread) {
-      console.error('Error creating chat thread:', newThreadError);
-      throw new Error('Failed to create chat thread.');
+  if (threadError || !thread) {
+    // If not found (PGRST116) or other error, return null
+    if (threadError && threadError.code !== 'PGRST116') {
+      console.error(`Error fetching chat thread ${threadId}:`, threadError);
     }
-    thread = newThread;
-    return { threadId: thread.id, events: [], name: thread.name };
+    return null; // Indicate thread not found or error
   }
 
   // Fetch existing events for the thread
@@ -347,20 +335,20 @@ export async function getOrCreateChatThread(projectId: string): Promise<{ thread
 
   if (eventsError) {
     console.error('Error fetching chat events:', eventsError);
-    throw new Error('Failed to fetch chat events.');
+    // Depending on requirements, might throw or return null/partial data
+    return null; // Indicate error fetching events
   }
 
   const displayableEvents: DisplayableBamlEvent[] = (dbEvents || []).map(e => ({
     id: e.id,
     type: e.event_type as AllowedTypes,
-    data: e.data as any,
+    data: e.data as any, // TODO: Consider more type safety if possible
     createdAt: e.created_at,
   }));
 
-  return { threadId: thread.id, events: displayableEvents, name: thread.name };
+  return { events: displayableEvents, name: thread.name };
 }
 
-// ADDED: New Server Action: postChatMessage (II.C)
 interface PostChatMessageResult {
   userInputDisplayEvent: DisplayableBamlEvent; // The user's message as saved
   assistantResponseDisplayEvent?: DisplayableBamlEvent; // BAML's response as saved
@@ -368,119 +356,263 @@ interface PostChatMessageResult {
   error?: string;
 }
 
-export async function postChatMessage(
+// NEW Server Action: Creates thread and posts the first message
+interface CreateChatResult extends PostChatMessageResult {
+  newThreadId: string;
+}
+
+// --- Internal Helper Function for Handling BAML Response --- 
+async function _handleBamlResponse(
   threadId: string,
   projectId: string,
-  userInput: BamlUserInput // From baml_client/types
-): Promise<PostChatMessageResult> {
+  bamlEventOutput: BamlEvent
+): Promise<{ assistantResponseDisplayEvent: DisplayableBamlEvent; updateTriggered: boolean; error?: string }> {
   const supabase = await createClient();
-  const now = new Date().toISOString();
+  let assistantResponseDisplayEvent: DisplayableBamlEvent;
+  let updateTriggered = false;
+  let errorMsg: string | undefined;
 
-  // 1. Save UserInput event
-  const userInputToSave = {
-    thread_id: threadId,
-    event_type: 'UserInput',
-    data: userInput,
-    created_at: now,
-  };
-  const { data: savedUserInput, error: userInputSaveError } = await supabase
-    .from('chat_events')
-    .insert(userInputToSave)
-    .select('id, created_at') // Get id and actual created_at from DB
-    .single();
-
-  if (userInputSaveError || !savedUserInput) {
-    console.error('Error saving user input event:', userInputSaveError);
-    return {
-      userInputDisplayEvent: { id: 'temp-error', type: "UserInput" as AllowedTypes, data: userInput, createdAt: now },
-      updateTriggered: false,
-      error: 'Failed to save user message.'
-    };
-  }
-
-  const userInputDisplayEvent: DisplayableBamlEvent = {
-    id: savedUserInput.id,
-    type: "UserInput" as AllowedTypes,
-    data: userInput,
-    createdAt: savedUserInput.created_at
-  };
-
-  // 2. Fetch all events for the current threadId to construct BamlChatThread input
-  const { data: dbEvents, error: eventsFetchError } = await supabase
-    .from('chat_events')
-    .select('event_type, data') // Select only fields needed for BamlEvent
-    .eq('thread_id', threadId)
-    .order('created_at', { ascending: true });
-
-  if (eventsFetchError) {
-    console.error('Error fetching events for BAML:', eventsFetchError);
-    return { userInputDisplayEvent, updateTriggered: false, error: 'Failed to fetch conversation history.' };
-  }
-
-  const bamlEventsForProcessing: BamlEvent[] = (dbEvents || []).map(dbEvent => ({
-    type: dbEvent.event_type as AllowedTypes,
-    data: dbEvent.data as any,
-  }));
-
-  const currentThreadState: BamlChatThread = { events: bamlEventsForProcessing };
-
-  // 3. Call b.DetermineNextStep
-  let nextBamlEventOutput: BamlEvent;
-  try {
-    // Ensure 'b' is accessible here; it should be if imported correctly at the top level
-    nextBamlEventOutput = await b.DetermineNextStep(currentThreadState);
-  } catch (bamlError) {
-    console.error('BAML DetermineNextStep error:', bamlError);
-    return { userInputDisplayEvent, updateTriggered: false, error: 'AI failed to determine next step.' };
-  }
-
-  // 4. Save the event returned by BAML
-  const bamlEventToSave = {
-    thread_id: threadId,
-    event_type: nextBamlEventOutput.type,
-    data: nextBamlEventOutput.data,
-  };
-  const { data: savedBamlEvent, error: bamlEventSaveError } = await supabase
+  // 1. Save the event returned by BAML
+  const bamlEventToSave = { thread_id: threadId, event_type: bamlEventOutput.type, data: bamlEventOutput.data };
+  const { data: savedBamlEventData, error: bamlEventSaveError } = await supabase
     .from('chat_events')
     .insert(bamlEventToSave)
     .select('id, created_at')
     .single();
 
-  if (bamlEventSaveError || !savedBamlEvent) {
-    console.error('Error saving BAML event:', bamlEventSaveError);
-     return {
-      userInputDisplayEvent,
-      assistantResponseDisplayEvent: { id: 'temp-baml-error', type: nextBamlEventOutput.type, data: nextBamlEventOutput.data, createdAt: new Date().toISOString() },
-      updateTriggered: false,
-      error: 'AI response generated but failed to save.'
+  if (bamlEventSaveError || !savedBamlEventData) {
+    console.error('Error saving BAML event (_handleBamlResponse):', bamlEventSaveError);
+    errorMsg = 'AI response generated but failed to save.';
+    // Create temporary display event even if save failed
+    assistantResponseDisplayEvent = { id: `temp-baml-error-${Date.now()}`, type: bamlEventOutput.type, data: bamlEventOutput.data, createdAt: new Date().toISOString() };
+  } else {
+    assistantResponseDisplayEvent = {
+      id: savedBamlEventData.id,
+      type: bamlEventOutput.type,
+      data: bamlEventOutput.data,
+      createdAt: savedBamlEventData.created_at
     };
   }
 
-  const assistantResponseDisplayEvent: DisplayableBamlEvent = {
-    id: savedBamlEvent.id,
-    type: nextBamlEventOutput.type,
-    data: nextBamlEventOutput.data,
-    createdAt: savedBamlEvent.created_at
-  };
-
-  let updateTriggered = false;
-  // 5. If UpdateEstimateRequest, trigger estimate generation
-  if (nextBamlEventOutput.type === "UpdateEstimateRequest") {
-    const requestData = nextBamlEventOutput.data as BamlUpdateEstimateRequest;
+  // 2. Handle UpdateEstimateRequest if needed
+  if (bamlEventOutput.type === "UpdateEstimateRequest") {
+    const requestData = bamlEventOutput.data as BamlUpdateEstimateRequest;
+    // Assuming startEstimateGeneration exists and works correctly
     const estimateResult = await startEstimateGeneration(projectId, requestData.changes_to_make, threadId);
     if (estimateResult.error) {
-      console.error('Error starting estimate generation from chat:', estimateResult.error);
-      // An UpdateEstimateResponse (failure) event will be added by the modified checkEstimateStatus/processCompletedRun logic.
+      console.error('Error starting estimate generation from chat (_handleBamlResponse):', estimateResult.error);
+       // Potentially append estimate error to errorMsg? Needs careful handling depending on desired UX
+       // For now, the error is logged, and the main error message (if any) from saving will be returned.
     } else {
       updateTriggered = true;
     }
   }
 
-  return {
-    userInputDisplayEvent,
-    assistantResponseDisplayEvent,
-    updateTriggered,
-  };
+  return { assistantResponseDisplayEvent, updateTriggered, error: errorMsg };
+}
+// --- End Internal Helper Function --- 
+
+export async function createChatThreadAndPostMessage(
+  projectId: string,
+  userInput: BamlUserInput
+): Promise<CreateChatResult> {
+  const supabase = await createClient();
+  const now = new Date();
+  let newThreadId = '';
+  let userInputDisplayEvent: DisplayableBamlEvent | null = null;
+
+  try {
+    // 1. Create the new chat thread
+    // Use first few words of user message for the name, or a timestamp default
+    const firstWords = userInput.message.split(' ').slice(0, 5).join(' ');
+    let defaultName = firstWords || `Chat - ${now.toISOString().split('T')[0]}`;
+    if (defaultName.length > 50) { // Keep name reasonably short
+        defaultName = defaultName.substring(0, 47) + '...';
+    }
+
+    const { data: newThread, error: newThreadError } = await supabase
+      .from('chat_threads')
+      .insert({ project_id: projectId, name: defaultName })
+      .select('id') // Only need the ID
+      .single();
+
+    if (newThreadError || !newThread) {
+      console.error('Error creating chat thread:', newThreadError);
+      throw new Error('Failed to create chat thread.');
+    }
+    newThreadId = newThread.id;
+
+    // 2. Save the first UserInput event
+    const userInputToSave = {
+      thread_id: newThreadId,
+      event_type: 'UserInput' as const, // Use const for specific type
+      data: userInput,
+      created_at: now.toISOString(), // Use ISO string consistent with polling
+    };
+    const { data: savedUserInput, error: userInputSaveError } = await supabase
+      .from('chat_events')
+      .insert(userInputToSave)
+      .select('id, created_at')
+      .single();
+
+    if (userInputSaveError || !savedUserInput) {
+      console.error('Error saving initial user input event:', userInputSaveError);
+      // Attempt cleanup: Delete the created thread if the first message fails to save
+      await supabase.from('chat_threads').delete().eq('id', newThreadId);
+      throw new Error('Failed to save initial user message.');
+    }
+
+    userInputDisplayEvent = {
+      id: savedUserInput.id,
+      type: "UserInput" as AllowedTypes, // CAST to AllowedTypes
+      data: userInput,
+      createdAt: savedUserInput.created_at
+    };
+
+    // 3. Call b.DetermineNextStep with only the first user message
+    const firstThreadState: BamlChatThread = { events: [{ type: 'UserInput' as AllowedTypes, data: userInput }] };
+    const nextBamlEventOutput = await b.DetermineNextStep(firstThreadState);
+
+    // 4. Handle BAML response using helper function
+    const { assistantResponseDisplayEvent, updateTriggered, error: bamlHandleError } = await _handleBamlResponse(
+      newThreadId,
+      projectId,
+      nextBamlEventOutput
+    );
+
+    // If the helper encountered an error saving the BAML event, return partial success
+    if (bamlHandleError) {
+        return {
+            newThreadId,
+            userInputDisplayEvent, // User input was saved
+            assistantResponseDisplayEvent, // Contains temp event data
+            updateTriggered: false, // updateTriggered from helper might be true, but saving failed, so set false?
+            error: bamlHandleError
+        };
+    }
+
+    // 5. Revalidate path
+    revalidatePath(`/projects/${projectId}`);
+
+    // Return success state
+    return {
+      newThreadId,
+      userInputDisplayEvent,
+      assistantResponseDisplayEvent, // Contains saved event data
+      updateTriggered,
+    };
+
+  } catch (error) {
+    console.error('Error in createChatThreadAndPostMessage:', error);
+    // Attempt to cleanup thread if created but subsequent steps failed
+     if (newThreadId) {
+       try {
+            await supabase.from('chat_threads').delete().eq('id', newThreadId);
+            console.log(`Cleaned up partially created thread ${newThreadId}`);
+       } catch (cleanupError) {
+            console.error(`Failed to cleanup thread ${newThreadId}:`, cleanupError);
+       }
+     }
+    // Return error state - ensure shape matches CreateChatResult but indicates failure
+    // Provide a default object if userInputDisplayEvent is null
+    const finalUserInputDisplayEvent = userInputDisplayEvent ?? { 
+      id: 'temp-error-user-catch', 
+      type: "UserInput" as AllowedTypes, // CAST to AllowedTypes
+      data: userInput, 
+      createdAt: now.toISOString() 
+    };
+
+    return {
+      newThreadId: '', // No valid thread ID created
+      userInputDisplayEvent: finalUserInputDisplayEvent, // Use the non-null version
+      updateTriggered: false,
+      error: error instanceof Error ? error.message : 'An unexpected error occurred while creating the chat.',
+    };
+  }
+}
+
+export async function postChatMessage(
+  threadId: string,
+  projectId: string,
+  userInput: BamlUserInput
+): Promise<PostChatMessageResult> {
+    const supabase = await createClient();
+    const now = new Date().toISOString();
+    let userInputDisplayEvent: DisplayableBamlEvent;
+
+    // 1. Save UserInput event
+    const userInputToSave = {
+      thread_id: threadId,
+      event_type: 'UserInput' as const,
+      data: userInput,
+      created_at: now,
+    };
+    const { data: savedUserInput, error: userInputSaveError } = await supabase
+      .from('chat_events')
+      .insert(userInputToSave)
+      .select('id, created_at')
+      .single();
+
+    if (userInputSaveError || !savedUserInput) {
+      console.error('Error saving user input event:', userInputSaveError);
+      return {
+        // Provide a temporary representation of the user input even if save failed
+        userInputDisplayEvent: { id: `temp-error-${Date.now()}`, type: "UserInput" as AllowedTypes, data: userInput, createdAt: now }, // CAST to AllowedTypes
+        updateTriggered: false,
+        error: 'Failed to save user message.'
+      };
+    }
+
+    userInputDisplayEvent = {
+      id: savedUserInput.id,
+      type: "UserInput" as AllowedTypes, // CAST to AllowedTypes
+      data: userInput,
+      createdAt: savedUserInput.created_at
+    };
+
+    // 2. Fetch history
+    const { data: dbEvents, error: eventsFetchError } = await supabase
+      .from('chat_events')
+      .select('event_type, data') // Select only fields needed for BamlEvent
+      .eq('thread_id', threadId)
+      .order('created_at', { ascending: true });
+
+    if (eventsFetchError) {
+      console.error('Error fetching events for BAML:', eventsFetchError);
+      // Return the saved user input, but indicate history fetch failed
+      return { userInputDisplayEvent, updateTriggered: false, error: 'Failed to fetch conversation history.' };
+    }
+
+    const bamlEventsForProcessing: BamlEvent[] = (dbEvents || []).map(dbEvent => ({
+      type: dbEvent.event_type as AllowedTypes,
+      data: dbEvent.data as any,
+    }));
+
+    const currentThreadState: BamlChatThread = { events: bamlEventsForProcessing };
+
+    // 3. Call BAML
+    let nextBamlEventOutput: BamlEvent;
+    try {
+        nextBamlEventOutput = await b.DetermineNextStep(currentThreadState);
+    } catch (bamlError) {
+        console.error('BAML DetermineNextStep error:', bamlError);
+        return { userInputDisplayEvent, updateTriggered: false, error: 'AI failed to determine next step.' };
+    }
+
+    // 4. Handle BAML response using helper function
+    const { assistantResponseDisplayEvent, updateTriggered, error: bamlHandleError } = await _handleBamlResponse(
+      threadId,
+      projectId,
+      nextBamlEventOutput
+    );
+
+    // 5. Return result
+    return {
+      userInputDisplayEvent,
+      assistantResponseDisplayEvent, // Contains saved or temp event data
+      updateTriggered,
+      error: bamlHandleError // Include error if BAML save failed
+    };
 }
 
 export async function getChatThreads(projectId: string): Promise<{ id: string; name: string; lastMessageAt: string }[]> {

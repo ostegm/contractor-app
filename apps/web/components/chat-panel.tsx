@@ -2,31 +2,32 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { X, Send, RefreshCw } from 'lucide-react';
-import { getOrCreateChatThread, postChatMessage, getChatEvents, DisplayableBamlEvent } from '@/app/projects/[id]/actions';
+import { getChatThreadDetails, createChatThreadAndPostMessage, postChatMessage, getChatEvents, DisplayableBamlEvent } from '@/app/projects/[id]/actions';
 import type { UserInput as BamlUserInput, AssisantMessage as BamlAssistantMessage, UpdateEstimateRequest as BamlUpdateEstimateRequest, UpdateEstimateResponse as BamlUpdateEstimateResponse, AllowedTypes } from '@/baml_client/baml_client/types';
 
 interface ChatPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  projectId?: string | null; // The projectId is optional for global chats
-  threadId?: string | null; // Specific thread ID if loading an existing chat
-  forceNewChat?: boolean; // When true, always create a new chat instead of retrieving the last one
+  projectId?: string | null;
+  threadId?: string | null; // Renamed from externalThreadId in previous plan, using this prop name
+  forceNewChat?: boolean;
 }
 
-export function ChatPanel({ isOpen, onClose, projectId, threadId: externalThreadId, forceNewChat = false }: ChatPanelProps) {
-  const [threadId, setThreadId] = useState<string | null>(null);
+export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadIdProp, forceNewChat = false }: ChatPanelProps) {
+  // Internal state for the active thread ID
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(initialThreadIdProp || null);
   const [threadName, setThreadName] = useState<string | null>(null);
   const [events, setEvents] = useState<DisplayableBamlEvent[]>([]);
   const [newMessage, setNewMessage] = useState<string>('');
   const [isSending, setIsSending] = useState<boolean>(false);
   const [isAssistantUpdatingEstimate, setIsAssistantUpdatingEstimate] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [isLoadingThread, setIsLoadingThread] = useState<boolean>(true);
+  const [isLoadingThread, setIsLoadingThread] = useState<boolean>(false); // Changed initial to false, will set true during load
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-resize textarea on mount and when value changes
+  // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -34,145 +35,113 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: externalThread
     }
   }, [newMessage]);
 
-  // Effect for initial load, projectId changes, and threadId changes
+  // Effect for initial load & when initialThreadIdProp or forceNewChat changes
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+        setActiveThreadId(null); // Clear active thread when panel closes
+        setEvents([]);
+        setThreadName(null);
+        return;
+    }
 
+    // If forceNewChat is true, we start with a null activeThreadId.
+    // The thread will be created on the first message send.
+    if (forceNewChat) {
+      console.log('ChatPanel: forceNewChat is true. Ready for new thread on first message.');
+      setActiveThreadId(null);
+      setThreadName('New Chat'); // Placeholder name
+      setEvents([]);
+      setIsLoadingThread(false);
+      setError(null);
+      return;
+    }
+
+    // If an initialThreadIdProp is provided (and not forcing new chat), load it.
+    if (initialThreadIdProp) {
+      console.log(`ChatPanel: Loading thread with initialThreadIdProp: ${initialThreadIdProp}`);
+      setActiveThreadId(initialThreadIdProp);
+      // Loading logic for this specific thread ID is handled in the next useEffect
+      // which depends on activeThreadId.
+    } else {
+      // No initial thread and not forcing new chat - essentially an empty state until a thread is selected
+      // or a new chat is explicitly started by sending a message.
+      console.log('ChatPanel: No initial thread, not forcing new. Waiting for action.');
+      setActiveThreadId(null);
+      setThreadName(null);
+      setEvents([]);
+      setIsLoadingThread(false);
+      setError(null);
+    }
+  }, [isOpen, initialThreadIdProp, forceNewChat]);
+
+  // Effect for loading messages when activeThreadId changes (and is not null)
+  useEffect(() => {
+    if (!isOpen || !activeThreadId) {
+      // If no active thread, ensure events are clear and not loading
+      if (!activeThreadId) {
+        setEvents([]);
+        setThreadName(null); // Or 'New Chat' if that's preferred for a pending new chat
+        setIsLoadingThread(false);
+      }
+      return;
+    }
+
+    console.log(`ChatPanel: activeThreadId changed to ${activeThreadId}, attempting to load details.`);
     setIsLoadingThread(true);
     setError(null);
-    setEvents([]); // Clear previous events
+    setEvents([]); // Clear previous events before loading new ones
 
-    const loadChatThread = async () => {
+    const loadThreadDetails = async () => {
       try {
-        // Get the Supabase client
-        const supabase = (await import('@/lib/supabase/client')).createClient();
-
-        // Force a new chat thread if requested
-        if (forceNewChat) {
-          console.log('Forcing creation of a new chat thread');
-
-          // Create a name with timestamp for the new thread
-          const now = new Date();
-          const defaultName = `Chat - ${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-          // Create a new thread record
-          if (!projectId) {
-            throw new Error('Cannot create a new chat thread without a valid project ID.');
-          }
-          const { data: newThread, error: newThreadError } = await supabase
-            .from('chat_threads')
-            .insert({ project_id: projectId, name: defaultName })
-            .select('id, name')
-            .single();
-
-          if (newThreadError || !newThread) {
-            throw new Error('Failed to create a new chat thread.');
-          }
-
-          // Use the newly created thread
-          setThreadId(newThread.id);
-          setThreadName(newThread.name);
-          setEvents([]); // Empty events for a new thread
-          return; // Exit early
-        }
-
-        // Load specific thread if an ID is provided
-        if (externalThreadId) {
-          // Get the thread information
-          const { data: thread, error: threadError } = await supabase
-            .from('chat_threads')
-            .select('id, name, project_id')
-            .eq('id', externalThreadId)
-            .single();
-
-          if (threadError || !thread) {
-            throw new Error('Failed to fetch the selected chat thread.');
-          }
-
-          // Get the events for this thread
-          const { data: dbEvents, error: eventsError } = await supabase
-            .from('chat_events')
-            .select('id, event_type, data, created_at')
-            .eq('thread_id', thread.id)
-            .order('created_at', { ascending: true });
-
-          if (eventsError) {
-            throw new Error('Failed to fetch chat events for the selected thread.');
-          }
-
-          const displayableEvents = (dbEvents || []).map(e => ({
-            id: e.id,
-            type: e.event_type as AllowedTypes,
-            data: e.data as any,
-            createdAt: e.created_at,
-          }));
-
-          setThreadId(thread.id);
-          setThreadName(thread.name);
-          setEvents(displayableEvents);
-
-          // Check for UpdateEstimateRequest
-          const lastEvent = displayableEvents[displayableEvents.length - 1];
+        const details = await getChatThreadDetails(activeThreadId);
+        if (details) {
+          setThreadName(details.name);
+          setEvents(details.events);
+          // Check for ongoing estimate update from loaded events
+          const lastEvent = details.events[details.events.length - 1];
           if (lastEvent && lastEvent.type === 'UpdateEstimateRequest') {
-            const correspondingResponse = displayableEvents
-              .slice(displayableEvents.indexOf(lastEvent) + 1)
+            const correspondingResponse = details.events
+              .slice(details.events.indexOf(lastEvent) + 1)
               .find(e => e.type === 'UpdateEstimateResponse');
-
             if (!correspondingResponse) {
               setIsAssistantUpdatingEstimate(true);
             }
           }
         } else {
-          // Get or create a thread for the current project
-          if (!projectId) {
-            throw new Error('Cannot load or create chat thread without a project ID.');
-          }
-          const data = await getOrCreateChatThread(projectId);
-
-          setThreadId(data.threadId);
-          setEvents(data.events);
-          setThreadName(data.name);
-
-          // Check if the last event was an UpdateEstimateRequest
-          const lastEvent = data.events[data.events.length - 1];
-          if (lastEvent && lastEvent.type === 'UpdateEstimateRequest') {
-            const correspondingResponse = data.events
-              .slice(data.events.indexOf(lastEvent) + 1)
-              .find(e => e.type === 'UpdateEstimateResponse');
-
-            if (!correspondingResponse) {
-              setIsAssistantUpdatingEstimate(true);
-            }
-          }
+          setError(`Failed to load chat thread: ${activeThreadId}. It might have been deleted or an error occurred.`);
+          setActiveThreadId(null); // Reset if thread not found
+          setThreadName(null);
         }
       } catch (err) {
-        console.error('Error loading chat thread:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load chat thread.');
+        console.error('Error loading chat thread details:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load chat thread details.');
+        setActiveThreadId(null); // Reset on error
+        setThreadName(null);
       } finally {
         setIsLoadingThread(false);
       }
     };
 
-    loadChatThread();
-  }, [isOpen, projectId, externalThreadId, forceNewChat]);
+    loadThreadDetails();
+  }, [isOpen, activeThreadId]); // Primary dependency is activeThreadId
 
-  // Effect for polling new events
+  // Effect for polling new events - depends on activeThreadId
   useEffect(() => {
-    if (!isOpen || !threadId) return;
+    if (!isOpen || !activeThreadId) return;
 
     const intervalId = setInterval(async () => {
       try {
         const lastEventTimestamp = events.length > 0 ? events[events.length - 1].createdAt : undefined;
-        const newEvents = await getChatEvents(threadId, lastEventTimestamp);
+        // Pass activeThreadId to getChatEvents
+        const newEvents = await getChatEvents(activeThreadId, lastEventTimestamp);
         if (newEvents.length > 0) {
           setEvents(prevEvents => {
             const allEvents = [...prevEvents];
             newEvents.forEach(newEvent => {
-              if (!allEvents.find(e => e.id === newEvent.id)) { // Prevent duplicates
+              if (!allEvents.find(e => e.id === newEvent.id)) {
                 allEvents.push(newEvent);
               }
             });
-            // Check the latest incoming events for UpdateEstimateResponse
             newEvents.forEach(event => {
               if (event.type === 'UpdateEstimateResponse') {
                 setIsAssistantUpdatingEstimate(false);
@@ -183,12 +152,11 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: externalThread
         }
       } catch (err) {
         console.warn('Polling for chat events failed:', err);
-        // Optionally set a non-critical error for polling failures
       }
-    }, 3000); // Poll every 3 seconds, adjust as needed
+    }, 3000);
 
     return () => clearInterval(intervalId);
-  }, [threadId, events, isOpen]);
+  }, [activeThreadId, events, isOpen]); // Depends on activeThreadId
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -196,9 +164,8 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: externalThread
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !threadId || isSending) return;
+    if (!newMessage.trim() || isSending) return;
 
-    // Ensure we have a projectId before sending
     if (!projectId) {
       setError('Cannot send message: No active project context.');
       return;
@@ -206,8 +173,9 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: externalThread
 
     setIsSending(true);
     setError(null);
-
     const userInput: BamlUserInput = { message: newMessage };
+    const currentNewMessage = newMessage; // Capture message before clearing
+    setNewMessage(''); // Clear input immediately
 
     // Optimistically add user message
     const tempUserEventId = `temp-user-${Date.now()}`;
@@ -218,34 +186,68 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: externalThread
         createdAt: new Date().toISOString(),
     };
     setEvents(prev => [...prev, optimisticUserEvent]);
-    setNewMessage('');
 
     try {
-      // projectId is checked above, guaranteed valid string here
-      const result = await postChatMessage(threadId, projectId, userInput);
+      if (!activeThreadId) {
+        // This is the first message in a new chat, create thread first
+        console.log('ChatPanel: Sending first message, creating new thread...');
+        const result = await createChatThreadAndPostMessage(projectId, userInput);
 
-      setEvents(prevEvents => {
-        // Replace optimistic event with actual from server, and add assistant response
-        const newEventsList = prevEvents.filter(event => event.id !== tempUserEventId);
-        newEventsList.push(result.userInputDisplayEvent);
-        if (result.assistantResponseDisplayEvent) {
-          newEventsList.push(result.assistantResponseDisplayEvent);
-          if (result.assistantResponseDisplayEvent.type === 'UpdateEstimateRequest') {
-            setIsAssistantUpdatingEstimate(true);
+        if (result.error || !result.newThreadId) {
+          setError(result.error || 'Failed to create new chat thread.');
+          setEvents(prevEvents => prevEvents.filter(event => event.id !== tempUserEventId)); // Remove optimistic
+          setNewMessage(currentNewMessage); // Restore message on failure
+          return;
+        }
+
+        setActiveThreadId(result.newThreadId);
+        // The thread name is set by the server action, could also update it here if needed
+        // For example, if createChatThreadAndPostMessage returned the name:
+        // if (result.threadName) setThreadName(result.threadName);
+        setEvents(prevEvents => {
+          const newEventsList = prevEvents.filter(event => event.id !== tempUserEventId);
+          if (result.userInputDisplayEvent) newEventsList.push(result.userInputDisplayEvent);
+          if (result.assistantResponseDisplayEvent) {
+            newEventsList.push(result.assistantResponseDisplayEvent);
+            if (result.assistantResponseDisplayEvent.type === 'UpdateEstimateRequest') {
+              setIsAssistantUpdatingEstimate(true);
+            }
+          }
+          return newEventsList;
+        });
+
+      } else {
+        // Existing thread, just post the message
+        console.log(`ChatPanel: Sending message to existing thread: ${activeThreadId}`);
+        const result = await postChatMessage(activeThreadId, projectId, userInput);
+
+        setEvents(prevEvents => {
+          const newEventsList = prevEvents.filter(event => event.id !== tempUserEventId);
+          newEventsList.push(result.userInputDisplayEvent);
+          if (result.assistantResponseDisplayEvent) {
+            newEventsList.push(result.assistantResponseDisplayEvent);
+            if (result.assistantResponseDisplayEvent.type === 'UpdateEstimateRequest') {
+              setIsAssistantUpdatingEstimate(true);
+            }
+          }
+          return newEventsList;
+        });
+
+        if (result.error) {
+          setError(result.error);
+          // Optionally restore message if only BAML part failed but user input was saved
+          if (!result.userInputDisplayEvent.id.startsWith('temp-error')) {
+            // User input was saved, don't restore message field
+          } else {
+            setNewMessage(currentNewMessage);
           }
         }
-        return newEventsList;
-      });
-
-      if (result.error) {
-        setError(result.error);
       }
-
     } catch (err: any) {
       console.error('Error posting message:', err);
       setError(err.message || 'Failed to send message.');
-      // Remove optimistic event if post fails hard
-      setEvents(prevEvents => prevEvents.filter(event => event.id !== tempUserEventId));
+      setEvents(prevEvents => prevEvents.filter(event => event.id !== tempUserEventId)); // Remove optimistic
+      setNewMessage(currentNewMessage); // Restore message on hard failure
     } finally {
       setIsSending(false);
     }
@@ -274,6 +276,9 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: externalThread
         return <p><em>Unknown event type: {event.type}</em></p>;
     }
   };
+
+  // Conditional rendering based on whether it's a new, uninitialized chat
+  const isNewUninitializedChat = !activeThreadId && !isLoadingThread && (forceNewChat || !initialThreadIdProp);
 
   if (!isOpen) {
     return null;
@@ -310,74 +315,92 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: externalThread
                   ${isOpen ? 'translate-x-0' : 'translate-x-full'} w-full md:w-96 border-l border-gray-700`}
       style={{ marginTop: 'var(--header-height, 64px)', height: 'calc(100% - var(--header-height, 64px))' }}
     >
-      {/* Chat Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-700">
-        <h2 className="text-lg font-semibold">{threadName || 'Chat with AI Assistant'}</h2>
+        <h2 className="text-lg font-semibold">
+          {isLoadingThread ? 'Loading Chat...' : (threadName || (isNewUninitializedChat ? 'New Chat' : 'Chat'))}
+        </h2>
         <Button variant="ghost" size="icon" onClick={onClose} className="text-gray-400 hover:text-white">
           <X className="h-5 w-5" />
         </Button>
       </div>
 
-      {/* Message Area */}
-      <div className="flex-grow p-4 space-y-3 overflow-y-auto bg-gray-900/80 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-900">
-        {events.map(event => (
-          <div key={event.id} className={`flex ${event.type === 'UserInput' ? 'justify-end' : 'justify-start'}`}>
-            <div
-              className={`max-w-[70%] p-3 rounded-lg shadow-lg
-                ${event.type === 'UserInput' ? 'bg-blue-600 text-white border border-blue-700/50' : 'bg-gray-800 text-gray-200 border border-gray-700'}
-                ${event.type === 'UpdateEstimateRequest' || event.type === 'UpdateEstimateResponse' ? 'bg-yellow-900/30 border border-yellow-700 text-yellow-400 w-full' : ''}
-              `}
-            >
-              {renderEventData(event)}
-              <div className="text-xs mt-1 opacity-70">
-                {new Date(event.createdAt).toLocaleTimeString()} - {new Date(event.createdAt).toLocaleDateString()}
-              </div>
-            </div>
+      {isLoadingThread && (
+        <div className="flex-grow flex items-center justify-center">
+          <div className="animate-pulse flex items-center">
+            <div className="h-4 w-4 bg-blue-600 rounded-full mr-2"></div>
+            <div className="h-4 w-4 bg-blue-600 rounded-full mr-2 animate-pulse delay-75"></div>
+            <div className="h-4 w-4 bg-blue-600 rounded-full animate-pulse delay-150"></div>
+            <span className="ml-3 text-gray-300">Loading chat...</span>
           </div>
-        ))}
-        <div ref={chatEndRef} />
-      </div>
-
-      {/* Error and Update Status */}
-      {error && <div className="p-2 text-red-500 border-t border-gray-700">Error: {error}</div>}
-      {isAssistantUpdatingEstimate && (
-        <div className="p-2 text-blue-400 border-t border-gray-700 bg-blue-900/30">
-          Assistant is updating the estimate...
         </div>
       )}
 
-      {/* Input Box */}
-      <div className="p-4 border-t border-gray-700 bg-gray-800">
-        <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-          <Textarea
-            ref={textareaRef}
-            value={newMessage}
-            onChange={(e) => {
-              setNewMessage(e.target.value);
-              // Auto-resize the textarea based on content - handled by the useEffect
-            }}
-            placeholder="Type your message... (Shift+Enter for new line)"
-            className="flex-grow px-3 py-4 bg-gray-700 border border-gray-600 rounded-md text-gray-200 resize-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 placeholder:text-gray-400"
-            disabled={isSending || isAssistantUpdatingEstimate}
-            rows={3} // Start with 3 rows instead of 1
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage(e);
-              }
-            }}
-            style={{ minHeight: '80px', maxHeight: '250px' }} // Increase min/max height
-          />
-          <Button
-            type="submit"
-            variant="ghost"
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            disabled={isSending || !newMessage.trim() || isAssistantUpdatingEstimate}
-          >
-            {isSending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </Button>
-        </form>
-      </div>
+      {!isLoadingThread && (
+        <>
+          <div className="flex-grow p-4 space-y-3 overflow-y-auto bg-gray-900/80 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-900">
+            {isNewUninitializedChat && events.length === 0 && (
+              <div className="text-center text-gray-400 pt-10">
+                <p>Send a message to start the conversation.</p>
+              </div>
+            )}
+            {events.map(event => (
+              <div key={event.id} className={`flex ${event.type === 'UserInput' ? 'justify-end' : 'justify-start'}`}>
+                <div
+                  className={`max-w-[70%] p-3 rounded-lg shadow-lg
+                    ${event.type === 'UserInput' ? 'bg-blue-600 text-white border border-blue-700/50' : 'bg-gray-800 text-gray-200 border border-gray-700'}
+                    ${event.type === 'UpdateEstimateRequest' || event.type === 'UpdateEstimateResponse' ? 'bg-yellow-900/30 border border-yellow-700 text-yellow-400 w-full' : ''}
+                  `}
+                >
+                  {renderEventData(event)}
+                  <div className="text-xs mt-1 opacity-70">
+                    {new Date(event.createdAt).toLocaleTimeString()} - {new Date(event.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div ref={chatEndRef} />
+          </div>
+
+          {error && <div className="p-2 text-red-500 border-t border-gray-700">Error: {error}</div>}
+          {isAssistantUpdatingEstimate && (
+            <div className="p-2 text-blue-400 border-t border-gray-700 bg-blue-900/30">
+              Assistant is updating the estimate...
+            </div>
+          )}
+
+          <div className="p-4 border-t border-gray-700 bg-gray-800">
+            <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+              <Textarea
+                ref={textareaRef}
+                value={newMessage}
+                onChange={(e) => {
+                  setNewMessage(e.target.value);
+                  // Auto-resize the textarea based on content - handled by the useEffect
+                }}
+                placeholder={isNewUninitializedChat && !projectId ? "Select a project to start chat" : "Type your message... (Shift+Enter for new line)"}
+                className="flex-grow px-3 py-4 bg-gray-700 border border-gray-600 rounded-md text-gray-200 resize-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 placeholder:text-gray-400"
+                disabled={isSending || isAssistantUpdatingEstimate || (isNewUninitializedChat && !projectId) }
+                rows={3} // Start with 3 rows instead of 1
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage(e);
+                  }
+                }}
+                style={{ minHeight: '80px', maxHeight: '250px' }} // Increase min/max height
+              />
+              <Button
+                type="submit"
+                variant="ghost"
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                disabled={isSending || !newMessage.trim() || isAssistantUpdatingEstimate || (isNewUninitializedChat && !projectId)}
+              >
+                {isSending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </form>
+          </div>
+        </>
+      )}
     </div>
   );
 } 
