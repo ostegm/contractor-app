@@ -64,6 +64,11 @@ export default function AppClientShell({ children }: AppClientShellProps) {
     }
   };
 
+  // Dedicated function to close the panel, passed to ChatPanel
+  const closeChatPanel = () => {
+    setIsChatPanelOpen(false);
+  };
+
   // Handler for chat thread selection from sidebar
   const handleSelectChatThread = (threadId: string) => {
     // Special case for "new" - this means we want to start a fresh chat
@@ -100,7 +105,7 @@ export default function AppClientShell({ children }: AppClientShellProps) {
         </main>
         <ChatPanel
           isOpen={isChatPanelOpen}
-          onClose={toggleChatPanel}
+          onClose={closeChatPanel}
           projectId={currentProjectId}
           threadId={currentChatThreadId}
           forceNewChat={currentChatThreadId === null && isChatPanelOpen}
