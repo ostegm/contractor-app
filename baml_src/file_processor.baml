@@ -28,10 +28,10 @@ class ConstructionProjectData {
 
 class InputFile {
   name string
-  type string // "image", "video", "audio", "text"
+  type string // "mime_type"
   description string? // Optional description
   content string?     // Text content or transcription
-  download_url string? // URL to download the file content\
+  download_url string? // URL to download the file content
   image_data image? // Optional image data https://docs.boundaryml.com/ref/baml/types#image
   audio_data audio? // Optional audio data https://docs.boundaryml.com/ref/baml/types#audio
 }
