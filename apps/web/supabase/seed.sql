@@ -130,7 +130,8 @@ BEGIN
     VALUES
         (project2_id, 'current_kitchen.png', 'project2/current_kitchen.png', 'Current kitchen photo.'),
         (project2_id, 'desired_kitchen.png', 'project2/desired_kitchen.png', 'Hypothetical end state showing goal of project.'),
-        (project2_id, 'walkthrough_notes.txt', 'project2/walkthrough_notes.txt', 'Notes from walkthrough of the kitchen.');
+        (project2_id, 'walkthrough_video.m4a', 'project2/walkthrough_notes.m4a', 'Audio notes of walkthrough of the kitchen.'),
+        (project2_id, 'walkthrough_notes.txt', 'project2/walkthrough_notes.txt', 'Additional notes from walkthrough of the kitchen.');
 
 
     RAISE NOTICE 'Seeding complete. Project 1 ID: %, Project 2 ID: %', project1_id, project2_id;

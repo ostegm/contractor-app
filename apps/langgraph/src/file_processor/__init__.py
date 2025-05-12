@@ -3,6 +3,6 @@
 This module defines a custom graph.
 """
 
-from file_processor.graph import graph
+from file_processor.graph import estimate_graph
 
-__all__ = ["graph"]
+__all__ = ["estimate_graph"]

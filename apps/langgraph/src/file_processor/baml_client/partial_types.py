@@ -76,6 +76,11 @@ class InputFile(BaseModel):
     content: Optional[str] = None
     download_url: Optional[str] = None
     image_data: Optional[baml_py.Image] = None
+    audio_data: Optional[baml_py.Audio] = None
+
+class ProcessedVideo(BaseModel):
+    summary: Optional[str] = None
+    frames: List["VideoFrame"]
 
 class UpdateEstimateRequest(BaseModel):
     changes_to_make: Optional[str] = None
@@ -86,3 +91,7 @@ class UpdateEstimateResponse(BaseModel):
 
 class UserInput(BaseModel):
     message: Optional[str] = None
+
+class VideoFrame(BaseModel):
+    timestamp: Optional[float] = None
+    description: Optional[str] = None

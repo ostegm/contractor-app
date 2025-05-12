@@ -154,6 +154,60 @@ class BamlAsyncClient:
       )
       return cast(types.ConstructionProjectData, raw.cast_to(types, types, partial_types, False))
     
+    async def ProcessAudio(
+        self,
+        audio: types.InputFile,
+        baml_options: BamlCallOptions = {},
+    ) -> str:
+      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
+
+      __tb__ = options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = options.get("client_registry", None)
+      collector = options.get("collector", None)
+      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
+      raw = await self.__runtime.call_function(
+        "ProcessAudio",
+        {
+          "audio": audio,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        collectors,
+      )
+      return cast(str, raw.cast_to(types, types, partial_types, False))
+    
+    async def ProcessVideo(
+        self,
+        video: types.InputFile,
+        baml_options: BamlCallOptions = {},
+    ) -> types.ProcessedVideo:
+      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
+
+      __tb__ = options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = options.get("client_registry", None)
+      collector = options.get("collector", None)
+      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
+      raw = await self.__runtime.call_function(
+        "ProcessVideo",
+        {
+          "video": video,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        collectors,
+      )
+      return cast(types.ProcessedVideo, raw.cast_to(types, types, partial_types, False))
+    
 
 
 class BamlStreamClient:
@@ -232,6 +286,72 @@ class BamlStreamClient:
         raw,
         lambda x: cast(partial_types.ConstructionProjectData, x.cast_to(types, types, partial_types, True)),
         lambda x: cast(types.ConstructionProjectData, x.cast_to(types, types, partial_types, False)),
+        self.__ctx_manager.get(),
+      )
+    
+    def ProcessAudio(
+        self,
+        audio: types.InputFile,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.BamlStream[Optional[str], str]:
+      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
+      __tb__ = options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = options.get("client_registry", None)
+      collector = options.get("collector", None)
+      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
+      raw = self.__runtime.stream_function(
+        "ProcessAudio",
+        {
+          "audio": audio,
+        },
+        None,
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        collectors,
+      )
+
+      return baml_py.BamlStream[Optional[str], str](
+        raw,
+        lambda x: cast(Optional[str], x.cast_to(types, types, partial_types, True)),
+        lambda x: cast(str, x.cast_to(types, types, partial_types, False)),
+        self.__ctx_manager.get(),
+      )
+    
+    def ProcessVideo(
+        self,
+        video: types.InputFile,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.BamlStream[partial_types.ProcessedVideo, types.ProcessedVideo]:
+      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
+      __tb__ = options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = options.get("client_registry", None)
+      collector = options.get("collector", None)
+      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
+      raw = self.__runtime.stream_function(
+        "ProcessVideo",
+        {
+          "video": video,
+        },
+        None,
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        collectors,
+      )
+
+      return baml_py.BamlStream[partial_types.ProcessedVideo, types.ProcessedVideo](
+        raw,
+        lambda x: cast(partial_types.ProcessedVideo, x.cast_to(types, types, partial_types, True)),
+        lambda x: cast(types.ProcessedVideo, x.cast_to(types, types, partial_types, False)),
         self.__ctx_manager.get(),
       )
     

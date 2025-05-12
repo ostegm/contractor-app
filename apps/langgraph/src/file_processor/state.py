@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, fields
 from typing import List, Optional, Union
 
-from .baml_client.types import ConstructionProjectData, InputFile
+from .baml_client.types import ConstructionProjectData, InputFile, ProcessedVideo
 from langchain_core.runnables import RunnableConfig
 
 
@@ -26,6 +26,9 @@ class State:
 
     # AI-generated construction estimate in JSON format
     ai_estimate: Optional[ConstructionProjectData] = None
+
+    # Processed Video
+    video_summary: Optional[ProcessedVideo] = None
 
 
 @dataclass(kw_only=True)

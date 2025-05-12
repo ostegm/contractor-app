@@ -33,6 +33,17 @@ class InputFile {
   content string?     // Text content or transcription
   download_url string? // URL to download the file content\
   image_data image? // Optional image data https://docs.boundaryml.com/ref/baml/types#image
+  audio_data audio? // Optional audio data https://docs.boundaryml.com/ref/baml/types#audio
+}
+
+class VideoFrame {
+  timestamp float @description("Timestamp of the frame in seconds")
+  description string @description("Detailed description of the frame and its relevance to the project")
+}
+
+class ProcessedVideo {
+  summary string @description("Summary of the video content with details about how each frame contributes to the project")
+  frames VideoFrame[] @description("A list of frames that are cover all of the details from the video")
 }
 
 function GenerateProjectEstimate(files: InputFile[], existing_estimate: ConstructionProjectData?, requested_changes: string?) -> ConstructionProjectData {
@@ -46,7 +57,7 @@ function GenerateProjectEstimate(files: InputFile[], existing_estimate: Construc
   <UserProvidedFiles>
   {% for file in files %}
   <file name={{ file.name }} type={{ file.type }} description={{ file.description }}>
-  {% if file.type == "image" %}
+  {% if file.image_data %}
   {{ file.image_data }}
   {% else %}
   {{ file.content }}
@@ -84,5 +95,43 @@ test TestGenerateProjectEstimate {
         file "../apps/langgraph/tests/testdata/dated-bathroom.png"
       }},
     ]
+  }
+}
+
+
+function ProcessVideo(video: InputFile) -> ProcessedVideo {
+  client GeminiProcessor
+  prompt #"
+    You're an expert construction estimator. You're given a video of a construction project.
+    Your task is to review the video and provide a summary of the project.
+
+   {{ ctx.output_format }}
+  "#
+
+}
+
+function ProcessAudio(audio: InputFile) -> string {
+  client GeminiProcessor
+  prompt #"
+    You're an expert construction estimator. You're given an audio file of a construction project.
+    Your task is to review the audio and provide a transcription of the audio.
+
+    <Audio>
+    {{ audio.audio_data }}
+    </Audio>
+
+    Output the transcription as a string.
+
+  "#
+}
+
+test TestProcessAudio {
+  functions [ProcessAudio]
+  args {
+    audio {
+      name "walkthrough_notes.m4a", type "audio", description "walkthrough notes", audio_data {
+        file "../apps/web/supabase/storage_seed_files/contractor-app-dev/project2/walkthrough_notes.m4a"
+      }
+    }
   }
 }

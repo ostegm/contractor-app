@@ -104,6 +104,13 @@ export interface InputFile {
   content?: string | null
   download_url?: string | null
   image_data?: Image | null
+  audio_data?: Audio | null
+  
+}
+
+export interface ProcessedVideo {
+  summary: string
+  frames: VideoFrame[]
   
 }
 
@@ -120,5 +127,11 @@ export interface UpdateEstimateResponse {
 
 export interface UserInput {
   message: string
+  
+}
+
+export interface VideoFrame {
+  timestamp: number
+  description: string
   
 }

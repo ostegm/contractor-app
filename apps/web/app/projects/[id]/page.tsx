@@ -5,7 +5,7 @@ import { useView, ViewContext } from "../../app-client-shell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Trash2, Upload, File, ArrowLeft, FileText, Play, ChevronDown, ChevronRight, StickyNote, Download, RefreshCw, LayoutDashboard, FolderOpen, TriangleAlert } from "lucide-react"
+import { Trash2, Upload, File, ArrowLeft, FileText, Play, ChevronDown, ChevronRight, StickyNote, Download, RefreshCw, LayoutDashboard, FolderOpen, TriangleAlert, Music } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { uploadFile, clearProjectInfo, clearProjectEstimate, startEstimateGeneration, checkEstimateStatus } from "./actions"
 import { ConstructionProjectData, InputFile, EstimateLineItem } from "@/baml_client/baml_client/types"
@@ -59,6 +59,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [fileContent, setFileContent] = useState<string | null>(null)
   const [isLoadingPreview, setIsLoadingPreview] = useState(false)
   const [signedImageUrl, setSignedImageUrl] = useState<string>('')
+  const [signedAudioUrl, setSignedAudioUrl] = useState<string>('')
   const [isLoading, setIsLoading] = useState(true)
   const [isEstimateOutdated, setIsEstimateOutdated] = useState(false)
   const [initialFileCount, setInitialFileCount] = useState(0)
@@ -400,17 +401,22 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     // Set the file to preview
     setPreviewFile(file);
     setFileContent(null);
-    setSignedImageUrl(''); // Reset the signed URL
+    setSignedImageUrl('');
+    setSignedAudioUrl('');
     setFilePreviewDialogOpen(true);
     
     // If it's an image file, get the signed URL
     if (isImageFile(file.file_name)) {
       const url = await getFileSignedUrl(file);
       setSignedImageUrl(url);
+    } 
+    // If it's an audio file, get the signed URL
+    else if (isAudioFile(file.file_name)) {
+      const url = await getFileSignedUrl(file);
+      setSignedAudioUrl(url);
     }
-    
     // Only attempt to load content for text files
-    if (isTextFile(file.file_name)) {
+    else if (isTextFile(file.file_name)) {
       setIsLoadingPreview(true);
       try {
         // Use the stored file path if available
@@ -462,6 +468,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   const isImageFile = (fileName: string) => {
     return fileName.match(/\.(jpeg|jpg|png|gif|webp|svg)$/i) !== null;
+  };
+
+  const isAudioFile = (fileName: string) => {
+    return fileName.match(/\.(mp3|wav|ogg|m4a|aac)$/i) !== null;
   };
 
   const handleClearProjectInfo = async () => {
@@ -735,7 +745,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     uploadedFiles.map((file) => (
                       <div key={file.id} className="flex items-center justify-between bg-gray-700/30 hover:bg-gray-700/50 p-3 rounded-md transition-colors">
                         <div className="flex items-center overflow-hidden">
-                          {isMarkdownFile(file.file_name) && file.description === 'Project note' ? <StickyNote className="mr-2 h-4 w-4 text-yellow-400 flex-shrink-0" /> : <File className="mr-2 h-4 w-4 text-blue-400 flex-shrink-0" />}
+                          {isMarkdownFile(file.file_name) && file.description === 'Project note' ? <StickyNote className="mr-2 h-4 w-4 text-yellow-400 flex-shrink-0" /> 
+                           : isImageFile(file.file_name) ? <File className="mr-2 h-4 w-4 text-purple-400 flex-shrink-0" />
+                           : isAudioFile(file.file_name) ? <Music className="mr-2 h-4 w-4 text-green-400 flex-shrink-0" />
+                           : <File className="mr-2 h-4 w-4 text-blue-400 flex-shrink-0" />}
                           <button onClick={(e) => handleFileClick(file, e)} className="text-gray-200 hover:text-blue-400 bg-transparent border-0 p-0 cursor-pointer truncate text-sm">
                             {file.file_name}
                           </button>
@@ -847,7 +860,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           <DialogContent className="bg-gray-800 text-white border-gray-700 max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
             <DialogHeader>
               <DialogTitle className="flex items-center">
-                <FileText className="mr-2 h-5 w-5 text-blue-400" />
+                {previewFile && isAudioFile(previewFile.file_name) ? <Music className="mr-2 h-5 w-5 text-green-400" /> :
+                 previewFile && isImageFile(previewFile.file_name) ? <File className="mr-2 h-5 w-5 text-purple-400" /> :
+                 <FileText className="mr-2 h-5 w-5 text-blue-400" />}
                 {previewFile?.file_name}
               </DialogTitle>
             </DialogHeader>
@@ -880,6 +895,19 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       ) : (
                         <div className="text-center text-gray-400">
                           Image path not available. This file may need to be re-uploaded.
+                        </div>
+                      )}
+                    </div>
+                  ) : previewFile && isAudioFile(previewFile.file_name) ? (
+                    <div className="flex justify-center p-4">
+                      {signedAudioUrl ? (
+                        <audio controls src={signedAudioUrl} className="w-full max-w-md">
+                          Your browser does not support the audio element.
+                        </audio>
+                      ) : (
+                        <div className="text-center text-gray-400">
+                          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2" />
+                          Loading audio...
                         </div>
                       )}
                     </div>

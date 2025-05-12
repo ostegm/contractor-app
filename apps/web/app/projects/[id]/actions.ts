@@ -116,10 +116,15 @@ export async function uploadFile(formData: FormData, projectId: string) {
 }
 
 // Extended InputFile type to add fields needed for our web application
-interface FileToProcess extends InputFile {
+// REMOVED: content field
+// MODIFIED: type will now hold the specific MIME type
+// ADDED: download_url to carry the signed URL
+interface FileToProcess extends Omit<InputFile, 'image_data'> { // Exclude image_data if it exists in Baml InputFile
+  type: string; // Specific MIME type (e.g., "image/jpeg", "audio/mpeg")
+  path: string; // Supabase storage path (file_url from DB)
+  bucket?: string; // Supabase storage bucket
+  download_url?: string; // Signed URL for direct download by backend
   error?: string;
-  path?: string; // This will hold the file_url from UploadedFile
-  bucket?: string;
 }
 
 // Define task job status types
@@ -128,76 +133,6 @@ type TaskJobStatus = 'not_started' | 'pending' | 'processing' | 'completed' | 'f
 // Re-export the BAML types for use in other files
 export type EstimateItem = EstimateLineItem;
 export type AIEstimate = ConstructionProjectData;
-
-async function processFilesForInput(files: FileToProcess[]): Promise<FileToProcess[]> {
-  // Process files to load their content
-  const processedFiles: FileToProcess[] = await Promise.all(files.map(async (file) => {
-    try {
-      // For images and text files, use Supabase's signed URLs
-      if ((file.type === 'image' || file.type === 'text') && file.path) {
-        console.log(`Processing ${file.type} file: ${file.name} with path: ${file.path}`);
-        
-        // Create a signed URL for the file
-        const bucket = file.bucket || STORAGE_BUCKET;
-        const supabase = await createClient();
-        const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-          .from(bucket)
-          .createSignedUrl(file.path, 3600); // 1 hour expiration
-        
-        if (signedUrlError) {
-          console.error(`Error creating signed URL for file ${file.name}:`, signedUrlError);
-          return {
-            ...file,
-            content: '',
-            error: `Failed to create signed URL: ${signedUrlError.message}`
-          };
-        }
-        
-        // Fetch the content using the signed URL
-        const response = await fetch(signedUrlData.signedUrl);
-        if (!response.ok) {
-          console.error(`Error fetching file ${file.name}: ${response.status} ${response.statusText}`);
-          return {
-            ...file,
-            content: '',
-            error: `Failed to fetch file: ${response.status} ${response.statusText}`
-          };
-        }
-        
-        if (file.type === 'image') {
-          // Convert the response to base64 for images
-          const arrayBuffer = await response.arrayBuffer();
-          const base64 = Buffer.from(arrayBuffer).toString('base64');
-          
-          return {
-            ...file,
-            content: base64
-          };
-        } else {
-          // Convert the response to text for text files
-          const content = await response.text();
-          
-          return {
-            ...file,
-            content
-          };
-        }
-      }
-      
-      // For other file types, just pass through
-      return file;
-    } catch (error) {
-      console.error(`Error processing file ${file.name}:`, error);
-      return {
-        ...file,
-        content: '',
-        error: error instanceof Error ? error.message : 'Unknown error processing file'
-      };
-    }
-  }));
-
-  return processedFiles;
-}
 
 export async function updateProjectEstimate(projectId: string, estimate: ConstructionProjectData) {
   try {
@@ -709,64 +644,92 @@ export async function startEstimateGeneration(
       return { error: 'Failed to fetch project information' }
     }
 
-    // Map UploadedFile to FileToProcess
-    const filesToProcess: FileToProcess[] = uploadedFiles.map((file) => {
-      // For text files
-      if (file.file_name.endsWith('.txt') || file.file_name.endsWith('.md')) {
-        return {
-          type: 'text',
-          name: file.file_name,
-          description: file.description || '',
-          path: file.file_url // Use file_url here
-        };
+    // Map UploadedFile to FileToProcess, now including MIME type and generating signed URL
+    const supabaseForUrls = await createClient(); // Create client specifically for URL generation
+    const filesToProcessPromises: Promise<FileToProcess>[] = uploadedFiles.map(async (file): Promise<FileToProcess> => {
+      // Determine MIME type (basic implementation based on extension)
+      let mimeType = 'application/octet-stream'; // Default
+      const extension = file.file_name.split('.').pop()?.toLowerCase();
+      if (extension) {
+        // Common Image Types
+        if (['jpg', 'jpeg'].includes(extension)) mimeType = 'image/jpeg';
+        else if (extension === 'png') mimeType = 'image/png';
+        else if (extension === 'gif') mimeType = 'image/gif';
+        else if (extension === 'webp') mimeType = 'image/webp';
+        // Common Audio Types
+        else if (['mp3'].includes(extension)) mimeType = 'audio/mpeg';
+        else if (extension === 'wav') mimeType = 'audio/wav';
+        else if (extension === 'ogg') mimeType = 'audio/ogg';
+        else if (extension === 'm4a') mimeType = 'audio/mp4'; // Added M4A support
+        // Common Text Types
+        else if (extension === 'txt') mimeType = 'text/plain';
+        else if (extension === 'md') mimeType = 'text/markdown';
+        else if (extension === 'csv') mimeType = 'text/csv';
+        // Common Video Types (Add as needed)
+        else if (extension === 'mp4') mimeType = 'video/mp4';
+        else if (extension === 'mov') mimeType = 'video/quicktime';
+        else if (extension === 'avi') mimeType = 'video/x-msvideo';
       }
-      // For images
-      else if (file.file_name.match(/\.(jpeg|jpg|png|gif)$/i)) {
-        return {
-          type: 'image',
-          name: file.file_name,
-          description: file.description || '',
-          path: file.file_url // Use file_url here
-        };
+
+      // Generate signed URL
+      let downloadUrl: string | undefined = undefined;
+      let fileError: string | undefined = undefined;
+      try {
+        const { data: signedUrlData, error: signedUrlError } = await supabaseForUrls.storage
+          .from(STORAGE_BUCKET) // Use constant or file.bucket if available
+          .createSignedUrl(file.file_url, 3600); // 1 hour expiration
+
+        if (signedUrlError) {
+          console.error(`Error creating signed URL for ${file.file_name}:`, signedUrlError);
+          fileError = `Failed to create signed URL: ${signedUrlError.message}`;
+        } else {
+          downloadUrl = signedUrlData.signedUrl;
+        }
+      } catch (urlError) {
+         console.error(`Unexpected error generating signed URL for ${file.file_name}:`, urlError);
+         fileError = urlError instanceof Error ? urlError.message : 'Unknown error generating signed URL';
       }
-      // For other file types
+
       return {
-        type: 'other',
+        type: mimeType, // Use determined MIME type
         name: file.file_name,
-        description: file.description || ''
-        // No path needed for 'other' as per original logic, content won't be fetched
+        description: file.description || '',
+        path: file.file_url,
+        bucket: STORAGE_BUCKET,
+        download_url: downloadUrl,
+        error: fileError // Store potential URL generation error
       };
     });
 
-    // Check if any files are missing paths (for types that require it)
-    const missingPaths = filesToProcess.filter(file =>
-      (file.type === 'image' || file.type === 'text') && !file.path
-    );
+    const filesToProcess = await Promise.all(filesToProcessPromises);
 
-    if (missingPaths.length > 0) {
-      const missingFileNames = missingPaths.map(f => f.name).join(', ');
-      // It's better to return an error that the frontend can display meaningfully
+    // Check for failures in generating signed URLs
+    const filesWithUrlErrors = filesToProcess.filter(file => file.error);
+    if (filesWithUrlErrors.length > 0) {
+      const errorDetails = filesWithUrlErrors.map(f => `${f.name}: ${f.error}`).join('; ');
       return {
-        error: `Missing file paths for: ${missingFileNames}. These files may need to be re-uploaded.`,
-        failedFiles: missingPaths // Optionally return the files that failed
+        error: `Failed to prepare ${filesWithUrlErrors.length} file(s) for processing: ${errorDetails}`,
+        failedFiles: filesWithUrlErrors
       };
     }
 
-    // Process files to load their content
-    const processedFiles = await processFilesForInput(filesToProcess) // Pass the newly mapped files
+    // REMOVED: Call to processFilesForInput as content fetching is moved to backend.
+    // const processedFiles = await processFilesForInput(filesToProcess) // Pass the newly mapped files
+    // The backend will now use the download_url directly.
+    const processedFiles = filesToProcess; // Use files with download_urls directly
 
-    // Check for failures in processed files
-    const failedFiles = processedFiles.filter(file => 
-      (file.type === 'image' && !file.content && file.error) || 
-      (file.type === 'text' && !file.content && file.error)
-    )
+    // Check for failures in processed files (this check might be less relevant now, but kept for structure)
+    // This check was originally for content fetching, which is removed.
+    // It now primarily checks if download_url failed to generate (handled above).
+    const failedFiles = processedFiles.filter(file => file.error);
 
     if (failedFiles.length > 0) {
-      const failedFileNames = failedFiles.map(f => f.name).join(', ')
-      return { 
-        error: `Failed to fetch content for ${failedFiles.length} file(s): ${failedFileNames}.`,
+      const failedFileNames = failedFiles.map(f => f.name).join(', ');
+      const errorMessages = failedFiles.map(f => f.error).join('; ');
+      return {
+        error: `Failed to prepare download URLs for ${failedFiles.length} file(s): ${failedFileNames}. Errors: ${errorMessages}`,
         failedFiles
-      }
+      };
     }
 
     // Create a thread
@@ -787,12 +750,12 @@ export async function startEstimateGeneration(
     const threadResult = await createThreadResponse.json() as { thread_id: string }
     const threadId = threadResult.thread_id
 
-    // Create the input state
+    // Create the input state - sending files with download_url and specific MIME type
     const inputState = {
-      files: processedFiles,
+      files: processedFiles.map(({ path, bucket, error, ...rest }) => rest), // Send relevant fields: name, description, type (mime), download_url
       existing_estimate: project.ai_estimate ? JSON.parse(project.ai_estimate) : null,
       requested_changes: requested_changes
-    }
+    };
 
     // Create a background run
     const createRunResponse = await fetch(`${LANGGRAPH_API_URL}/threads/${threadId}/runs`, {

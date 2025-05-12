@@ -21,7 +21,7 @@ import { b } from '../index';
 import type { Check, Checked  } from "../types";
 import type { Image, Audio } from "@boundaryml/baml";
 
-import type {  AllowedTypes,  AssisantMessage,  BamlChatThread,  ConstructionProjectData,  EstimateLineItem,  Event,  InputFile,  UpdateEstimateRequest,  UpdateEstimateResponse,  UserInput } from "../types"
+import type {  AllowedTypes,  AssisantMessage,  BamlChatThread,  ConstructionProjectData,  EstimateLineItem,  Event,  InputFile,  ProcessedVideo,  UpdateEstimateRequest,  UpdateEstimateResponse,  UserInput,  VideoFrame } from "../types"
 
 import type * as types from "../types"
 
@@ -72,6 +72,44 @@ export const GenerateProjectEstimate = async (
     files,
     existing_estimate,
     requested_changes,
+  );
+  return Promise.resolve(stream.toStreamable());
+};
+
+/**
+ * Executes the streaming variant of the "ProcessAudio" BAML action.
+ *
+ * This action initiates a streaming response by calling the corresponding
+ * BAML stream function. The returned stream yields incremental updates.
+ *
+ * @param { InputFile } audio - Input parameter.
+ *
+ * @returns {ReadableStream<Uint8Array>} A stream that yields incremental updates from the action.
+ */
+export const ProcessAudio = async (
+  audio: InputFile,
+): Promise<ReadableStream<Uint8Array>> => {
+  const stream = b.stream.ProcessAudio(
+    audio,
+  );
+  return Promise.resolve(stream.toStreamable());
+};
+
+/**
+ * Executes the streaming variant of the "ProcessVideo" BAML action.
+ *
+ * This action initiates a streaming response by calling the corresponding
+ * BAML stream function. The returned stream yields incremental updates.
+ *
+ * @param { InputFile } video - Input parameter.
+ *
+ * @returns {ReadableStream<Uint8Array>} A stream that yields incremental updates from the action.
+ */
+export const ProcessVideo = async (
+  video: InputFile,
+): Promise<ReadableStream<Uint8Array>> => {
+  const stream = b.stream.ProcessVideo(
+    video,
   );
   return Promise.resolve(stream.toStreamable());
 };
