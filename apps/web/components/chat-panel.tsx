@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { X, Send, RefreshCw } from 'lucide-react';
+import { X, Send, RefreshCw, ChevronDown, ChevronRight, ChevronUp } from 'lucide-react';
 import { getChatThreadDetails, createChatThreadAndPostMessage, postChatMessage, getChatEvents, DisplayableBamlEvent } from '@/app/projects/[id]/actions';
 import type { UserInput as BamlUserInput, AssisantMessage as BamlAssistantMessage, UpdateEstimateRequest as BamlUpdateEstimateRequest, UpdateEstimateResponse as BamlUpdateEstimateResponse, AllowedTypes } from '@/baml_client/baml_client/types';
 
@@ -25,6 +25,8 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
   const [isAssistantUpdatingEstimate, setIsAssistantUpdatingEstimate] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingThread, setIsLoadingThread] = useState<boolean>(false); // Changed initial to false, will set true during load
+  // ADDED: State for managing expansion of UpdateEstimateRequest events
+  const [expandedUpdateRequests, setExpandedUpdateRequests] = useState<Record<string, boolean>>({});
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -36,6 +38,14 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 250)}px`;
     }
   }, [newMessage]);
+
+  // ADDED: Function to toggle expansion state for UpdateEstimateRequest events
+  const toggleUpdateRequestExpansion = (eventId: string) => {
+    setExpandedUpdateRequests(prev => ({
+      ...prev,
+      [eventId]: !prev[eventId]
+    }));
+  };
 
   // Effect for initial load & when initialThreadIdProp or forceNewChat changes
   useEffect(() => {
@@ -277,16 +287,33 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
       case 'AssisantMessage': // Corrected to AssisantMessage if that is the type from BAML
         return <p>{(event.data as BamlAssistantMessage).message}</p>;
       case 'UpdateEstimateRequest':
+        const requestData = event.data as BamlUpdateEstimateRequest;
+        const isExpanded = expandedUpdateRequests[event.id];
         return (
           <div>
-            <p><strong>Assistant:</strong> I need to update the project estimate.</p>
-            <p><em>Changes: {(event.data as BamlUpdateEstimateRequest).changes_to_make}</em></p>
+            <p><strong>System:</strong> Agent updating estimate.</p>
+            <Button 
+              variant="ghost"
+              size="sm"
+              onClick={() => toggleUpdateRequestExpansion(event.id)}
+              className="text-blue-400 hover:text-blue-300 px-1 py-0 h-auto text-xs mt-1 flex items-center"
+            >
+              {isExpanded ? <ChevronUp className="h-3 w-3 mr-1" /> : <ChevronDown className="h-3 w-3 mr-1" />} 
+              {isExpanded ? 'Hide Details' : 'Show Details'}
+            </Button>
+            {isExpanded && (
+              <div className="mt-2 pt-2 border-t border-yellow-600/30">
+                <p className="text-sm italic">
+                  Changes: {requestData.changes_to_make}
+                </p>
+              </div>
+            )}
           </div>
         );
       case 'UpdateEstimateResponse':
         const responseData = event.data as BamlUpdateEstimateResponse;
         if (responseData.success) {
-          return <p><strong>System:</strong> Project estimate update request processed successfully.</p>;
+          return <p><strong>System:</strong> Estimate updated.</p>;
         }
         return <p><strong>System:</strong> Project estimate update failed. Error: {responseData.error_message}</p>;
       default:
