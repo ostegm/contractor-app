@@ -84,9 +84,10 @@ export default function AppClientShell({ children }: AppClientShellProps) {
     }
   };
 
-  const sidebarWidthClass = isChatPanelOpen ? "w-48" : "w-72"; // Wider sidebar by default
-  const mainContentMarginClass = isChatPanelOpen ? "md:ml-48" : "md:ml-72"; // Matching margins
-  const mainContentWidthClass = isChatPanelOpen ? "md:mr-96" : "";
+  // Define classes based on panel state
+  const sidebarWidthClass = "w-25"; // Use a narrower width
+  const mainContentMarginLeftClass = "md:ml-10"; // Match the sidebar width
+  const mainContentMarginRightClass = isChatPanelOpen ? "md:mr-10" : ""; // Adjust right margin when open
 
   return (
     // The <body> tag will be in the actual layout.tsx (Server Component)
@@ -96,11 +97,11 @@ export default function AppClientShell({ children }: AppClientShellProps) {
       <div className="flex flex-1 min-h-0">
         <ProjectSidebar
           toggleChatPanel={toggleChatPanel}
-          className={sidebarWidthClass}
+          className={`${sidebarWidthClass} transition-all duration-300 ease-in-out`} // Ensure transition is on the sidebar too
           projectId={currentProjectId}
           onSelectChatThread={handleSelectChatThread}
         />
-        <main className={`flex-1 p-0 overflow-y-auto ${mainContentMarginClass} ${mainContentWidthClass} transition-all duration-300 ease-in-out`}>
+        <main className={`flex-1 p-0 overflow-y-auto ${mainContentMarginLeftClass} ${mainContentMarginRightClass} transition-all duration-300 ease-in-out`}>
           {children}
         </main>
         <ChatPanel
