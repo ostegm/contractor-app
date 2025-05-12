@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Review [CLAUDE.md](mdc:CLAUDE.md) to understand how the UI components interact with server actions and supabase DB. 
