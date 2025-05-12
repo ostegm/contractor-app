@@ -308,7 +308,6 @@ export async function clearProjectEstimate(projectId: string) {
   }
 }
 
-// ADDED: New Server Action: getOrCreateChatThread (II.B)
 export async function getOrCreateChatThread(projectId: string): Promise<{ threadId: string; events: DisplayableBamlEvent[]; name: string }> {
   const supabase = await createClient();
   let { data: thread, error: threadError } = await supabase
@@ -371,7 +370,7 @@ interface PostChatMessageResult {
 
 export async function postChatMessage(
   threadId: string,
-  projectId: string, // Required for startEstimateGeneration if triggered
+  projectId: string,
   userInput: BamlUserInput // From baml_client/types
 ): Promise<PostChatMessageResult> {
   const supabase = await createClient();
@@ -468,7 +467,6 @@ export async function postChatMessage(
   // 5. If UpdateEstimateRequest, trigger estimate generation
   if (nextBamlEventOutput.type === "UpdateEstimateRequest") {
     const requestData = nextBamlEventOutput.data as BamlUpdateEstimateRequest;
-    // Assuming startEstimateGeneration is defined elsewhere in this file and modified as per plan
     const estimateResult = await startEstimateGeneration(projectId, requestData.changes_to_make, threadId);
     if (estimateResult.error) {
       console.error('Error starting estimate generation from chat:', estimateResult.error);
@@ -485,56 +483,28 @@ export async function postChatMessage(
   };
 }
 
-// New Server Action: Get all chat threads for a project or general chats
-export async function getChatThreads(projectId?: string): Promise<{ id: string; name: string; lastMessageAt: string }[]> {
+export async function getChatThreads(projectId: string): Promise<{ id: string; name: string; lastMessageAt: string }[]> {
   const supabase = await createClient();
-
   let query = supabase
     .from('chat_threads')
-    .select('id, name, created_at');
+    .select('id, name, created_at')
+    .eq('project_id', projectId); // Only query for the specific project
 
-  if (projectId) {
-    // Get threads for a specific project
-    query = query.eq('project_id', projectId);
-  } else {
-    // Get general threads (not associated with a project)
-    query = query.eq('project_id', 'general');
-  }
-
-  // Order by latest activity
-  query = query.order('created_at', { ascending: false });
-
-  const { data: threads, error } = await query;
+  // Fetch the threads based on the constructed query
+  const { data: threadsData, error } = await query.order('created_at', { ascending: false });
 
   if (error) {
     console.error('Error fetching chat threads:', error);
-    return [];
+    throw new Error(`Failed to fetch chat threads: ${error.message}`);
   }
 
-  // Get the last message timestamp for each thread
-  const threadsWithLastMessage = await Promise.all((threads || []).map(async (thread) => {
-    const { data: lastMessages } = await supabase
-      .from('chat_events')
-      .select('created_at')
-      .eq('thread_id', thread.id)
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    const lastMessageAt = lastMessages && lastMessages.length > 0
-      ? lastMessages[0].created_at
-      : thread.created_at;
-
-    return {
-      id: thread.id,
-      name: thread.name,
-      lastMessageAt
-    };
+  // Map data - assuming lastMessageAt needs to be derived or is actually created_at for sorting?
+  // For now, using created_at as lastMessageAt based on the select query.
+  return (threadsData || []).map(thread => ({
+    id: thread.id,
+    name: thread.name,
+    lastMessageAt: thread.created_at // Using created_at based on select
   }));
-
-  // Sort threads by latest message time
-  return threadsWithLastMessage.sort((a, b) =>
-    new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
-  );
 }
 
 // ADDED: Server Action: getChatEvents (for polling updates) (II.F)

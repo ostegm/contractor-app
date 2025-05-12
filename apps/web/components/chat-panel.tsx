@@ -56,10 +56,12 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: externalThread
           const defaultName = `Chat - ${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
           // Create a new thread record
-          const chatProjectId = projectId || 'general';
+          if (!projectId) {
+            throw new Error('Cannot create a new chat thread without a valid project ID.');
+          }
           const { data: newThread, error: newThreadError } = await supabase
             .from('chat_threads')
-            .insert({ project_id: chatProjectId, name: defaultName })
+            .insert({ project_id: projectId, name: defaultName })
             .select('id, name')
             .single();
 
@@ -122,8 +124,10 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: externalThread
           }
         } else {
           // Get or create a thread for the current project
-          const chatProjectId = projectId || 'general';
-          const data = await getOrCreateChatThread(chatProjectId);
+          if (!projectId) {
+            throw new Error('Cannot load or create chat thread without a project ID.');
+          }
+          const data = await getOrCreateChatThread(projectId);
 
           setThreadId(data.threadId);
           setEvents(data.events);
@@ -194,6 +198,12 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: externalThread
     e.preventDefault();
     if (!newMessage.trim() || !threadId || isSending) return;
 
+    // Ensure we have a projectId before sending
+    if (!projectId) {
+      setError('Cannot send message: No active project context.');
+      return;
+    }
+
     setIsSending(true);
     setError(null);
 
@@ -211,9 +221,8 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: externalThread
     setNewMessage('');
 
     try {
-      // Use the projectId if available, otherwise use 'general'
-      const chatProjectId = projectId || 'general';
-      const result = await postChatMessage(threadId, chatProjectId, userInput);
+      // projectId is checked above, guaranteed valid string here
+      const result = await postChatMessage(threadId, projectId, userInput);
 
       setEvents(prevEvents => {
         // Replace optimistic event with actual from server, and add assistant response

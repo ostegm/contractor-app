@@ -52,9 +52,17 @@ export function ProjectSidebar({
 
   // Function to fetch chat threads that can be called anytime
   const fetchChatThreads = useCallback(async () => {
+    // Only fetch if projectId is a non-empty string
+    if (!projectId) {
+      setChatThreads([]); // Clear threads if no project ID
+      setIsLoadingThreads(false);
+      return;
+    }
+    
     setIsLoadingThreads(true);
     try {
-      const threads = await getChatThreads(projectId || undefined);
+      // projectId is confirmed non-empty here
+      const threads = await getChatThreads(projectId);
       setChatThreads(threads);
     } catch (error) {
       console.error('Error fetching chat threads:', error);
