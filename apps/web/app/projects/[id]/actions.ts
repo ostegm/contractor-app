@@ -412,6 +412,7 @@ async function _handleBamlResponse(
 }
 // --- End Internal Helper Function --- 
 
+// REFACTORED: Calls postChatMessage after creating the thread
 export async function createChatThreadAndPostMessage(
   projectId: string,
   userInput: BamlUserInput
@@ -419,141 +420,88 @@ export async function createChatThreadAndPostMessage(
   const supabase = await createClient();
   const now = new Date();
   let newThreadId = '';
-  let userInputDisplayEvent: DisplayableBamlEvent | null = null;
 
   try {
     // 1. Create the new chat thread
-    // Use first few words of user message for the name, or a timestamp default
     const firstWords = userInput.message.split(' ').slice(0, 5).join(' ');
     let defaultName = firstWords || `Chat - ${now.toISOString().split('T')[0]}`;
-    if (defaultName.length > 50) { // Keep name reasonably short
+    if (defaultName.length > 50) {
         defaultName = defaultName.substring(0, 47) + '...';
     }
 
     const { data: newThread, error: newThreadError } = await supabase
       .from('chat_threads')
       .insert({ project_id: projectId, name: defaultName })
-      .select('id') // Only need the ID
+      .select('id')
       .single();
 
     if (newThreadError || !newThread) {
       console.error('Error creating chat thread:', newThreadError);
-      throw new Error('Failed to create chat thread.');
+      // Don't return full CreateChatResult shape here, just throw
+      throw new Error(`Failed to create chat thread: ${newThreadError?.message || 'Unknown error'}`);
     }
     newThreadId = newThread.id;
 
-    // 2. Save the first UserInput event
-    const userInputToSave = {
-      thread_id: newThreadId,
-      event_type: 'UserInput' as const, // Use const for specific type
-      data: userInput,
-      created_at: now.toISOString(), // Use ISO string consistent with polling
-    };
-    const { data: savedUserInput, error: userInputSaveError } = await supabase
-      .from('chat_events')
-      .insert(userInputToSave)
-      .select('id, created_at')
-      .single();
+    // 2. Call postChatMessage to handle saving the user input and getting the AI response
+    const postResult = await postChatMessage(newThreadId, projectId, userInput);
 
-    if (userInputSaveError || !savedUserInput) {
-      console.error('Error saving initial user input event:', userInputSaveError);
-      // Attempt cleanup: Delete the created thread if the first message fails to save
-      await supabase.from('chat_threads').delete().eq('id', newThreadId);
-      throw new Error('Failed to save initial user message.');
-    }
-
-    userInputDisplayEvent = {
-      id: savedUserInput.id,
-      type: "UserInput" as AllowedTypes, // CAST to AllowedTypes
-      data: userInput,
-      createdAt: savedUserInput.created_at
-    };
-
-    // 3. Fetch current estimate
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('ai_estimate')
-      .eq('id', projectId)
-      .single();
-
-    if (projectError) {
-      console.error('Error fetching project estimate for chat:', projectError);
-      // Attempt cleanup: Delete the created thread and saved message
-      await supabase.from('chat_events').delete().eq('id', savedUserInput.id);
-      await supabase.from('chat_threads').delete().eq('id', newThreadId);
-      throw new Error('Failed to fetch project estimate for chat.');
-    }
-
-    let currentEstimate: ConstructionProjectData | null = null;
-    if (project?.ai_estimate) {
+    // 3. Check for errors from postChatMessage
+    if (postResult.error) {
+      // If posting the message failed, attempt to delete the newly created thread
+      console.warn(`Initial message posting failed for thread ${newThreadId}. Attempting cleanup.`);
       try {
-        currentEstimate = JSON.parse(project.ai_estimate as string);
-      } catch (parseError) {
-        console.error('Error parsing current estimate JSON:', parseError);
-         // Decide how to handle - proceed without estimate? Return error?
-        // For now, proceeding without, but logging the error.
+        await supabase.from('chat_threads').delete().eq('id', newThreadId);
+        console.log(`Cleaned up created thread ${newThreadId} after message post failure.`);
+      } catch (cleanupError) {
+        console.error(`Failed to cleanup thread ${newThreadId} after message post failure:`, cleanupError);
+        // Log cleanup error but proceed with returning the original post error
       }
+      // Return an error result consistent with CreateChatResult shape
+       return {
+         newThreadId: '', // Indicate thread creation ultimately failed due to post error
+         userInputDisplayEvent: postResult.userInputDisplayEvent, // May be a temporary event if save failed
+         assistantResponseDisplayEvent: postResult.assistantResponseDisplayEvent, // Could be undefined
+         updateTriggered: postResult.updateTriggered, // Likely false
+         error: postResult.error,
+       };
     }
 
-    // 4. Call b.DetermineNextStep with the first user message and estimate
-    const firstThreadState: BamlChatThread = { events: [{ type: 'UserInput' as AllowedTypes, data: userInput }] };
-    // Ensure currentEstimate is not null before passing, BAML might require it
-    // If BAML function definition makes current_estimate mandatory, handle null case appropriately.
-    // Assuming for now BAML handles null or we pass an empty object if needed.
-    const nextBamlEventOutput = await b.DetermineNextStep(firstThreadState, currentEstimate ?? {} as ConstructionProjectData);
-
-    // 5. Handle BAML response using helper function
-    const { assistantResponseDisplayEvent, updateTriggered, error: bamlHandleError } = await _handleBamlResponse(
-      newThreadId,
-      projectId,
-      nextBamlEventOutput
-    );
-
-    // If the helper encountered an error saving the BAML event, return partial success
-    if (bamlHandleError) {
-        return {
-            newThreadId,
-            userInputDisplayEvent, // User input was saved
-            assistantResponseDisplayEvent, // Contains temp event data
-            updateTriggered: false, // updateTriggered from helper might be true, but saving failed, so set false?
-            error: bamlHandleError
-        };
-    }
-
-    // 5. Revalidate path
+    // 4. Revalidate path on full success
     revalidatePath(`/projects/${projectId}`);
 
-    // Return success state
+    // 5. Return success state including the newThreadId
     return {
       newThreadId,
-      userInputDisplayEvent,
-      assistantResponseDisplayEvent, // Contains saved event data
-      updateTriggered,
+      userInputDisplayEvent: postResult.userInputDisplayEvent, // From postChatMessage
+      assistantResponseDisplayEvent: postResult.assistantResponseDisplayEvent, // From postChatMessage
+      updateTriggered: postResult.updateTriggered, // From postChatMessage
     };
 
   } catch (error) {
     console.error('Error in createChatThreadAndPostMessage:', error);
-    // Attempt to cleanup thread if created but subsequent steps failed
-     if (newThreadId) {
+    
+    // If the error occurred after thread creation (e.g., postChatMessage threw unexpectedly)
+    // but before postChatMessage returned an error object handled above.
+    if (newThreadId) {
        try {
             await supabase.from('chat_threads').delete().eq('id', newThreadId);
-            console.log(`Cleaned up partially created thread ${newThreadId}`);
+            console.log(`Cleaned up thread ${newThreadId} due to error during creation/post sequence.`);
        } catch (cleanupError) {
-            console.error(`Failed to cleanup thread ${newThreadId}:`, cleanupError);
+            console.error(`Failed to cleanup thread ${newThreadId} after error:`, cleanupError);
        }
      }
-    // Return error state - ensure shape matches CreateChatResult but indicates failure
-    // Provide a default object if userInputDisplayEvent is null
-    const finalUserInputDisplayEvent = userInputDisplayEvent ?? { 
-      id: 'temp-error-user-catch', 
-      type: "UserInput" as AllowedTypes, // CAST to AllowedTypes
+
+    // Return error state - provide a default user input object for consistency
+    const defaultUserInputDisplayEvent = { 
+      id: `temp-error-catch-${Date.now()}`, 
+      type: "UserInput" as AllowedTypes, // CAST
       data: userInput, 
       createdAt: now.toISOString() 
     };
 
     return {
-      newThreadId: '', // No valid thread ID created
-      userInputDisplayEvent: finalUserInputDisplayEvent, // Use the non-null version
+      newThreadId: '', // No valid thread ID
+      userInputDisplayEvent: defaultUserInputDisplayEvent, 
       updateTriggered: false,
       error: error instanceof Error ? error.message : 'An unexpected error occurred while creating the chat.',
     };
