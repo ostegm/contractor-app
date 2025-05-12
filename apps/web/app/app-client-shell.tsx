@@ -85,9 +85,9 @@ export default function AppClientShell({ children }: AppClientShellProps) {
   };
 
   // Define classes based on panel state
-  const sidebarWidthClass = "w-25"; // Use a narrower width
-  const mainContentMarginLeftClass = "md:ml-10"; // Match the sidebar width
-  const mainContentMarginRightClass = isChatPanelOpen ? "md:mr-10" : ""; // Adjust right margin when open
+  const sidebarWidthClass = "w-25"; // User preference
+  const mainContentMarginLeftClass = "md:ml-10"; // User preference
+  const mainContentMarginRightClass = isChatPanelOpen ? "md:mr-96" : ""; // Match ChatPanel width (w-96)
 
   return (
     // The <body> tag will be in the actual layout.tsx (Server Component)
