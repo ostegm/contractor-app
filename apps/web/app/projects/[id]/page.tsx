@@ -15,7 +15,6 @@ import ReactMarkdown from "react-markdown"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import Image from "next/image"
-import ChatInterface from "./components/ChatInterface"
 
 // Storage bucket name used in Supabase URLs
 const STORAGE_BUCKET_NAME = 'contractor-app-dev';
@@ -513,10 +512,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         </div>
       </div>
 
-      {/* ADDED: Main content area with ChatInterface (example placement) */}
-      {/* You might want to adjust this to a two-column layout or integrate into existing views */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2">
+      {/* Main content area */}
+      <div className="grid grid-cols-1 gap-6">
+        <div>
           {/* Existing view logic based on currentProjectView */}
           {currentProjectView === 'estimate' && (
             <div className="estimate-view space-y-6">
@@ -727,12 +725,6 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               </div>
             </div>
           )}
-        </div>
-
-        {/* Chat Interface Column */}
-        <div className="md:col-span-1">
-          {/* Ensure id is available before rendering */}
-          {id && <ChatInterface projectId={id} />}
         </div>
       </div>
 
