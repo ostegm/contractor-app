@@ -7,6 +7,10 @@
                 "@modelcontextprotocol/server-postgres",
                 "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
             ]
+        },
+        "browser-tools": {
+            "command": "npx @agentdeskai/browser-tools-mcp@1.2.0",
+            "enabled": true
         }
     }
 }
