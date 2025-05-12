@@ -70,8 +70,25 @@ contractor-monorepo/
 
 
 ## TODOS
-- Finish chat implemnentation - doesnt seem to be passing the ai estimate from the db.
 - Chat styling around app.
+- Finish chat implemnentation - doesnt seem to be passing the ai estimate from the db.
+- Auto name chats async after 2 messages
+- Rename, delete chat functionality
+- Export to CSV
+- Handle audio notes? Video input - video probably needs to be parsed into screenshots
+- Manual edit mode (clicking an item to edit)
+- Build test case for yard project
+   - Plans from yard designer
+   - Web search for Pricing per plant
+   - How many grasses of type x are there in this project?
+- How to enable web search (firecrawl?) 
+- How to make it faster (only produce sections of the aiestimate? Don't regenerate all of it)
+- Test cases from Lily
+- Test case from forrest
+- Schedule a Landscaper call for feedback
+- Need to import into quickbooks (see chat gpt)
+- Review export/import functionality chatgpt - maybe add to app?
+
+
 - Deploy to vercel/langgraph/supabase
-- Audio notes? Video input - video probably needs to be parsed into screenshots
 - Do we really need a two step pipeline - maybe remove langgraph?
