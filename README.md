@@ -72,6 +72,7 @@ contractor-monorepo/
 ## TODOS
 - Export to CSV
 - Handle audio notes? Video input - video probably needs to be parsed into screenshots
+- Mobile UX?
 - Auto name chats async after 2 messages (baml impl with 4.1nano)
 - Manual edit mode (clicking an item to edit)
 - Cleanup polling (i think its happening due to chat thread polling)
