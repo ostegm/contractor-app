@@ -12,9 +12,12 @@
   "dependencies": {
     "@boundaryml/baml": "0.86.1",
     "@boundaryml/baml-nextjs-plugin": "^0.1.0",
+    "@radix-ui/react-alert-dialog": "^1.1.13",
     "@radix-ui/react-dialog": "^1.1.6",
+    "@radix-ui/react-dropdown-menu": "^2.1.14",
     "@radix-ui/react-label": "^2.1.2",
     "@radix-ui/react-slot": "^1.1.2",
+    "@radix-ui/react-tooltip": "^1.2.6",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.48.1",

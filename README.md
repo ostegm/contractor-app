@@ -70,10 +70,9 @@ contractor-monorepo/
 
 
 ## TODOS
-- Chat styling around app.
+- Insert a few chat threads for seeing organization (some from today, yesterday and older)
 - Finish chat implemnentation - doesnt seem to be passing the ai estimate from the db.
-- Auto name chats async after 2 messages
-- Rename, delete chat functionality
+- Auto name chats async after 2 messages (baml impl with 4.1nano)
 - Export to CSV
 - Handle audio notes? Video input - video probably needs to be parsed into screenshots
 - Manual edit mode (clicking an item to edit)

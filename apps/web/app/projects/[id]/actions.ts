@@ -945,3 +945,87 @@ function extractAIEstimate(result: ApiResponse): ConstructionProjectData | null 
   return null
 }
 
+// ADDED: Rename Chat Thread Server Action
+export async function renameChatThread(threadId: string, newName: string): Promise<void> {
+  console.log(`Server Action: Renaming thread ${threadId} to "${newName}"`);
+  const supabase = await createClient();
+  
+  const { error } = await supabase
+    .from('chat_threads')
+    .update({ name: newName })
+    .eq('id', threadId);
+
+  if (error) {
+    console.error('Error renaming chat thread:', error);
+    throw new Error(`Failed to rename chat thread: ${error.message}`);
+  }
+
+  // Find the project ID associated with the thread to revalidate the correct path
+  const { data: threadData, error: fetchError } = await supabase
+    .from('chat_threads')
+    .select('project_id')
+    .eq('id', threadId)
+    .single();
+
+  if (fetchError) {
+    console.error('Error fetching project_id for revalidation:', fetchError);
+    // Proceed without revalidation if fetching project_id fails, but log it.
+  } else if (threadData?.project_id) {
+    revalidatePath(`/projects/${threadData.project_id}`);
+    // Optionally revalidate the dashboard or other relevant paths if needed
+  } else {
+      console.warn('Could not find project_id for thread to revalidate path.');
+  }
+
+  // No need for simulated delay in actual implementation
+}
+
+// ADDED: Delete Chat Thread Server Action
+export async function deleteChatThread(threadId: string): Promise<void> {
+  console.log(`Server Action: Deleting thread ${threadId}`);
+  const supabase = await createClient();
+
+  // Find the project ID before deleting for revalidation
+  const { data: threadData, error: fetchError } = await supabase
+    .from('chat_threads')
+    .select('project_id')
+    .eq('id', threadId)
+    .single();
+
+  if (fetchError && fetchError.code !== 'PGRST116') { // Ignore 'Not Found' error if already deleted
+      console.error('Error fetching project_id before deleting thread:', fetchError);
+      // Depending on requirements, might want to throw here or proceed cautiously
+  }
+
+  // Delete associated chat events first (optional but recommended for cleanup)
+  const { error: eventsError } = await supabase
+    .from('chat_events')
+    .delete()
+    .eq('thread_id', threadId);
+
+  if (eventsError) {
+    console.error('Error deleting chat events:', eventsError);
+    // Decide if this is a fatal error for the deletion process
+  }
+
+  // Delete the chat thread
+  const { error } = await supabase
+    .from('chat_threads')
+    .delete()
+    .eq('id', threadId);
+
+  if (error) {
+    console.error('Error deleting chat thread:', error);
+    throw new Error(`Failed to delete chat thread: ${error.message}`);
+  }
+
+  // Revalidate path if project_id was found
+  if (threadData?.project_id) {
+      revalidatePath(`/projects/${threadData.project_id}`);
+  } else {
+      console.warn('Could not revalidate path after deleting thread, project_id not found.');
+  }
+
+  // No need for simulated delay
+}
+
