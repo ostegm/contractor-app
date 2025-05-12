@@ -15,6 +15,9 @@ const inter = Inter({ subsets: ["latin"] });
 interface ViewContextType {
   currentProjectView: 'estimate' | 'files';
   setCurrentProjectView: Dispatch<SetStateAction<'estimate' | 'files'>>;
+  // ADDED: Callback for chat-triggered estimate updates
+  onEstimateUpdateTriggeredByChat: (() => void) | null;
+  setOnEstimateUpdateTriggeredByChat: Dispatch<SetStateAction<(() => void) | null>>;
 }
 
 export const ViewContext = createContext<ViewContextType | undefined>(undefined);
@@ -40,6 +43,8 @@ export default function AppClientShell({ children }: AppClientShellProps) {
   const [currentChatThreadId, setCurrentChatThreadId] = useState<string | null>(null);
   // ADDED: State to trigger sidebar refresh
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
+  // ADDED: State to hold the callback from the project page
+  const [onEstimateUpdateTriggeredByChat, setOnEstimateUpdateTriggeredByChat] = useState<(() => void) | null>(null);
 
   // Get the current pathname from Next.js
   const pathname = usePathname();
@@ -107,7 +112,12 @@ export default function AppClientShell({ children }: AppClientShellProps) {
   return (
     // The <body> tag will be in the actual layout.tsx (Server Component)
     // This component provides the structure within the body.
-    <ViewContext.Provider value={{ currentProjectView, setCurrentProjectView }}>
+    <ViewContext.Provider value={{ 
+      currentProjectView, 
+      setCurrentProjectView, 
+      onEstimateUpdateTriggeredByChat, // Provide callback state
+      setOnEstimateUpdateTriggeredByChat // Provide setter function
+    }}>
       <HeaderNav />
       <div className="flex flex-1 min-h-0">
         {!isDashboard && (
@@ -130,6 +140,7 @@ export default function AppClientShell({ children }: AppClientShellProps) {
             threadId={currentChatThreadId}
             forceNewChat={currentChatThreadId === null && isChatPanelOpen}
             onChatThreadCreated={handleNewChatCreated}
+            onEstimateUpdateTriggered={onEstimateUpdateTriggeredByChat || undefined} // Pass callback to ChatPanel
           />
         )}
       </div>

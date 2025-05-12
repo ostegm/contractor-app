@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, use, useCallback } from "react"
-import { useView } from "../../app-client-shell"
+import { useView, ViewContext } from "../../app-client-shell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -42,7 +42,6 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const { currentProjectView } = useView()
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [isUploading, setIsUploading] = useState(false)
-  const [isProcessingState, setIsProcessingState] = useState(false)
   const [estimateStatus, setEstimateStatus] = useState<'not_started' | 'processing' | 'completed' | 'failed'>('not_started')
   const [estimateError, setEstimateError] = useState<string | null>(null)
   const [projectInfo, setProjectInfo] = useState<string>("")
@@ -64,6 +63,33 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [isEstimateOutdated, setIsEstimateOutdated] = useState(false)
   const [initialFileCount, setInitialFileCount] = useState(0)
   const supabase = createClient()
+
+  // Get context function to register the callback
+  const { setOnEstimateUpdateTriggeredByChat } = useView();
+
+  // Callback for chat component to trigger loading state
+  const handleEstimateUpdateTriggered = useCallback(() => {
+    setEstimateStatus('processing');
+    setEstimateError(null); // Clear previous errors
+    toast.info('Estimate update triggered by chat...');
+  }, []);
+
+  // Register/unregister the callback with the context when project ID changes
+  useEffect(() => {
+    if (id && setOnEstimateUpdateTriggeredByChat) {
+      // Register the callback for the current project ID
+      setOnEstimateUpdateTriggeredByChat(() => handleEstimateUpdateTriggered);
+      
+      // Cleanup function to unregister when component unmounts or ID changes
+      return () => {
+        setOnEstimateUpdateTriggeredByChat(null);
+      };
+    }
+    // If no ID, ensure callback is null
+    if (!id && setOnEstimateUpdateTriggeredByChat) {
+      setOnEstimateUpdateTriggeredByChat(null);
+    }
+  }, [id, setOnEstimateUpdateTriggeredByChat, handleEstimateUpdateTriggered]);
 
   // useCallback for fetchProject
   const fetchProject = useCallback(async () => {
@@ -515,19 +541,21 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       {/* Main content area */}
       <div className="grid grid-cols-1 gap-6">
         <div>
+          {/* 
+            NOTE: handleEstimateUpdateTriggered is now passed via ViewContext 
+            in app-client-shell.tsx to the ChatPanel.
+          */}
           {/* Existing view logic based on currentProjectView */}
           {currentProjectView === 'estimate' && (
             <div className="estimate-view space-y-6">
-              {/* Estimate Generation Status Overlays */}
-              {(isProcessingState || estimateStatus === 'processing') && (
-                <div className="fixed inset-0 bg-gray-900/80 z-40 flex flex-col items-center justify-center">
+              {estimateStatus === 'processing' ? (
+                <div className="bg-gray-800 rounded-lg p-8 border border-gray-700 text-center min-h-[400px] flex flex-col justify-center items-center">
                   <RefreshCw className="h-12 w-12 animate-spin text-blue-500 mb-4" />
                   <h2 className="text-xl font-semibold text-gray-200 mb-2">Generating Estimate</h2>
                   <p className="text-gray-300 text-sm max-w-md text-center">Analyzing files... This may take a moment.</p>
                 </div>
-              )}
-              {estimateStatus === 'failed' && estimateError && (
-                <div className="fixed inset-0 bg-gray-900/80 z-40 flex flex-col items-center justify-center p-4">
+              ) : estimateStatus === 'failed' && estimateError ? (
+                <div className="bg-gray-800 rounded-lg p-8 border border-gray-700 text-center min-h-[400px] flex flex-col justify-center items-center">
                   <div className="text-red-500 mb-4"><TriangleAlert className="h-12 w-12" /></div>
                   <h2 className="text-xl font-semibold text-gray-200 mb-2">Estimate Generation Failed</h2>
                   <p className="text-red-400 text-sm max-w-md text-center mb-4">{estimateError}</p>
@@ -535,10 +563,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     Try Again
                   </Button>
                 </div>
-              )}
-
-              {/* AI Estimate Display */}
-              {aiEstimate ? (
+              ) : aiEstimate ? (
                 <div className="space-y-5">
                   {isEstimateOutdated && (
                     <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 flex items-center">
@@ -671,7 +696,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     </div>
                   </div>
                 </div>
-              ) : estimateStatus !== 'processing' && estimateStatus !== 'failed' && (
+              ) : (
                 <div className="bg-gray-800 rounded-lg p-8 border border-gray-700 border-dashed text-center min-h-[400px] flex flex-col justify-center items-center">
                   <FileText className="h-12 w-12 text-blue-400 mb-4" />
                   <h2 className="text-xl font-semibold mb-2">No Estimate Generated Yet</h2>

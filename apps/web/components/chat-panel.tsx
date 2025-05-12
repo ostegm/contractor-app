@@ -12,9 +12,10 @@ interface ChatPanelProps {
   threadId?: string | null; // Renamed from externalThreadId in previous plan, using this prop name
   forceNewChat?: boolean;
   onChatThreadCreated?: () => void; // ADDED: Callback when a new thread is successfully created
+  onEstimateUpdateTriggered?: () => void; // ADDED: Callback when estimate update is triggered
 }
 
-export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadIdProp, forceNewChat = false, onChatThreadCreated }: ChatPanelProps) {
+export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadIdProp, forceNewChat = false, onChatThreadCreated, onEstimateUpdateTriggered }: ChatPanelProps) {
   // Internal state for the active thread ID
   const [activeThreadId, setActiveThreadId] = useState<string | null>(initialThreadIdProp || null);
   const [threadName, setThreadName] = useState<string | null>(null);
@@ -222,6 +223,11 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
           return newEventsList;
         });
 
+        // ---> ADDED: Trigger estimate update callback
+        if (result.updateTriggered && onEstimateUpdateTriggered) {
+          onEstimateUpdateTriggered();
+        }
+
       } else {
         // Existing thread, just post the message
         console.log(`ChatPanel: Sending message to existing thread: ${activeThreadId}`);
@@ -238,6 +244,11 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
           }
           return newEventsList;
         });
+
+        // ---> ADDED: Trigger estimate update callback
+        if (result.updateTriggered && onEstimateUpdateTriggered) {
+          onEstimateUpdateTriggered();
+        }
 
         if (result.error) {
           setError(result.error);
