@@ -41,17 +41,25 @@ export default function AppClientShell({ children }: AppClientShellProps) {
 
   // Get the current pathname from Next.js
   const pathname = usePathname();
+  const isDashboard = pathname === '/dashboard';
 
-  // Update the currentProjectId when the URL changes
+  // Update the currentProjectId when the URL changes & close chat on dashboard
   useEffect(() => {
+    // Close chat if we navigate to the dashboard
+    if (isDashboard) {
+      setIsChatPanelOpen(false);
+      setCurrentProjectId(null); // Clear project ID on dashboard
+      return; // Exit early, no project matching needed
+    }
+
     // Check if we're on a project page by looking at the URL
     const projectMatch = pathname?.match(/\/projects\/([a-zA-Z0-9-]+)/);
     if (projectMatch && projectMatch[1]) {
       setCurrentProjectId(projectMatch[1]);
     } else {
-      setCurrentProjectId(null);
+      setCurrentProjectId(null); // Clear project ID if not on a project page
     }
-  }, [pathname]);
+  }, [pathname, isDashboard]); // Add isDashboard dependency
 
   const toggleChatPanel = (forceNewChat = false) => {
     // If panel is closed, or forcing a new chat, start a new chat
@@ -84,10 +92,10 @@ export default function AppClientShell({ children }: AppClientShellProps) {
     }
   };
 
-  // Define classes based on panel state
-  const sidebarWidthClass = "w-25"; // User preference
-  const mainContentMarginLeftClass = "md:ml-10"; // User preference
-  const mainContentMarginRightClass = isChatPanelOpen ? "md:mr-96" : ""; // Match ChatPanel width (w-96)
+  // Define classes based on panel state and dashboard view
+  const sidebarWidthClass = isDashboard ? "" : "w-25"; // No width if on dashboard
+  const mainContentMarginLeftClass = isDashboard ? "md:ml-0" : "md:ml-10"; // No left margin if on dashboard
+  const mainContentMarginRightClass = isChatPanelOpen && !isDashboard ? "md:mr-96" : ""; // Right margin only if chat is open AND not on dashboard
 
   return (
     // The <body> tag will be in the actual layout.tsx (Server Component)
@@ -95,22 +103,26 @@ export default function AppClientShell({ children }: AppClientShellProps) {
     <ViewContext.Provider value={{ currentProjectView, setCurrentProjectView }}>
       <HeaderNav />
       <div className="flex flex-1 min-h-0">
-        <ProjectSidebar
-          toggleChatPanel={toggleChatPanel}
-          className={`${sidebarWidthClass} transition-all duration-300 ease-in-out`} // Ensure transition is on the sidebar too
-          projectId={currentProjectId}
-          onSelectChatThread={handleSelectChatThread}
-        />
-        <main className={`flex-1 p-0 overflow-y-auto ${mainContentMarginLeftClass} ${mainContentMarginRightClass} transition-all duration-300 ease-in-out`}>
+        {!isDashboard && (
+          <ProjectSidebar
+            toggleChatPanel={toggleChatPanel}
+            className={`${sidebarWidthClass} transition-all duration-300 ease-in-out`}
+            projectId={currentProjectId}
+            onSelectChatThread={handleSelectChatThread}
+          />
+        )}
+        <main className={`flex-1 p-4 overflow-y-auto ${mainContentMarginLeftClass} ${mainContentMarginRightClass} transition-all duration-300 ease-in-out`}>
           {children}
         </main>
-        <ChatPanel
-          isOpen={isChatPanelOpen}
-          onClose={closeChatPanel}
-          projectId={currentProjectId}
-          threadId={currentChatThreadId}
-          forceNewChat={currentChatThreadId === null && isChatPanelOpen}
-        />
+        {!isDashboard && (
+          <ChatPanel
+            isOpen={isChatPanelOpen}
+            onClose={closeChatPanel}
+            projectId={currentProjectId}
+            threadId={currentChatThreadId}
+            forceNewChat={currentChatThreadId === null && isChatPanelOpen}
+          />
+        )}
       </div>
       <Toaster />
     </ViewContext.Provider>

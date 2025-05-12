@@ -67,7 +67,8 @@ export default async function DashboardPage() {
                   <h3 className="text-lg font-medium mb-2 text-blue-400">{project.name}</h3>
                   <p className="text-gray-400 text-sm mb-4 line-clamp-2">{project.description}</p>
                   
-                  {/* Show AI estimate info if available */}
+                  {/* Show AI estimate info if available - REMOVED */}
+                  {/* 
                   {project.ai_estimate && (
                     <div className="bg-gray-900/50 rounded p-3 border border-gray-700">
                       <div className="text-sm">
@@ -85,6 +86,7 @@ export default async function DashboardPage() {
                       </div>
                     </div>
                   )}
+                  */}
                 </div>
                 
                 <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-700">
