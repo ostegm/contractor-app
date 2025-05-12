@@ -11,19 +11,6 @@
         "browser-tools": {
             "command": "npx @agentdeskai/browser-tools-mcp@1.2.0",
             "enabled": true
-        },
-        "interactive-feedback-mcp": {
-            "command": "uv",
-            "args": [
-              "--directory",
-              "/Users/otto/Documents/mcp/interactive-feedback-mcp",
-              "run",
-              "server.py"
-            ],
-            "timeout": 600,
-            "autoApprove": [
-              "interactive_feedback"
-            ]
-          }
+        }
     }
 }
