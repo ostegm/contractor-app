@@ -36,6 +36,8 @@ export default function AppClientShell({ children }: AppClientShellProps) {
   const [currentProjectView, setCurrentProjectView] = useState<'estimate' | 'files'>('estimate');
   // Extract the current project ID from the URL if available
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  // Track the selected chat thread
+  const [currentChatThreadId, setCurrentChatThreadId] = useState<string | null>(null);
 
   // Get the current pathname from Next.js
   const pathname = usePathname();
@@ -51,12 +53,34 @@ export default function AppClientShell({ children }: AppClientShellProps) {
     }
   }, [pathname]);
 
-  const toggleChatPanel = () => {
-    setIsChatPanelOpen(!isChatPanelOpen);
+  const toggleChatPanel = (forceNewChat = false) => {
+    // If panel is closed, or forcing a new chat, start a new chat
+    if (!isChatPanelOpen || forceNewChat) {
+      setCurrentChatThreadId(null); // Clear thread ID to create a new chat
+      setIsChatPanelOpen(true); // Make sure panel is open
+    } else {
+      // If panel is open and not forcing a new chat, close it
+      setIsChatPanelOpen(false);
+    }
   };
 
-  const sidebarWidthClass = isChatPanelOpen ? "w-40" : "w-60";
-  const mainContentMarginClass = isChatPanelOpen ? "md:ml-40" : "md:ml-60";
+  // Handler for chat thread selection from sidebar
+  const handleSelectChatThread = (threadId: string) => {
+    // Special case for "new" - this means we want to start a fresh chat
+    if (threadId === 'new') {
+      setCurrentChatThreadId(null);
+    } else {
+      setCurrentChatThreadId(threadId);
+    }
+
+    // Open the chat panel if it's not already open
+    if (!isChatPanelOpen) {
+      setIsChatPanelOpen(true);
+    }
+  };
+
+  const sidebarWidthClass = isChatPanelOpen ? "w-48" : "w-72"; // Wider sidebar by default
+  const mainContentMarginClass = isChatPanelOpen ? "md:ml-48" : "md:ml-72"; // Matching margins
   const mainContentWidthClass = isChatPanelOpen ? "md:mr-96" : "";
 
   return (
@@ -68,14 +92,18 @@ export default function AppClientShell({ children }: AppClientShellProps) {
         <ProjectSidebar
           toggleChatPanel={toggleChatPanel}
           className={sidebarWidthClass}
+          projectId={currentProjectId}
+          onSelectChatThread={handleSelectChatThread}
         />
-        <main className={`flex-1 p-4 overflow-y-auto ${mainContentMarginClass} ${mainContentWidthClass} transition-all duration-300 ease-in-out`}>
+        <main className={`flex-1 p-0 overflow-y-auto ${mainContentMarginClass} ${mainContentWidthClass} transition-all duration-300 ease-in-out`}>
           {children}
         </main>
         <ChatPanel
           isOpen={isChatPanelOpen}
           onClose={toggleChatPanel}
           projectId={currentProjectId}
+          threadId={currentChatThreadId}
+          forceNewChat={currentChatThreadId === null && isChatPanelOpen}
         />
       </div>
       <Toaster />

@@ -9,9 +9,11 @@ interface ChatPanelProps {
   isOpen: boolean;
   onClose: () => void;
   projectId?: string | null; // The projectId is optional for global chats
+  threadId?: string | null; // Specific thread ID if loading an existing chat
+  forceNewChat?: boolean; // When true, always create a new chat instead of retrieving the last one
 }
 
-export function ChatPanel({ isOpen, onClose, projectId }: ChatPanelProps) {
+export function ChatPanel({ isOpen, onClose, projectId, threadId: externalThreadId, forceNewChat = false }: ChatPanelProps) {
   const [threadId, setThreadId] = useState<string | null>(null);
   const [threadName, setThreadName] = useState<string | null>(null);
   const [events, setEvents] = useState<DisplayableBamlEvent[]>([]);
@@ -22,8 +24,17 @@ export function ChatPanel({ isOpen, onClose, projectId }: ChatPanelProps) {
   const [isLoadingThread, setIsLoadingThread] = useState<boolean>(true);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Effect for initial load and projectId changes
+  // Auto-resize textarea on mount and when value changes
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 250)}px`;
+    }
+  }, [newMessage]);
+
+  // Effect for initial load, projectId changes, and threadId changes
   useEffect(() => {
     if (!isOpen) return;
 
@@ -31,33 +42,115 @@ export function ChatPanel({ isOpen, onClose, projectId }: ChatPanelProps) {
     setError(null);
     setEvents([]); // Clear previous events
 
-    // If there's no project ID, we use a placeholder ID for a general chat
-    const chatProjectId = projectId || 'general';
+    const loadChatThread = async () => {
+      try {
+        // Get the Supabase client
+        const supabase = (await import('@/lib/supabase/client')).createClient();
 
-    getOrCreateChatThread(chatProjectId)
-      .then(data => {
-        setThreadId(data.threadId);
-        setEvents(data.events);
-        setThreadName(data.name);
-        // Check if the last event was an UpdateEstimateRequest to set initial isAssistantUpdatingEstimate
-        const lastEvent = data.events[data.events.length -1];
-        if (lastEvent && lastEvent.type === 'UpdateEstimateRequest') {
-            // We need to see if an UpdateEstimateResponse has already come in for this
-            const correspondingResponse = data.events.slice(data.events.indexOf(lastEvent) + 1)
-                                      .find(e => e.type === 'UpdateEstimateResponse');
-            if (!correspondingResponse) {
-                 setIsAssistantUpdatingEstimate(true);
-            }
+        // Force a new chat thread if requested
+        if (forceNewChat) {
+          console.log('Forcing creation of a new chat thread');
+
+          // Create a name with timestamp for the new thread
+          const now = new Date();
+          const defaultName = `Chat - ${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+          // Create a new thread record
+          const chatProjectId = projectId || 'general';
+          const { data: newThread, error: newThreadError } = await supabase
+            .from('chat_threads')
+            .insert({ project_id: chatProjectId, name: defaultName })
+            .select('id, name')
+            .single();
+
+          if (newThreadError || !newThread) {
+            throw new Error('Failed to create a new chat thread.');
+          }
+
+          // Use the newly created thread
+          setThreadId(newThread.id);
+          setThreadName(newThread.name);
+          setEvents([]); // Empty events for a new thread
+          return; // Exit early
         }
-      })
-      .catch(err => {
-        console.error('Error getting or creating chat thread:', err);
-        setError(err.message || 'Failed to load chat thread.');
-      })
-      .finally(() => {
+
+        // Load specific thread if an ID is provided
+        if (externalThreadId) {
+          // Get the thread information
+          const { data: thread, error: threadError } = await supabase
+            .from('chat_threads')
+            .select('id, name, project_id')
+            .eq('id', externalThreadId)
+            .single();
+
+          if (threadError || !thread) {
+            throw new Error('Failed to fetch the selected chat thread.');
+          }
+
+          // Get the events for this thread
+          const { data: dbEvents, error: eventsError } = await supabase
+            .from('chat_events')
+            .select('id, event_type, data, created_at')
+            .eq('thread_id', thread.id)
+            .order('created_at', { ascending: true });
+
+          if (eventsError) {
+            throw new Error('Failed to fetch chat events for the selected thread.');
+          }
+
+          const displayableEvents = (dbEvents || []).map(e => ({
+            id: e.id,
+            type: e.event_type as AllowedTypes,
+            data: e.data as any,
+            createdAt: e.created_at,
+          }));
+
+          setThreadId(thread.id);
+          setThreadName(thread.name);
+          setEvents(displayableEvents);
+
+          // Check for UpdateEstimateRequest
+          const lastEvent = displayableEvents[displayableEvents.length - 1];
+          if (lastEvent && lastEvent.type === 'UpdateEstimateRequest') {
+            const correspondingResponse = displayableEvents
+              .slice(displayableEvents.indexOf(lastEvent) + 1)
+              .find(e => e.type === 'UpdateEstimateResponse');
+
+            if (!correspondingResponse) {
+              setIsAssistantUpdatingEstimate(true);
+            }
+          }
+        } else {
+          // Get or create a thread for the current project
+          const chatProjectId = projectId || 'general';
+          const data = await getOrCreateChatThread(chatProjectId);
+
+          setThreadId(data.threadId);
+          setEvents(data.events);
+          setThreadName(data.name);
+
+          // Check if the last event was an UpdateEstimateRequest
+          const lastEvent = data.events[data.events.length - 1];
+          if (lastEvent && lastEvent.type === 'UpdateEstimateRequest') {
+            const correspondingResponse = data.events
+              .slice(data.events.indexOf(lastEvent) + 1)
+              .find(e => e.type === 'UpdateEstimateResponse');
+
+            if (!correspondingResponse) {
+              setIsAssistantUpdatingEstimate(true);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error loading chat thread:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load chat thread.');
+      } finally {
         setIsLoadingThread(false);
-      });
-  }, [isOpen, projectId]);
+      }
+    };
+
+    loadChatThread();
+  }, [isOpen, projectId, externalThreadId, forceNewChat]);
 
   // Effect for polling new events
   useEffect(() => {
@@ -248,19 +341,23 @@ export function ChatPanel({ isOpen, onClose, projectId }: ChatPanelProps) {
       <div className="p-4 border-t border-gray-700 bg-gray-800">
         <form onSubmit={handleSendMessage} className="flex items-center gap-2">
           <Textarea
+            ref={textareaRef}
             value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
+            onChange={(e) => {
+              setNewMessage(e.target.value);
+              // Auto-resize the textarea based on content - handled by the useEffect
+            }}
             placeholder="Type your message... (Shift+Enter for new line)"
-            className="flex-grow px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 resize-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 placeholder:text-gray-400"
+            className="flex-grow px-3 py-4 bg-gray-700 border border-gray-600 rounded-md text-gray-200 resize-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 placeholder:text-gray-400"
             disabled={isSending || isAssistantUpdatingEstimate}
-            rows={1} // Start with 1 row, can expand
+            rows={3} // Start with 3 rows instead of 1
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleSendMessage(e);
               }
             }}
-            style={{ minHeight: '40px', maxHeight: '120px' }} // Control min/max height for textarea
+            style={{ minHeight: '80px', maxHeight: '250px' }} // Increase min/max height
           />
           <Button
             type="submit"

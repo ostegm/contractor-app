@@ -485,6 +485,58 @@ export async function postChatMessage(
   };
 }
 
+// New Server Action: Get all chat threads for a project or general chats
+export async function getChatThreads(projectId?: string): Promise<{ id: string; name: string; lastMessageAt: string }[]> {
+  const supabase = await createClient();
+
+  let query = supabase
+    .from('chat_threads')
+    .select('id, name, created_at');
+
+  if (projectId) {
+    // Get threads for a specific project
+    query = query.eq('project_id', projectId);
+  } else {
+    // Get general threads (not associated with a project)
+    query = query.eq('project_id', 'general');
+  }
+
+  // Order by latest activity
+  query = query.order('created_at', { ascending: false });
+
+  const { data: threads, error } = await query;
+
+  if (error) {
+    console.error('Error fetching chat threads:', error);
+    return [];
+  }
+
+  // Get the last message timestamp for each thread
+  const threadsWithLastMessage = await Promise.all((threads || []).map(async (thread) => {
+    const { data: lastMessages } = await supabase
+      .from('chat_events')
+      .select('created_at')
+      .eq('thread_id', thread.id)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    const lastMessageAt = lastMessages && lastMessages.length > 0
+      ? lastMessages[0].created_at
+      : thread.created_at;
+
+    return {
+      id: thread.id,
+      name: thread.name,
+      lastMessageAt
+    };
+  }));
+
+  // Sort threads by latest message time
+  return threadsWithLastMessage.sort((a, b) =>
+    new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
+  );
+}
+
 // ADDED: Server Action: getChatEvents (for polling updates) (II.F)
 export async function getChatEvents(threadId: string, sinceIsoTimestamp?: string): Promise<DisplayableBamlEvent[]> {
   const supabase = await createClient();

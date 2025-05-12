@@ -486,7 +486,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   // Main component render
   return (
-    <div className="container mx-auto p-0 md:p-4 max-w-none">
+    <div className="container mx-auto p-0 max-w-none">
       {/* Top Bar Controls - Include Project Name and Generate Estimate Button */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div className="flex items-center">
