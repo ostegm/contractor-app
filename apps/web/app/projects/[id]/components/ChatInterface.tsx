@@ -167,21 +167,28 @@ export default function ChatInterface({ projectId }: ChatInterfaceProps) {
   };
 
   if (isLoadingThread) {
-    return <div className="p-4">Loading chat...</div>;
+    return <div className="p-4 text-gray-300 bg-gray-800 rounded-lg border border-gray-700 h-full min-h-[400px] flex items-center justify-center shadow-md">
+      <div className="animate-pulse flex items-center">
+        <div className="h-4 w-4 bg-blue-600 rounded-full mr-2"></div>
+        <div className="h-4 w-4 bg-blue-600 rounded-full mr-2 animate-pulse delay-75"></div>
+        <div className="h-4 w-4 bg-blue-600 rounded-full animate-pulse delay-150"></div>
+        <span className="ml-3">Loading chat...</span>
+      </div>
+    </div>;
   }
 
   return (
-    <div className="flex flex-col h-[500px] border rounded-md">
-      <div className="p-2 border-b">
-        <h2 className="text-lg font-semibold">{threadName || 'Chat'}</h2>
+    <div className="flex flex-col h-full min-h-[400px] max-h-[calc(100vh-200px)] border border-gray-700 rounded-lg bg-gray-800 shadow-md">
+      <div className="p-2 border-b border-gray-700">
+        <h2 className="text-lg font-semibold text-gray-200">{threadName || 'Chat'}</h2>
       </div>
-      <div className="flex-grow overflow-y-auto p-4 space-y-2 bg-gray-50">
+      <div className="flex-grow overflow-y-auto p-4 space-y-3 bg-gray-900/80">
         {events.map(event => (
           <div key={event.id} className={`flex ${event.type === 'UserInput' ? 'justify-end' : 'justify-start'}`}>
-            <div 
-              className={`max-w-[70%] p-3 rounded-lg shadow-md 
-                ${event.type === 'UserInput' ? 'bg-blue-500 text-white' : 'bg-white text-gray-800'}
-                ${event.type === 'UpdateEstimateRequest' || event.type === 'UpdateEstimateResponse' ? 'bg-yellow-100 text-yellow-800 w-full' : ''}
+            <div
+              className={`max-w-[70%] p-3 rounded-lg shadow-lg
+                ${event.type === 'UserInput' ? 'bg-blue-600 text-white border border-blue-700/50' : 'bg-gray-800 text-gray-200 border border-gray-700'}
+                ${event.type === 'UpdateEstimateRequest' || event.type === 'UpdateEstimateResponse' ? 'bg-yellow-900/30 border border-yellow-700 text-yellow-400 w-full' : ''}
               `}
             >
               {renderEventData(event)}
@@ -193,24 +200,24 @@ export default function ChatInterface({ projectId }: ChatInterfaceProps) {
         ))}
         <div ref={chatEndRef} />
       </div>
-      {error && <div className="p-2 text-red-500 border-t">Error: {error}</div>}
+      {error && <div className="p-2 text-red-500 border-t border-gray-700">Error: {error}</div>}
       {isAssistantUpdatingEstimate && (
-        <div className="p-2 text-blue-500 border-t bg-blue-50">
+        <div className="p-2 text-blue-400 border-t border-gray-700 bg-blue-900/30">
           Assistant is updating the estimate...
         </div>
       )}
-      <form onSubmit={handleSendMessage} className="p-2 border-t flex items-center">
+      <form onSubmit={handleSendMessage} className="p-2 border-t border-gray-700 flex items-center gap-2">
         <input
           type="text"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           placeholder="Type your message..."
-          className="flex-grow p-2 border rounded-l-md focus:ring-blue-500 focus:border-blue-500"
+          className="flex-grow px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 placeholder:text-gray-400"
           disabled={isSending || isAssistantUpdatingEstimate}
         />
-        <button 
-          type="submit" 
-          className="bg-blue-500 text-white p-2 rounded-r-md hover:bg-blue-600 disabled:bg-gray-400"
+        <button
+          type="submit"
+          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
           disabled={isSending || !newMessage.trim() || isAssistantUpdatingEstimate}
         >
           {isSending ? 'Sending...' : 'Send'}
