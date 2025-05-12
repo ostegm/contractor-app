@@ -94,7 +94,7 @@ export default function AppClientShell({ children }: AppClientShellProps) {
 
   // Define classes based on panel state and dashboard view
   const sidebarWidthClass = isDashboard ? "" : "w-25"; // No width if on dashboard
-  const mainContentMarginLeftClass = isDashboard ? "md:ml-0" : "md:ml-10"; // No left margin if on dashboard
+  const mainContentMarginLeftClass = isDashboard ? "md:ml-0" : "md:ml-100"; // No left margin if on dashboard
   const mainContentMarginRightClass = isChatPanelOpen && !isDashboard ? "md:mr-96" : ""; // Right margin only if chat is open AND not on dashboard
 
   return (
