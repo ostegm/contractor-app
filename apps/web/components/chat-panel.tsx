@@ -11,9 +11,10 @@ interface ChatPanelProps {
   projectId?: string | null;
   threadId?: string | null; // Renamed from externalThreadId in previous plan, using this prop name
   forceNewChat?: boolean;
+  onChatThreadCreated?: () => void; // ADDED: Callback when a new thread is successfully created
 }
 
-export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadIdProp, forceNewChat = false }: ChatPanelProps) {
+export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadIdProp, forceNewChat = false, onChatThreadCreated }: ChatPanelProps) {
   // Internal state for the active thread ID
   const [activeThreadId, setActiveThreadId] = useState<string | null>(initialThreadIdProp || null);
   const [threadName, setThreadName] = useState<string | null>(null);
@@ -198,6 +199,11 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
           setEvents(prevEvents => prevEvents.filter(event => event.id !== tempUserEventId)); // Remove optimistic
           setNewMessage(currentNewMessage); // Restore message on failure
           return;
+        }
+
+        // Call the callback to notify parent that a new thread was created
+        if (onChatThreadCreated) {
+          onChatThreadCreated();
         }
 
         setActiveThreadId(result.newThreadId);

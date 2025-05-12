@@ -38,6 +38,8 @@ export default function AppClientShell({ children }: AppClientShellProps) {
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   // Track the selected chat thread
   const [currentChatThreadId, setCurrentChatThreadId] = useState<string | null>(null);
+  // ADDED: State to trigger sidebar refresh
+  const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
 
   // Get the current pathname from Next.js
   const pathname = usePathname();
@@ -92,6 +94,11 @@ export default function AppClientShell({ children }: AppClientShellProps) {
     }
   };
 
+  // ADDED: Callback to trigger sidebar refresh when a new chat is created
+  const handleNewChatCreated = () => {
+    setSidebarRefreshKey(k => k + 1);
+  };
+
   // Define classes based on panel state and dashboard view
   const sidebarWidthClass = isDashboard ? "" : "w-25"; // No width if on dashboard
   const mainContentMarginLeftClass = isDashboard ? "md:ml-0" : "md:ml-100"; // No left margin if on dashboard
@@ -109,6 +116,7 @@ export default function AppClientShell({ children }: AppClientShellProps) {
             className={`${sidebarWidthClass} transition-all duration-300 ease-in-out`}
             projectId={currentProjectId}
             onSelectChatThread={handleSelectChatThread}
+            refreshTrigger={sidebarRefreshKey}
           />
         )}
         <main className={`flex-1 p-4 overflow-y-auto ${mainContentMarginLeftClass} ${mainContentMarginRightClass} transition-all duration-300 ease-in-out`}>
@@ -121,6 +129,7 @@ export default function AppClientShell({ children }: AppClientShellProps) {
             projectId={currentProjectId}
             threadId={currentChatThreadId}
             forceNewChat={currentChatThreadId === null && isChatPanelOpen}
+            onChatThreadCreated={handleNewChatCreated}
           />
         )}
       </div>

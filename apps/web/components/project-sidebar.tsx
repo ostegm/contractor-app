@@ -248,6 +248,7 @@ interface ProjectSidebarProps {
   className?: string;
   projectId?: string | null; // Current project ID (if any)
   onSelectChatThread?: (threadId: string) => void; // Callback when a thread is selected
+  refreshTrigger?: number; // ADDED: To trigger manual refresh
 }
 
 // --- Helper function to group threads by date ---
@@ -288,7 +289,8 @@ export function ProjectSidebar({
   toggleChatPanel,
   className,
   projectId,
-  onSelectChatThread
+  onSelectChatThread,
+  refreshTrigger
 }: ProjectSidebarProps) {
   const { currentProjectView, setCurrentProjectView } = useView(); // Use context
   const [chatThreads, setChatThreads] = useState<ChatThread[]>([]);
@@ -318,7 +320,7 @@ export function ProjectSidebar({
   // Fetch chat threads when the component mounts or projectId changes
   useEffect(() => {
     fetchChatThreads();
-  }, [fetchChatThreads]);
+  }, [fetchChatThreads, refreshTrigger]);
 
   // Poll for updated chat threads every 10 seconds
   useEffect(() => {
@@ -333,7 +335,7 @@ export function ProjectSidebar({
 
     return () => clearInterval(intervalId);
     // */
-  }, [fetchChatThreads, projectId]);
+  }, [fetchChatThreads, projectId, refreshTrigger]);
 
   // --- Rename and Delete Handlers ---
   const handleRenameThread = async (threadId: string, newName: string) => {
