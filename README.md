@@ -70,12 +70,11 @@ contractor-monorepo/
 
 
 ## TODOS
-- Insert a few chat threads for seeing organization (some from today, yesterday and older)
-- Finish chat implemnentation - doesnt seem to be passing the ai estimate from the db.
-- Auto name chats async after 2 messages (baml impl with 4.1nano)
 - Export to CSV
 - Handle audio notes? Video input - video probably needs to be parsed into screenshots
+- Auto name chats async after 2 messages (baml impl with 4.1nano)
 - Manual edit mode (clicking an item to edit)
+- Cleanup polling (i think its happening due to chat thread polling)
 - Build test case for yard project
    - Plans from yard designer
    - Web search for Pricing per plant

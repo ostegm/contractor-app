@@ -135,6 +135,61 @@ BEGIN
 
     RAISE NOTICE 'Seeding complete. Project 1 ID: %, Project 2 ID: %', project1_id, project2_id;
 
+    -- Add Chat Threads and Events
+    DECLARE
+        thread1_id UUID := uuid_generate_v4();
+        thread2_id UUID := uuid_generate_v4();
+        thread3_id UUID := uuid_generate_v4();
+        thread4_id UUID := uuid_generate_v4();
+        event_time_today TIMESTAMP WITH TIME ZONE := CURRENT_TIMESTAMP;
+        event_time_yesterday TIMESTAMP WITH TIME ZONE := CURRENT_TIMESTAMP - INTERVAL '1 day';
+        event_time_older TIMESTAMP WITH TIME ZONE := CURRENT_TIMESTAMP - INTERVAL '3 days';
+    BEGIN
+        -- Project 1 Threads
+        INSERT INTO chat_threads (id, project_id, name, created_at, updated_at) VALUES
+            (thread1_id, project1_id, 'Initial Bathroom Ideas', event_time_older, event_time_older + INTERVAL '10 minutes'),
+            (thread2_id, project1_id, 'Follow-up Questions', event_time_yesterday, event_time_yesterday + INTERVAL '5 minutes');
+
+        -- Project 1 Events (Thread 1 - Older)
+        INSERT INTO chat_events (thread_id, event_type, data, created_at) VALUES
+            (thread1_id, 'UserInput', jsonb_build_object('message', 'What kind of tile options do you recommend for a modern look?'), event_time_older),
+            (thread1_id, 'AssisantMessage', jsonb_build_object('message', 'Large format porcelain tiles in neutral colors like gray or white are popular for modern bathrooms. Matte finishes can also enhance the contemporary feel.'), event_time_older + INTERVAL '1 minute'),
+            (thread1_id, 'UserInput', jsonb_build_object('message', 'Okay, thanks. And what about heated floors?'), event_time_older + INTERVAL '5 minutes'),
+            (thread1_id, 'AssisantMessage', jsonb_build_object('message', 'Heated floors are a great addition for comfort. We can integrate an electric radiant heat system under the tiles. It adds about $1200-$1600 to the estimate.'), event_time_older + INTERVAL '6 minutes'),
+            (thread1_id, 'UserInput', jsonb_build_object('message', 'Okay, lets add those.'), event_time_older + INTERVAL '6 minutes'),
+            (thread1_id, 'UpdateEstimateRequest', jsonb_build_object('changes_to_make', 'Confirm addition of heated floor system to the estimate: add Heated floor system (materials, installation, compatible with new tile) item with quantity 80 sq ft and cost range $1200-$1600 as already present in the estimate. Confirm electrical line for heated floors remains included.'), event_time_older + INTERVAL '7 minutes'),
+            (thread1_id, 'UpdateEstimateResponse', jsonb_build_object('success', true, 'error_message', ''), event_time_older + INTERVAL '7 minutes');
+
+        -- Project 1 Events (Thread 2 - Yesterday)
+        INSERT INTO chat_events (thread_id, event_type, data, created_at) VALUES
+            (thread2_id, 'UserInput', jsonb_build_object('message', 'Regarding the estimate, can we switch the vanity selection?'), event_time_yesterday),
+            (thread2_id, 'AssisantMessage', jsonb_build_object('message', 'Absolutely. Do you have a specific model or style in mind? Changing the vanity may adjust the cost.'), event_time_yesterday + INTERVAL '1 minute'),
+            (thread2_id, 'UserInput', jsonb_build_object('message', 'I uploaded a picture of one I liked.'), event_time_yesterday + INTERVAL '4 minutes')
+            -- (thread2_id, 'FileUpload', jsonb_build_object('file_name', 'preferred_vanity.jpg', 'file_id', uuid_generate_v4()), event_time_yesterday + INTERVAL '5 minutes')
+            ;
+
+        -- Project 2 Threads
+        INSERT INTO chat_threads (id, project_id, name, created_at, updated_at) VALUES
+            (thread3_id, project2_id, 'Kitchen Layout Discussion', event_time_older - INTERVAL '1 day', event_time_older - INTERVAL '1 day' + INTERVAL '20 minutes'),
+            (thread4_id, project2_id, 'Appliance Choices', event_time_today, event_time_today + INTERVAL '2 minutes');
+
+        -- Project 2 Events (Thread 3 - Older)
+        INSERT INTO chat_events (thread_id, event_type, data, created_at) VALUES
+            (thread3_id, 'UserInput', jsonb_build_object('message', 'Hi, let''s talk about the kitchen layout. I uploaded the current and desired state pictures.'), event_time_older - INTERVAL '1 day'),
+            -- (thread3_id, 'FileUpload', jsonb_build_object('file_name', 'current_kitchen.png', 'file_id', uuid_generate_v4()), event_time_older - INTERVAL '1 day' + INTERVAL '1 minute'),
+            -- (thread3_id, 'FileUpload', jsonb_build_object('file_name', 'desired_kitchen.png', 'file_id', uuid_generate_v4()), event_time_older - INTERVAL '1 day' + INTERVAL '2 minutes'),
+            (thread3_id, 'AssisantMessage', jsonb_build_object('message', 'Thanks for uploading those. Looking at the desired state, it seems you want to open up the space between the kitchen and dining area. Is that correct?'), event_time_older - INTERVAL '1 day' + INTERVAL '5 minutes'),
+            (thread3_id, 'UserInput', jsonb_build_object('message', 'Yes, exactly. And add an island if possible.'), event_time_older - INTERVAL '1 day' + INTERVAL '10 minutes'),
+            (thread3_id, 'AssisantMessage', jsonb_build_object('message', 'Okay, removing that wall and adding an island are significant changes. I''ll factor that into the planning and upcoming estimate.'), event_time_older - INTERVAL '1 day' + INTERVAL '11 minutes');
+
+        -- Project 2 Events (Thread 4 - Today)
+        INSERT INTO chat_events (thread_id, event_type, data, created_at) VALUES
+            (thread4_id, 'UserInput', jsonb_build_object('message', 'What range/oven brands do you typically work with?'), event_time_today),
+            (thread4_id, 'AssisantMessage', jsonb_build_object('message', 'We commonly install brands like Bosch, KitchenAid, and GE Profile, but we can accommodate most major brands based on your preference and budget.'), event_time_today + INTERVAL '1 minute');
+
+        RAISE NOTICE 'Chat threads and events seeding complete.';
+    END;
+
 EXCEPTION
     WHEN OTHERS THEN
         RAISE NOTICE 'Error during seeding: %', SQLERRM;
