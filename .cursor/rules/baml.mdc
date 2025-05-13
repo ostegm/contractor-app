@@ -1,6 +1,6 @@
 ---
-description: Working with baml files
+description: Working with baml files or modifying the core agent workflows
 globs: 
 alwaysApply: false
 ---
-Review BAML.md for instructions on working baml code. 
+Review [BAML.md](mdc:BAML.md) for instructions on working baml code. 
