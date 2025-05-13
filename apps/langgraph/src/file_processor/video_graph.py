@@ -97,6 +97,71 @@ async def download_file(url: str, destination: Path) -> None:
                 await f.write(await response.read())
     logger.info(f"Downloaded {url} to {destination}")
 
+
+async def _extract_key_frames_locally(
+    local_video_path: str, 
+    key_frames: list[KeyFrame], 
+    project_id: str,
+    base_temp_dir: Path
+) -> list[tuple[KeyFrame, Path]]:
+    """
+    Extracts key frames from the video file using ffmpeg and saves them locally.
+
+    Args:
+        local_video_path: Path to the local video file.
+        key_frames: List of KeyFrame objects specifying which frames to extract.
+        project_id: The project ID, used for creating a subdirectory in temp.
+        base_temp_dir: The base temporary directory to use.
+
+    Returns:
+        A list of tuples, where each tuple contains the KeyFrame object and 
+        the Path to the locally saved frame image.
+    """
+    if not key_frames:
+        logger.info("No key frames provided for local extraction.")
+        return []
+
+    # Ensure the directory for frames exists for this project_id within temp dir
+    project_frames_dir = base_temp_dir / project_id
+    project_frames_dir.mkdir(exist_ok=True, parents=True) # Ensure parent dirs exist
+
+    extracted_frame_paths: list[tuple[KeyFrame, Path]] = []
+
+    for key_frame in key_frames:
+        frame_filename = key_frame.filename or f"frame_ts_{key_frame.timestamp_s:.2f}.png"
+        # Sanitize filename if necessary, though Path should handle most valid OS names
+        local_frame_path = project_frames_dir / frame_filename
+        
+        logger.info(f"Extracting frame locally: {frame_filename} at {key_frame.timestamp_s}s to {local_frame_path}")
+        ffmpeg_command = [
+            "ffmpeg",
+            "-ss", str(key_frame.timestamp_s),
+            "-i", local_video_path,
+            "-vf", "thumbnail", 
+            "-vframes", "1",
+            "-q:v", "2", 
+            str(local_frame_path)
+        ]
+        
+        process = await asyncio.create_subprocess_exec(
+            *ffmpeg_command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await process.communicate()
+
+        if process.returncode != 0:
+            logger.error(f"Error extracting frame {frame_filename} locally: {stderr.decode()}")
+            # Optionally, continue to next frame or raise error; here we continue
+            continue 
+        
+        logger.info(f"Frame extracted locally to {local_frame_path}")
+        extracted_frame_paths.append((key_frame, local_frame_path))
+    
+    return extracted_frame_paths
+
+
+
 # --- Graph Nodes ---
 
 async def analyze_video_node(state: VideoState) -> Dict[str, Any]:
@@ -131,65 +196,49 @@ async def extract_frames_node(state: VideoState) -> Dict[str, Any]:
     logger.info("--- Running extract_frames_node ---")
     if not state.analysis or not state.analysis.key_frames:
         logger.info("No key frames to extract from analysis.")
-        await _cleanup_temp_file(state.local_video_path)
+        await _cleanup_temp_file(state.local_video_path) # Cleanup video if no frames to extract
         return {"extracted_frames": []}
     
     if not state.local_video_path or not Path(state.local_video_path).exists():
-        await _cleanup_temp_file(state.local_video_path) # ensure no partial path lingers
+        # No cleanup for state.local_video_path as it might not exist or be valid.
         raise ValueError("Local video path not found or video not downloaded from previous step.")
 
     if not SUPABASE_URL or not SUPABASE_KEY or not SUPABASE_BUCKET_NAME:
         logger.warning("Supabase environment variables not fully set. Frame upload will be skipped.")
-        # Skip upload but prepare InputFile objects with placeholder URLs if desired, or raise error
-        await _cleanup_temp_file(state.local_video_path)
+        await _cleanup_temp_file(state.local_video_path) # Cleanup video if skipping uploads
+        # To maintain consistency, we could return InputFile objects with placeholder/error URLs
+        # For now, raising an error as this is a critical step if reached.
         raise ValueError("Supabase configuration missing for frame upload.")
 
     # Initialize Supabase client within the async function
     supabase: AsyncClient = await create_async_client(SUPABASE_URL, SUPABASE_KEY)
-
-    extracted_frames_input_files: list[InputFile] = []
     
-    # Ensure the directory for frames exists for this project_id within temp dir
-    project_frames_dir = TEMP_DIR / state.project_id
-    project_frames_dir.mkdir(exist_ok=True)
+    extracted_frames_input_files: list[InputFile] = []
 
-    for key_frame in state.analysis.key_frames:
-        frame_filename = key_frame.filename or f"frame_ts_{key_frame.timestamp_s:.2f}.png"
-        local_frame_path = project_frames_dir / frame_filename
-        
-        # Sanitize filename further if needed
-        storage_path = f"{state.project_id}/frames/{uuid.uuid4()}_{frame_filename}" # Ensure unique names in storage
-
-        logger.info(f"Extracting frame: {frame_filename} at {key_frame.timestamp_s}s")
-        ffmpeg_command = [
-            "ffmpeg",
-            "-ss", str(key_frame.timestamp_s),
-            "-i", state.local_video_path,
-            "-vf", "thumbnail", # Optimized for picking best frame around timestamp
-            "-vframes", "1",
-            "-q:v", "2", # Good quality for JPEGs/PNGs
-            str(local_frame_path)
-        ]
-        
-        process = await asyncio.create_subprocess_exec(
-            *ffmpeg_command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+    # Step 1: Extract frames locally
+    try:
+        locally_extracted_frames = await _extract_key_frames_locally(
+            local_video_path=state.local_video_path,
+            key_frames=state.analysis.key_frames,
+            project_id=state.project_id,
+            base_temp_dir=TEMP_DIR 
         )
-        stdout, stderr = await process.communicate()
+    except Exception as e:
+        logger.error(f"Error during local frame extraction: {e}")
+        await _cleanup_temp_file(state.local_video_path) # Cleanup video on extraction error
+        raise # Re-throw to mark graph run as failed
 
-        if process.returncode != 0:
-            logger.error(f"Error extracting frame {frame_filename}: {stderr.decode()}")
-            # Optionally, continue to next frame or raise error
-            continue 
-        
-        logger.info(f"Frame extracted to {local_frame_path}")
+    # Step 2: Upload locally extracted frames to Supabase
+    for key_frame, local_frame_path in locally_extracted_frames:
+        # storage_path needs to be unique and well-formed.
+        # Using original filename from KeyFrame if available, else the generated one.
+        # Prepending with UUID to ensure uniqueness in Supabase.
+        frame_filename_for_storage = local_frame_path.name 
+        storage_path = f"{state.project_id}/frames/{uuid.uuid4()}_{frame_filename_for_storage}"
 
         frame_url_in_supabase = f"error_uploading_{storage_path}" # Default in case of error
         try:
             async with aiofiles.open(local_frame_path, 'rb') as f_frame:
-                # Supabase Python client uses synchronous requests, so for async,
-                # we use supabase-py-async
                 upload_response = await supabase.storage.from_(SUPABASE_BUCKET_NAME).upload(
                     path=storage_path, 
                     file=f_frame, 
@@ -197,35 +246,30 @@ async def extract_frames_node(state: VideoState) -> Dict[str, Any]:
                 )
             
             if upload_response.status_code == 200:
-                # Get public URL
                 get_url_response = supabase.storage.from_(SUPABASE_BUCKET_NAME).get_public_url(storage_path)
                 frame_url_in_supabase = get_url_response
-                logger.info(f"Uploaded {frame_filename} to Supabase. URL: {frame_url_in_supabase}")
+                logger.info(f"Uploaded {local_frame_path.name} to Supabase. URL: {frame_url_in_supabase}")
             else:
-                logger.error(f"Error uploading {frame_filename} to Supabase. Status: {upload_response.status_code}, Response: {await upload_response.json() if upload_response else 'No response'}")
-                # Attempt to get error message if it's a known Supabase error structure
-                # try:
-                #     error_data = await upload_response.json()
-                #     print(f"Supabase error details: {error_data.get('message', error_data)}")
-                # except Exception:
-                #     pass # Ignore if response is not JSON or doesn't have message
+                logger.error(f"Error uploading {local_frame_path.name} to Supabase. Status: {upload_response.status_code}, Response: {await upload_response.json() if upload_response.content else 'No response content'}")
 
         except Exception as e:
-            logger.error(f"Exception during Supabase upload for {frame_filename}: {e}")
-            # frame_url_in_supabase remains the error placeholder
-
+            logger.error(f"Exception during Supabase upload for {local_frame_path.name}: {e}")
+        
         extracted_frames_input_files.append(
             InputFile(
-                name=frame_filename,
-                type="image/png", # Assuming PNG, ffmpeg can output various
+                name=local_frame_path.name, # Use the actual filename from local_frame_path
+                type="image/png", 
                 description=key_frame.description,
-                download_url=frame_url_in_supabase, # This should be the actual URL from Supabase
-                # No content, image_data, or audio_data for these file objects initially
+                download_url=frame_url_in_supabase,
             )
         )
-        # Optionally, clean up local_frame_path if no longer needed immediately
-        # await _cleanup_temp_file(str(local_frame_path))
-
+        # Clean up the local frame file after attempting upload
+        await _cleanup_temp_file(str(local_frame_path))
+    
+    # If all local frames were processed (uploaded or failed individually), 
+    # we can now decide if the main local video path should be cleaned up.
+    # This is typically handled by the return_results_node or when the graph ends.
+    # For this node, its primary responsibility is the frames.
 
     return {"extracted_frames": extracted_frames_input_files}
 
