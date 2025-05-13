@@ -35,15 +35,12 @@ import type * as types from "../types"
  * This server action calls the underlying BAML function "AnalyzeVideo"
  * with the specified parameters.
  *
- * @param { string } video_reference - Input parameter.
  *
  * @returns {Promise<VideoAnalysis>} A promise that resolves with the result of the action.
  */
 export const AnalyzeVideo = async (
-  video_reference: string,
 ): Promise<VideoAnalysis> => {
   return b.AnalyzeVideo(
-    video_reference,
   );
 };
 

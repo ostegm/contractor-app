@@ -360,8 +360,6 @@ function useBamlAction<FunctionName extends FunctionNames>(
  *
  * **Input Types:**
  *
- * - video_reference: string
- *
  *
  * **Return Type:**
  * - **Non‑streaming:** VideoAnalysis

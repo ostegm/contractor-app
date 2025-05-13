@@ -39,7 +39,7 @@ class HttpRequest:
     
     def AnalyzeVideo(
         self,
-        video_reference: str,
+        
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -52,7 +52,7 @@ class HttpRequest:
       return self.__runtime.build_request_sync(
         "AnalyzeVideo",
         {
-          "video_reference": video_reference,
+          
         },
         self.__ctx_manager.get(),
         tb,
@@ -142,7 +142,7 @@ class HttpStreamRequest:
     
     def AnalyzeVideo(
         self,
-        video_reference: str,
+        
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -155,7 +155,7 @@ class HttpStreamRequest:
       return self.__runtime.build_request_sync(
         "AnalyzeVideo",
         {
-          "video_reference": video_reference,
+          
         },
         self.__ctx_manager.get(),
         tb,

@@ -86,7 +86,7 @@ export class BamlSyncClient {
 
   
   AnalyzeVideo(
-      video_reference: string,
+      
       __baml_options__?: BamlCallOptions
   ): VideoAnalysis {
     try {
@@ -95,7 +95,7 @@ export class BamlSyncClient {
       const raw = this.runtime.callFunctionSync(
         "AnalyzeVideo",
         {
-          "video_reference": video_reference
+          
         },
         this.ctxManager.cloneContext(),
         options.tb?.__tb(),

@@ -35,15 +35,12 @@ import type * as types from "../types"
  * This action initiates a streaming response by calling the corresponding
  * BAML stream function. The returned stream yields incremental updates.
  *
- * @param { string } video_reference - Input parameter.
  *
  * @returns {ReadableStream<Uint8Array>} A stream that yields incremental updates from the action.
  */
 export const AnalyzeVideo = async (
-  video_reference: string,
 ): Promise<ReadableStream<Uint8Array>> => {
   const stream = b.stream.AnalyzeVideo(
-    video_reference,
   );
   return Promise.resolve(stream.toStreamable());
 };

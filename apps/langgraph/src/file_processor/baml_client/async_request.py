@@ -39,7 +39,7 @@ class AsyncHttpRequest:
     
     async def AnalyzeVideo(
         self,
-        video_reference: str,
+        
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -52,7 +52,6 @@ class AsyncHttpRequest:
       return await self.__runtime.build_request(
         "AnalyzeVideo",
         {
-          "video_reference": video_reference,
         },
         self.__ctx_manager.get(),
         tb,
@@ -145,7 +144,7 @@ class AsyncHttpStreamRequest:
     
     async def AnalyzeVideo(
         self,
-        video_reference: str,
+        
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -158,7 +157,6 @@ class AsyncHttpStreamRequest:
       return await self.__runtime.build_request(
         "AnalyzeVideo",
         {
-          "video_reference": video_reference,
         },
         self.__ctx_manager.get(),
         tb,

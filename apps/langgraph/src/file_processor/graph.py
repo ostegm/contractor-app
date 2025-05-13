@@ -9,7 +9,7 @@ from typing import Any, Dict, Union
 # Third-party imports
 import aiohttp
 from .baml_client import b
-from .baml_client.types import ConstructionProjectData, InputFile, ProcessedVideo
+from .baml_client.types import ConstructionProjectData, InputFile
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph
 from baml_py import Image, Audio # Assuming Audio is available from baml_py
@@ -159,25 +159,6 @@ async def generate_estimate(state: State, config: RunnableConfig) -> Dict[str, A
         error_msg = f"BAML GenerateProjectEstimate failed: {str(e)}"
         logger.error(error_msg)
         raise Exception(error_msg)
-
-
-async def process_video(state: State, config: RunnableConfig) -> Dict[str, Any]:
-    """Process the video using BAML and update the project information."""
-    logger.info("Processing video using BAML...")
-    _ = Configuration.from_runnable_config(config)
-    try:
-        logger.info("Making BAML call to ProcessVideo...")
-        response: ProcessedVideo = await b.ProcessVideo(video=state.video)
-        logger.info("Successfully processed video using BAML.")
-        return {"video_summary": response}
-    except Exception as e:
-        error_msg = f"BAML ProcessVideo failed: {str(e)}"
-        logger.error(error_msg)
-        raise Exception(error_msg)
-
-
-
-
 
 def build_estimate_workflow():
     """Builds the workflow for generating a construction estimate."""

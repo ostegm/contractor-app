@@ -122,16 +122,14 @@ class KeyFrame {
 
 class VideoAnalysis {
   detailed_description string @description("A detailed summary of the video content, quoting user narration if present, and referencing key frame filenames to illustrate points. This description should be comprehensive enough for a downstream estimator to understand the video's content without watching it.")
-  key_frames KeyFrame[] @description("A list of 10-20 key frames that capture the most informative visual details from the video relevant to project estimation.")
+  key_frames KeyFrame[]
 }
 
-function AnalyzeVideo(video_reference: string) -> VideoAnalysis {
+function AnalyzeVideo() -> VideoAnalysis {
   client GeminiProcessor
   prompt #"
   You are a construction-estimation assistant. You are given a reference to a video walkthrough of a project site.
   Your task is to analyze the video thoroughly and extract key visual information and spoken narration to aid in project estimation.
-
-  The video reference is: {{ video_reference }}
 
   Follow these instructions carefully:
   1. Identify and select between 10 to 20 key frames from the video that are most informative for understanding the project scope, existing conditions, materials, and potential challenges.
@@ -145,8 +143,6 @@ function AnalyzeVideo(video_reference: string) -> VideoAnalysis {
      - Quotes important phrases from the user's narration, if any.
      - References the `filename` of the key frames you selected to illustrate specific points in your summary (e.g., "As seen in frame_03.png, the northern wall shows signs of water damage...").
      - Is comprehensive enough that a downstream estimator, who will *not* see the video, can understand the project's key aspects.
-
-  3. Return your analysis as a JSON object that strictly adheres to the `VideoAnalysis` schema, containing `detailed_description` and the list of `key_frames`.
 
   {{ ctx.output_format }}
   "#

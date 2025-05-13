@@ -1,11 +1,10 @@
-
 """Define the state structures for the agent."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field, fields
 from typing import List, Optional, Union
 
-from .baml_client.types import ConstructionProjectData, InputFile, ProcessedVideo
+from .baml_client.types import ConstructionProjectData, InputFile, VideoAnalysis
 from langchain_core.runnables import RunnableConfig
 
 
@@ -27,8 +26,18 @@ class State:
     # AI-generated construction estimate in JSON format
     ai_estimate: Optional[ConstructionProjectData] = None
 
-    # Processed Video
-    video_summary: Optional[ProcessedVideo] = None
+
+@dataclass
+class VideoState:
+    """Defines the state for the video processing workflow."""
+    project_id: str
+    video_file: InputFile  # Contains original filename, type, and signed download_url
+    analysis: Optional[VideoAnalysis] = None # Populated by analyze_video node
+    extracted_frames: list[InputFile] = field(default_factory=list) # Populated by extract_frames node
+    # Temporary path for the downloaded video file, used across nodes.
+    # This avoids downloading the video multiple times.
+    # It will be cleaned up at the end of the graph execution if needed.
+    local_video_path: Optional[str] = None 
 
 
 @dataclass(kw_only=True)

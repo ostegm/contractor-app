@@ -102,7 +102,7 @@ class BamlAsyncClient:
     
     async def AnalyzeVideo(
         self,
-        video_reference: str,
+        
         baml_options: BamlCallOptions = {},
     ) -> types.VideoAnalysis:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -118,7 +118,7 @@ class BamlAsyncClient:
       raw = await self.__runtime.call_function(
         "AnalyzeVideo",
         {
-          "video_reference": video_reference,
+          
         },
         self.__ctx_manager.get(),
         tb,
@@ -222,7 +222,7 @@ class BamlStreamClient:
     
     def AnalyzeVideo(
         self,
-        video_reference: str,
+        
         baml_options: BamlCallOptions = {},
     ) -> baml_py.BamlStream[partial_types.VideoAnalysis, types.VideoAnalysis]:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -237,7 +237,6 @@ class BamlStreamClient:
       raw = self.__runtime.stream_function(
         "AnalyzeVideo",
         {
-          "video_reference": video_reference,
         },
         None,
         self.__ctx_manager.get(),

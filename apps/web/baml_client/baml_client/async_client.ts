@@ -84,7 +84,7 @@ export class BamlAsyncClient {
 
   
   async AnalyzeVideo(
-      video_reference: string,
+      
       __baml_options__?: BamlCallOptions
   ): Promise<VideoAnalysis> {
     try {
@@ -93,7 +93,7 @@ export class BamlAsyncClient {
       const raw = await this.runtime.callFunction(
         "AnalyzeVideo",
         {
-          "video_reference": video_reference
+          
         },
         this.ctxManager.cloneContext(),
         options.tb?.__tb(),
@@ -190,7 +190,7 @@ class BamlStreamClient {
 
   
   AnalyzeVideo(
-      video_reference: string,
+      
       __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry, collector?: Collector | Collector[] }
   ): BamlStream<partial_types.VideoAnalysis, VideoAnalysis> {
     try {
@@ -199,7 +199,7 @@ class BamlStreamClient {
       const raw = this.runtime.streamFunction(
         "AnalyzeVideo",
         {
-          "video_reference": video_reference
+          
         },
         undefined,
         this.ctxManager.cloneContext(),
