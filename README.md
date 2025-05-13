@@ -72,6 +72,8 @@ contractor-monorepo/
 ## TODOS
 - Export to CSV
 - Handle Video input - process into text file and images
+- Delete video cascades to ai gen files.
+- Rename file_url column to storage_path
 - Need to import into quickbooks (see chat gpt)
 - Review export/import functionality chatgpt - maybe add to app?
 - Mobile UX?
