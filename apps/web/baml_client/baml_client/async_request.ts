@@ -32,14 +32,14 @@ export class AsyncHttpRequest {
 
   
   async AnalyzeVideo(
-      
+      video_name: string,video_description: string,
       __baml_options__?: BamlCallOptions
   ): Promise<HTTPRequest> {
     try {
       return await this.runtime.buildRequest(
         "AnalyzeVideo",
         {
-          
+          "video_name": video_name,"video_description": video_description
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),
@@ -118,14 +118,14 @@ export class AsyncHttpStreamRequest {
 
   
   async AnalyzeVideo(
-      
+      video_name: string,video_description: string,
       __baml_options__?: BamlCallOptions
   ): Promise<HTTPRequest> {
     try {
       return await this.runtime.buildRequest(
         "AnalyzeVideo",
         {
-          
+          "video_name": video_name,"video_description": video_description
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),

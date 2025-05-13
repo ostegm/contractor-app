@@ -74,21 +74,21 @@ async def delete_file(file: GeminiFile) -> None:
     await GENAI_CLIENT.aio.files.delete(name=file.name)
     logger.info(f"Deleted file: {file.name}")
 
-async def run_analyze_video_baml(video_file: GeminiFile) -> VideoAnalysis:
+async def run_analyze_video_baml(uploaded_video_file: GeminiFile, video_name: str, video_description: str) -> VideoAnalysis:
     """Calls the BAML AnalyzeVideo function with the Gemini video URI."""
-    logger.info(f"Requesting video analysis from BAML for {video_file.uri}...")
-    req = await b.request.AnalyzeVideo()
+    logger.info(f"Requesting video analysis from BAML for {uploaded_video_file.uri}...")
+    req = await b.request.AnalyzeVideo(video_name=video_name, video_description=video_description)
     body = req.body.json()
     res = await GENAI_CLIENT.aio.models.generate_content(
         model="gemini-2.5-flash-preview-04-17",
         contents=[
-            video_file,
+            uploaded_video_file,
             body["contents"][0]
         ],
     )
     # Parse the LLM response.
     analysis = b.parse.AnalyzeVideo(res.text)
-    await delete_file(video_file)
+    await delete_file(uploaded_video_file)
     logger.info("Received analysis from BAML.")
     return analysis
 
@@ -184,7 +184,8 @@ async def analyze_video_node(state: VideoState) -> Dict[str, Any]:
         uploaded_file = await upload_video_to_gemini(str(local_video_path))
         
         # The BAML function AnalyzeVideo takes the gemini_file_uri (which is video_file.uri from gemini SDK)
-        video_analysis_result = await run_analyze_video_baml(uploaded_file)
+        video_analysis_result = await run_analyze_video_baml(
+            uploaded_file, state.video_file.name, state.video_file.description)
         
         return {
             "analysis": video_analysis_result,
@@ -238,8 +239,7 @@ async def extract_frames_node(state: VideoState) -> Dict[str, Any]:
         # storage_path needs to be unique and well-formed.
         # Using the generated filename.
         # Prepending with UUID to ensure uniqueness in Supabase.
-        unique_frame_filename = f"{uuid.uuid4()}_{frame_filename}"
-        storage_path = f"{state.project_id}/frames/{unique_frame_filename}"
+        storage_path = f"{state.project_id}/frames/{state.parent_file_id}/{frame_filename}"
         try:
             # Upload bytes directly
             upload_response = await supabase.storage.from_(SUPABASE_BUCKET_NAME).upload(
@@ -256,7 +256,7 @@ async def extract_frames_node(state: VideoState) -> Dict[str, Any]:
         
         extracted_frames_input_files.append(
             InputFile(
-                name=unique_frame_filename, # Use the generated filename
+                name=frame_filename, # Use the generated filename
                 type="image/png", 
                 description=key_frame.description,
                 download_url=storage_path, # Put storage path in download url so we can put it in the files table.

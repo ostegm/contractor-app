@@ -32,14 +32,14 @@ export class HttpRequest {
 
   
   AnalyzeVideo(
-      
+      video_name: string,video_description: string,
       __baml_options__?: BamlCallOptions
   ): HTTPRequest {
     try {
       return this.runtime.buildRequestSync(
         "AnalyzeVideo",
         {
-          
+          "video_name": video_name,"video_description": video_description
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),
@@ -118,14 +118,14 @@ export class HttpStreamRequest {
 
   
   AnalyzeVideo(
-      
+      video_name: string,video_description: string,
       __baml_options__?: BamlCallOptions
   ): HTTPRequest {
     try {
       return this.runtime.buildRequestSync(
         "AnalyzeVideo",
         {
-          
+          "video_name": video_name,"video_description": video_description
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),

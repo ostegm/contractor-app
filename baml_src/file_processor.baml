@@ -125,16 +125,19 @@ class VideoAnalysis {
   key_frames KeyFrame[]
 }
 
-function AnalyzeVideo() -> VideoAnalysis {
+function AnalyzeVideo(video_name: string, video_description: string) -> VideoAnalysis {
   client GeminiProcessor
   prompt #"
   You are a construction-estimation assistant. You are given a reference to a video walkthrough of a project site.
   Your task is to analyze the video thoroughly and extract key visual information and spoken narration to aid in project estimation.
 
+  The video name is: {{ video_name }}
+  The users description of the video is: {{ video_description }}
+
   Follow these instructions carefully:
   1. Identify and select between 10 to 20 key frames from the video that are most informative for understanding the project scope, existing conditions, materials, and potential challenges.
      For each key frame, provide:
-     - A descriptive `filename` (e.g., "frame_01.png", "frame_02.png", ...).
+     - A descriptive `filename` that is prefixed with the video name (e.g., "{{video_name}}_frame_01.png", "{{video_name}}_frame_02.png", ...).
      - The `timestamp_s` in seconds from the beginning of the video where the frame occurs.
      - A detailed `description` of what is visually depicted in the frame and its significance to the project. Note any specific items, conditions, or measurements visible.
 

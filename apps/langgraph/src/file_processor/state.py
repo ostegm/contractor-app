@@ -31,6 +31,7 @@ class State:
 class VideoState:
     """Defines the state for the video processing workflow."""
     project_id: str
+    parent_file_id: str  # The id of the video file that is being processed.
     video_file: InputFile  # Contains original filename, type, and signed download_url
     analysis: Optional[VideoAnalysis] = None # Populated by analyze_video node
     extracted_frames: list[InputFile] = field(default_factory=list) # Populated by extract_frames node
