@@ -83,7 +83,7 @@ port = 54324
 [storage]
 enabled = true
 # The maximum file size allowed (e.g. "5MB", "500KB").
-file_size_limit = "50MiB"
+file_size_limit = "15000MiB"
   [storage.buckets.contractor-app-dev]
     public = false
     # allowed_mime_types = ["image/png", "image/jpeg", "application/zip", "text/plain", "text/plain; charset=utf-8"]

@@ -1,7 +1,8 @@
 {
   "dependencies": ["."],
   "graphs": {
-    "file_processor": "file_processor.graph:estimate_graph"
+    "file_processor": "file_processor.graph:estimate_graph",
+    "video_processor": "file_processor.video_graph:video_processor_graph"
   },
   "env": ".env"
 }

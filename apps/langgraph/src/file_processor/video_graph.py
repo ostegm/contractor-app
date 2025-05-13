@@ -41,8 +41,13 @@ TEMP_DIR.mkdir(exist_ok=True)
 
 async def _cleanup_temp_file(path: Optional[str]):
     if path and Path(path).exists():
+        def safe_remove(p):
+            try:
+                os.remove(p)
+            except FileNotFoundError:
+                pass
         try:
-            os.remove(path)
+            await asyncio.to_thread(safe_remove, path)
             logger.info(f"Cleaned up temporary file: {path}")
         except Exception as e:
             logger.error(f"Error cleaning up temporary file {path}: {e}")
@@ -85,7 +90,6 @@ async def run_analyze_video_baml(video_file: GeminiFile) -> VideoAnalysis:
     analysis = b.parse.AnalyzeVideo(res.text)
     await delete_file(video_file)
     logger.info("Received analysis from BAML.")
-    breakpoint()
     return analysis
 
 async def download_file(url: str, destination: Path) -> None:
@@ -101,46 +105,42 @@ async def download_file(url: str, destination: Path) -> None:
 async def _extract_key_frames_locally(
     local_video_path: str, 
     key_frames: list[KeyFrame], 
-    project_id: str,
-    base_temp_dir: Path
-) -> list[tuple[KeyFrame, Path]]:
+    project_id: str, # project_id is not used anymore for directory creation but kept for consistency
+    base_temp_dir: Path # base_temp_dir is not used anymore
+) -> list[tuple[KeyFrame, bytes, str]]: # Returns KeyFrame, image_bytes, filename
     """
-    Extracts key frames from the video file using ffmpeg and saves them locally.
+    Extracts key frames from the video file using ffmpeg and returns them as bytes.
 
     Args:
         local_video_path: Path to the local video file.
         key_frames: List of KeyFrame objects specifying which frames to extract.
-        project_id: The project ID, used for creating a subdirectory in temp.
-        base_temp_dir: The base temporary directory to use.
+        project_id: The project ID (currently unused in this in-memory version).
+        base_temp_dir: The base temporary directory (currently unused).
 
     Returns:
-        A list of tuples, where each tuple contains the KeyFrame object and 
-        the Path to the locally saved frame image.
+        A list of tuples, where each tuple contains the KeyFrame object, 
+        the image data as bytes, and the generated filename.
     """
     if not key_frames:
-        logger.info("No key frames provided for local extraction.")
+        logger.info("No key frames provided for in-memory extraction.")
         return []
 
-    # Ensure the directory for frames exists for this project_id within temp dir
-    project_frames_dir = base_temp_dir / project_id
-    project_frames_dir.mkdir(exist_ok=True, parents=True) # Ensure parent dirs exist
-
-    extracted_frame_paths: list[tuple[KeyFrame, Path]] = []
+    extracted_frames_data: list[tuple[KeyFrame, bytes, str]] = []
 
     for key_frame in key_frames:
+        # Generate a filename, still useful for Supabase path and InputFile name
         frame_filename = key_frame.filename or f"frame_ts_{key_frame.timestamp_s:.2f}.png"
-        # Sanitize filename if necessary, though Path should handle most valid OS names
-        local_frame_path = project_frames_dir / frame_filename
         
-        logger.info(f"Extracting frame locally: {frame_filename} at {key_frame.timestamp_s}s to {local_frame_path}")
+        logger.info(f"Extracting frame in-memory: {frame_filename} at {key_frame.timestamp_s}s")
         ffmpeg_command = [
             "ffmpeg",
             "-ss", str(key_frame.timestamp_s),
             "-i", local_video_path,
             "-vf", "thumbnail", 
             "-vframes", "1",
-            "-q:v", "2", 
-            str(local_frame_path)
+            "-f", "image2pipe", # Output format is image2pipe
+            "-c:v", "png", # Codec is png
+            "pipe:1" # Output to stdout
         ]
         
         process = await asyncio.create_subprocess_exec(
@@ -151,14 +151,18 @@ async def _extract_key_frames_locally(
         stdout, stderr = await process.communicate()
 
         if process.returncode != 0:
-            logger.error(f"Error extracting frame {frame_filename} locally: {stderr.decode()}")
+            logger.error(f"Error extracting frame {frame_filename} in-memory: {stderr.decode()}")
             # Optionally, continue to next frame or raise error; here we continue
             continue 
         
-        logger.info(f"Frame extracted locally to {local_frame_path}")
-        extracted_frame_paths.append((key_frame, local_frame_path))
+        if not stdout:
+            logger.warning(f"No stdout data received for frame {frame_filename} during in-memory extraction.")
+            continue
+
+        logger.info(f"Frame {frame_filename} extracted in-memory ({len(stdout)} bytes).")
+        extracted_frames_data.append((key_frame, stdout, frame_filename))
     
-    return extracted_frame_paths
+    return extracted_frames_data
 
 
 
@@ -167,6 +171,7 @@ async def _extract_key_frames_locally(
 async def analyze_video_node(state: VideoState) -> Dict[str, Any]:
     """Downloads the video, uploads to Gemini Files API, and calls BAML for analysis."""
     logger.info("--- Running analyze_video_node ---")
+    state.video_file = InputFile(**state.video_file)
     if not state.video_file.download_url:
         await _cleanup_temp_file(state.local_video_path)
         raise ValueError("Video file download_url is missing.")
@@ -192,7 +197,7 @@ async def analyze_video_node(state: VideoState) -> Dict[str, Any]:
 
 
 async def extract_frames_node(state: VideoState) -> Dict[str, Any]:
-    """Extracts key frames using ffmpeg and uploads them to Supabase Storage."""
+    """Extracts key frames using ffmpeg, uploads them as bytes to Supabase Storage."""
     logger.info("--- Running extract_frames_node ---")
     if not state.analysis or not state.analysis.key_frames:
         logger.info("No key frames to extract from analysis.")
@@ -215,89 +220,57 @@ async def extract_frames_node(state: VideoState) -> Dict[str, Any]:
     
     extracted_frames_input_files: list[InputFile] = []
 
-    # Step 1: Extract frames locally
+    # Step 1: Extract frames in-memory
     try:
-        locally_extracted_frames = await _extract_key_frames_locally(
+        in_memory_extracted_frames = await _extract_key_frames_locally(
             local_video_path=state.local_video_path,
             key_frames=state.analysis.key_frames,
-            project_id=state.project_id,
-            base_temp_dir=TEMP_DIR 
+            project_id=state.project_id, # Pass along, though not used for path creation now
+            base_temp_dir=TEMP_DIR # Pass along, though not used for path creation now
         )
     except Exception as e:
-        logger.error(f"Error during local frame extraction: {e}")
+        logger.error(f"Error during in-memory frame extraction: {e}")
         await _cleanup_temp_file(state.local_video_path) # Cleanup video on extraction error
         raise # Re-throw to mark graph run as failed
 
-    # Step 2: Upload locally extracted frames to Supabase
-    for key_frame, local_frame_path in locally_extracted_frames:
+    # Step 2: Upload in-memory extracted frames to Supabase
+    for key_frame, frame_bytes, frame_filename in in_memory_extracted_frames:
         # storage_path needs to be unique and well-formed.
-        # Using original filename from KeyFrame if available, else the generated one.
+        # Using the generated filename.
         # Prepending with UUID to ensure uniqueness in Supabase.
-        frame_filename_for_storage = local_frame_path.name 
-        storage_path = f"{state.project_id}/frames/{uuid.uuid4()}_{frame_filename_for_storage}"
-
-        frame_url_in_supabase = f"error_uploading_{storage_path}" # Default in case of error
+        unique_frame_filename = f"{uuid.uuid4()}_{frame_filename}"
+        storage_path = f"{state.project_id}/frames/{unique_frame_filename}"
         try:
-            async with aiofiles.open(local_frame_path, 'rb') as f_frame:
-                upload_response = await supabase.storage.from_(SUPABASE_BUCKET_NAME).upload(
-                    path=storage_path, 
-                    file=f_frame, 
-                    file_options={"content-type": "image/png", "cache-control": "3600", "upsert": "false"}
-                )
-            
-            if upload_response.status_code == 200:
-                get_url_response = supabase.storage.from_(SUPABASE_BUCKET_NAME).get_public_url(storage_path)
-                frame_url_in_supabase = get_url_response
-                logger.info(f"Uploaded {local_frame_path.name} to Supabase. URL: {frame_url_in_supabase}")
-            else:
-                logger.error(f"Error uploading {local_frame_path.name} to Supabase. Status: {upload_response.status_code}, Response: {await upload_response.json() if upload_response.content else 'No response content'}")
+            # Upload bytes directly
+            upload_response = await supabase.storage.from_(SUPABASE_BUCKET_NAME).upload(
+                path=storage_path, 
+                file=frame_bytes, # Pass bytes directly
+                file_options={"content-type": "image/png", "cache-control": "3600", "upsert": "false"}
+            )
+            logger.info(f"Uploaded {frame_filename} to Supabase. URL: {storage_path}: {upload_response}")
 
         except Exception as e:
-            logger.error(f"Exception during Supabase upload for {local_frame_path.name}: {e}")
+            logger.error(f"Exception during Supabase upload for {frame_filename}: {e}")
+            await _cleanup_temp_file(state.local_video_path)
+            raise
         
         extracted_frames_input_files.append(
             InputFile(
-                name=local_frame_path.name, # Use the actual filename from local_frame_path
+                name=unique_frame_filename, # Use the generated filename
                 type="image/png", 
                 description=key_frame.description,
-                download_url=frame_url_in_supabase,
+                download_url=storage_path, # Put storage path in download url so we can put it in the files table.
             )
         )
-        # Clean up the local frame file after attempting upload
-        await _cleanup_temp_file(str(local_frame_path))
+        # No local frame file to clean up with _cleanup_temp_file for this frame
     
-    # If all local frames were processed (uploaded or failed individually), 
-    # we can now decide if the main local video path should be cleaned up.
-    # This is typically handled by the return_results_node or when the graph ends.
-    # For this node, its primary responsibility is the frames.
-
+    # If all in-memory frames were processed (uploaded or failed individually), 
+    # the main local video path cleanup is handled by the return_results_node.
+    await _cleanup_temp_file(state.local_video_path)
     return {"extracted_frames": extracted_frames_input_files}
 
 
-async def return_results_node(state: VideoState) -> Dict[str, Any]:
-    """Prepares the final result structure for the video processing workflow."""
-    logger.info("--- Running return_results_node ---")
-    
-    # Cleanup the downloaded video file
-    await _cleanup_temp_file(state.local_video_path)
 
-    if not state.analysis:
-        # This case should ideally be handled by graph logic if analysis is critical
-        logger.warning("Video analysis is missing in the final state.")
-        return {
-            "final_output": { # Define a consistent "final_output" key for the graph's result
-                "detailed_description": "Error: Video analysis could not be completed.",
-                "frames": [],
-                "error": "Video analysis missing."
-            }
-        }
-
-    return {
-        "final_output": {
-            "detailed_description": state.analysis.detailed_description,
-            "frames": state.extracted_frames, # List of InputFile objects
-        }
-    }
 
 
 # --- Graph Definition ---
@@ -305,13 +278,11 @@ graph_builder = StateGraph(VideoState)
 
 graph_builder.add_node("analyze_video", analyze_video_node)
 graph_builder.add_node("extract_frames", extract_frames_node)
-graph_builder.add_node("return_results", return_results_node)
 
 graph_builder.set_entry_point("analyze_video")
 
 graph_builder.add_edge("analyze_video", "extract_frames")
-graph_builder.add_edge("extract_frames", "return_results")
-graph_builder.add_edge("return_results", END) # Explicitly end the graph
+graph_builder.add_edge("extract_frames", END)
 
 
 # Compile the graph
