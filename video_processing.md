@@ -3,12 +3,18 @@
 ## 0. Status & Implementation Notes (NEW SECTION)
 
 *   **Overall LangGraph Status:** The LangGraph `video_processor` workflow (Sections 4 & 5) is **IMPLEMENTED and TESTED**.
-*   **BAML:** Implemented within `baml_src/file_processor.baml` instead of a separate `video.baml`.
+*   **Next.js Server Actions (Section 6):** The core server actions (`uploadFile` modifications, `startVideoProcessing`, `checkVideoProcessingStatus`) are **IMPLEMENTED**. Video processing is automatically triggered by `uploadFile` for video files.
+*   **Filename Conventions:**
+    *   Original video files retain their names in the DB, but use a sanitized, timestamped name for Supabase storage path upon initial upload by user.
+    *   AI-generated summary text file is named `video_summary_{sanitized_original_video_filename_base}.txt`.
+    *   AI-generated frame images use their BAML-defined names (e.g., `frame_01.png`).
+    *   Storage path for AI-generated content: `{projectId}/ai_generated/{originalVideoFileId}/{filename}`.
+*   **BAML:** Implemented within `baml_src/file_processor.baml`.
 *   **Gemini API Usage:** Uses the `google-generativeai` Python SDK, including polling for video "ACTIVE" state and a modular approach for content generation with BAML.
-*   **Supabase Client:** Uses the official `supabase` Python library (async client).
-*   **Logging:** Uses Python's `logging` module instead of `print`.
-*   **Output:** The LangGraph `video_processor` returns a dictionary with a key `"final_output"`, which contains `detailed_description` (string) and `frames` (list of `InputFile` objects). Each `InputFile` for a frame has its Supabase storage public URL in the `download_url` field.
-*   **Secrets:** Uses `GOOGLE_API_KEY`. `SUPABASE_KEY` is used for Supabase client (service role or storage admin access).
+*   **Supabase Client:** Uses the official `supabase` Python library (async client) in LangGraph, and the standard Supabase JS client in Next.js server actions.
+*   **Logging:** Python `logging` in LangGraph; `console.log/error` in Next.js actions.
+*   **LangGraph Output:** The `video_processor` graph returns a dictionary containing `analysis: VideoAnalysis`, `extracted_frames: InputFile[]`, and `parent_file_id: string`, `project_id: string` directly at the root of the output object from the `/join` endpoint.
+*   **Secrets:** LangGraph needs `GOOGLE_API_KEY`, `SUPABASE_URL`, `SUPABASE_KEY`. Next.js needs `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` (or anon key depending on setup), `LANGGRAPH_API_URL`, `LANGGRAPH_API_KEY`.
 
 ## 1 · Description
 
