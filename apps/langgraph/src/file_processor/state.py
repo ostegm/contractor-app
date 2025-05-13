@@ -31,10 +31,10 @@ class State:
 class VideoState:
     """Defines the state for the video processing workflow."""
     project_id: str
-    parent_file_id: str  # The id of the video file that is being processed.
-    video_file: InputFile  # Contains original filename, type, and signed download_url
-    analysis: Optional[VideoAnalysis] = None # Populated by analyze_video node
-    extracted_frames: list[InputFile] = field(default_factory=list) # Populated by extract_frames node
+    video_file: InputFile  # Contains original filename, type, and signed download_url from Next.js
+    parent_file_id: Optional[str] = None # ID of the original video file, passed from Next.js
+    analysis: Optional[VideoAnalysis] = None # Populated by analyze_video_node
+    extracted_frames: list[InputFile] = field(default_factory=list) # Populated by extract_frames_node
     # Temporary path for the downloaded video file, used across nodes.
     # This avoids downloading the video multiple times.
     # It will be cleaned up at the end of the graph execution if needed.

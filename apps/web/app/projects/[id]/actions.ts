@@ -13,7 +13,8 @@ import {
   type BamlChatThread,
   type ConstructionProjectData,
   type EstimateLineItem,
-  type InputFile
+  type InputFile,
+  type VideoAnalysis
 } from '@/baml_client/baml_client/types'
 
 if (!process.env.SUPABASE_STORAGE_BUCKET) {
@@ -1125,4 +1126,286 @@ export async function deleteChatThread(threadId: string): Promise<void> {
 
   // No need for simulated delay
 }
+
+// +++ START VIDEO PROCESSING ADDITIONS +++
+export async function startVideoProcessing(
+  projectId: string,
+  fileId: string // ID of the original video file in the 'files' table
+) {
+  const supabase = await createClient()
+  if (!LANGGRAPH_API_URL || !LANGGRAPH_API_KEY) {
+    return { error: 'Video processing service is not configured.' };
+  }
+
+  try {
+    // 1. Fetch the original video file record from Supabase
+    const { data: videoFileRow, error: fileError } = await supabase
+      .from('files')
+      .select('file_name, file_url, description, type')
+      .eq('id', fileId)
+      .eq('project_id', projectId)
+      .single();
+
+    if (fileError || !videoFileRow) {
+      console.error('Error fetching video file for processing:', fileError);
+      return { error: `Failed to find video file (ID: ${fileId}) for project ${projectId}.` };
+    }
+
+    // 2. Create a signed URL for the video file for LangGraph to access
+    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUrl(videoFileRow.file_url, 3600); // 1 hour expiration
+
+    if (signedUrlError || !signedUrlData) {
+      console.error('Error creating signed URL for video processing:', signedUrlError);
+      return { error: `Failed to create signed URL for video: ${signedUrlError?.message}` };
+    }
+
+    // 3. Call LangGraph to create a thread
+    const createThreadResponse = await fetch(`${LANGGRAPH_API_URL}/threads`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': LANGGRAPH_API_KEY,
+      },
+      body: JSON.stringify({}), // Empty body usually sufficient for thread creation
+    });
+
+    if (!createThreadResponse.ok) {
+      const errorText = await createThreadResponse.text();
+      console.error('LangGraph thread creation failed:', errorText);
+      return { error: `Video processing thread creation failed: ${createThreadResponse.status}` };
+    }
+    const threadResult = await createThreadResponse.json() as { thread_id: string };
+    const langGraphThreadId = threadResult.thread_id;
+
+    // 4. Prepare input for LangGraph video_processor run
+    const langGraphInput = {
+      project_id: projectId,
+      parent_file_id: fileId,
+      video_file: {
+        name: videoFileRow.file_name,
+        type: videoFileRow.type || 'video/mp4', // Ensure type is always a string, default if null/undefined from DB
+        description: videoFileRow.description || undefined, 
+        download_url: signedUrlData.signedUrl,
+      },
+    };
+
+    // 5. Call LangGraph to start a run
+    const createRunResponse = await fetch(`${LANGGRAPH_API_URL}/threads/${langGraphThreadId}/runs`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': LANGGRAPH_API_KEY,
+      },
+      body: JSON.stringify({
+        assistant_id: 'video_processor',
+        input: langGraphInput,
+      }),
+    });
+
+    if (!createRunResponse.ok) {
+      const errorText = await createRunResponse.text();
+      console.error('LangGraph run creation failed:', errorText);
+      // TODO: Optionally, try to delete the LangGraph thread if run creation fails?
+      return { error: `Video processing run creation failed: ${createRunResponse.status}` };
+    }
+    const runResult = await createRunResponse.json() as { run_id: string };
+    const langGraphRunId = runResult.run_id;
+
+    // 6. Insert a task_job record
+    const { error: jobError } = await supabase.from('task_jobs').insert({
+      project_id: projectId,
+      file_id: fileId, // Link to the original video file
+      thread_id: langGraphThreadId,
+      run_id: langGraphRunId,
+      status: 'processing',
+      job_type: 'video_process',
+    });
+
+    if (jobError) {
+      console.error('Error creating video processing task job:', jobError);
+      // TODO: More robust error handling, e.g., alert if critical, attempt cleanup?
+      return { error: `Failed to create task job: ${jobError.message}` };
+    }
+
+    revalidatePath(`/projects/${projectId}`); // Revalidate to show pending status in UI
+    return { success: true, message: 'Video processing started.', run_id: langGraphRunId, thread_id: langGraphThreadId };
+
+  } catch (error) {
+    console.error('Unexpected error in startVideoProcessing:', error);
+    return { error: error instanceof Error ? error.message : 'An unknown error occurred while starting video processing.' };
+  }
+}
+
+export async function checkVideoProcessingStatus(jobId: string) {
+  const supabase = await createClient();
+  if (!LANGGRAPH_API_URL || !LANGGRAPH_API_KEY) {
+    return { error: 'Video processing service is not configured.' };
+  }
+
+  try {
+    // 1. Fetch the task_job record
+    const { data: taskJob, error: taskJobError } = await supabase
+      .from('task_jobs')
+      .select('*, files(project_id)') // files(project_id) to get project_id for revalidation
+      .eq('id', jobId)
+      .eq('job_type', 'video_process')
+      .single();
+
+    if (taskJobError) {
+      if (taskJobError.code === 'PGRST116') { // No rows found
+        return { status: 'not_found', error: `Job ID ${jobId} not found.` };
+      }
+      console.error('Error fetching video processing task job:', taskJobError);
+      return { error: `Failed to fetch task job: ${taskJobError.message}` };
+    }
+
+    if (taskJob.status === 'completed' || taskJob.status === 'failed') {
+      return { status: taskJob.status as TaskJobStatus, error: taskJob.error_message };
+    }
+
+    // 2. Job is 'processing', check LangGraph run status and get output if successful by joining
+    //    First, just check status without joining to see if it's even done.
+    const lgStatusCheckResponse = await fetch(`${LANGGRAPH_API_URL}/threads/${taskJob.thread_id}/runs/${taskJob.run_id}`, {
+      headers: { 'x-api-key': LANGGRAPH_API_KEY },
+    });
+
+    if (!lgStatusCheckResponse.ok) {
+      const errorText = await lgStatusCheckResponse.text();
+      console.error('LangGraph status check failed (pre-join):', errorText);
+      await updateTaskStatus(taskJob.id, 'failed', `LangGraph status check error: ${lgStatusCheckResponse.status}`);
+      return { status: 'failed' as TaskJobStatus, error: `LangGraph status check error: ${lgStatusCheckResponse.status}` };
+    }
+
+    const langGraphRunStatus = await lgStatusCheckResponse.json() as { status: string };
+
+    if (langGraphRunStatus.status === 'success') {
+      // Now that status is success, join to get the full output
+      const lgJoinResponse = await fetch(`${LANGGRAPH_API_URL}/threads/${taskJob.thread_id}/runs/${taskJob.run_id}/join`, {
+        headers: { 'x-api-key': LANGGRAPH_API_KEY },
+      });
+
+      if (!lgJoinResponse.ok) {
+        const errorText = await lgJoinResponse.text();
+        console.error('LangGraph join run failed:', errorText);
+        await updateTaskStatus(taskJob.id, 'failed', `LangGraph join run error: ${lgJoinResponse.status}`);
+        return { status: 'failed' as TaskJobStatus, error: `LangGraph join run error: ${lgJoinResponse.status}` };
+      }
+
+      // Expecting the output to be { analysis: VideoAnalysis, extracted_frames: InputFile[] }
+      const langGraphRunOutput = await lgJoinResponse.json() as { analysis: VideoAnalysis; extracted_frames: InputFile[], parent_file_id: string, project_id: string } | null ;
+
+      if (!langGraphRunOutput || !langGraphRunOutput.analysis || !langGraphRunOutput.extracted_frames) {
+        console.error('LangGraph run output is missing expected fields (analysis, extracted_frames).', langGraphRunOutput);
+        await updateTaskStatus(taskJob.id, 'failed', 'LangGraph output format error.');
+        return { status: 'failed'as TaskJobStatus, error: 'LangGraph output format error.' };
+      }
+      
+      // 3. LangGraph run succeeded, process the output
+      const output = langGraphRunOutput;
+      const originalVideoFileId = output.parent_file_id;
+      let projectIdToUse = output.project_id;
+      if (!projectIdToUse) {
+        projectIdToUse = taskJob.project_id;
+      }
+
+      if (!originalVideoFileId || !projectIdToUse) {
+          console.error('Missing originalVideoFileId or projectId for processing video results', { originalVideoFileId, projectIdToUse, taskJob });
+          await updateTaskStatus(taskJob.id, 'failed', 'Internal error: Missing context for result processing.');
+          return { status: 'failed' as TaskJobStatus, error: 'Internal error processing results.'};
+      }
+
+      // Fetch the original video's filename for the summary
+      const { data: originalVideoDetails, error: originalVideoDetailsError } = await supabase
+        .from('files')
+        .select('file_name')
+        .eq('id', originalVideoFileId)
+        .single();
+
+      if (originalVideoDetailsError || !originalVideoDetails) {
+        console.error('Failed to fetch original video filename for summary:', originalVideoDetailsError);
+        await updateTaskStatus(taskJob.id, 'failed', 'Failed to retrieve original video details for summary.');
+        return { status: 'failed' as TaskJobStatus, error: 'Failed to process results (original video details).' };
+      }
+      
+      const baseOriginalFileName = originalVideoDetails.file_name.split('.').slice(0, -1).join('.') || originalVideoDetails.file_name;
+      const sanitizedBaseOriginalFileName = baseOriginalFileName.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 100); // Keep it reasonably short
+      const summaryFileName = `video_summary_${sanitizedBaseOriginalFileName}.txt`;
+      
+      // 3a. Upload summary text to Supabase Storage
+      // Path for AI generated content, includes original file ID for association and now original name for readability
+      const summaryStoragePath = `${projectIdToUse}/ai_generated/${originalVideoFileId}/${summaryFileName}`;
+      
+      const { error: summaryUploadError } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(summaryStoragePath, output.analysis.detailed_description, { contentType: 'text/plain', upsert: true });
+
+      if (summaryUploadError) {
+        console.error('Error uploading video summary text:', summaryUploadError);
+        await updateTaskStatus(taskJob.id, 'failed', `Failed to upload summary: ${summaryUploadError.message}`);
+        return { status: 'failed' as TaskJobStatus, error: `Failed to save summary: ${summaryUploadError.message}` };
+      }
+
+      // 3b. Create files table entries
+      const newFileEntries = [];
+      // Summary file entry
+      newFileEntries.push({
+        project_id: projectIdToUse,
+        parent_file_id: originalVideoFileId,
+        file_name: summaryFileName,
+        description: `AI-generated video summary of ${originalVideoDetails.file_name}`,
+        file_url: summaryStoragePath, // Store the storage path
+        type: 'text/plain',
+        origin: 'ai',
+      });
+
+      // Frame file entries
+      for (const frameFile of output.extracted_frames) {
+        newFileEntries.push({
+          project_id: projectIdToUse,
+          parent_file_id: originalVideoFileId,
+          file_name: frameFile.name, // Name from LangGraph output (includes UUID)
+          description: frameFile.description || 'AI-generated video frame',
+          file_url: frameFile.download_url, // This is the storage path from LangGraph
+          type: frameFile.type || 'image/png', // Use type from LangGraph if available
+          origin: 'ai',
+        });
+      }
+
+      const { error: insertFilesError } = await supabase.from('files').insert(newFileEntries);
+      if (insertFilesError) {
+        console.error('Error inserting AI-generated file records:', insertFilesError);
+        // Attempt to clean up summary file from storage?
+        await supabase.storage.from(STORAGE_BUCKET).remove([summaryStoragePath]);
+        await updateTaskStatus(taskJob.id, 'failed', `Failed to save processed file records: ${insertFilesError.message}`);
+        return { status: 'failed' as TaskJobStatus, error: `Failed to save file records: ${insertFilesError.message}` };
+      }
+
+      // 3c. Update task_job to completed
+      await updateTaskStatus(taskJob.id, 'completed');
+      revalidatePath(`/projects/${projectIdToUse}`);
+      return { status: 'completed' as TaskJobStatus };
+
+    } else if (['error', 'timeout', 'interrupted'].includes(langGraphRunStatus.status)) {
+      // 4. LangGraph run failed
+      const failureMessage = `Video processing failed in LangGraph with status: ${langGraphRunStatus.status}`;
+      console.error(failureMessage, langGraphRunStatus.status); // Log output if any
+      await updateTaskStatus(taskJob.id, 'failed', failureMessage);
+      return { status: 'failed' as TaskJobStatus, error: failureMessage };
+    } else {
+      // 5. LangGraph run is still pending/processing (based on initial status check)
+      return { status: langGraphRunStatus.status as TaskJobStatus }; // Return the actual status like 'pending' or 'processing'
+    }
+
+  } catch (error) {
+    console.error('Unexpected error in checkVideoProcessingStatus:', error);
+    // If jobId is available, try to mark task as failed
+    // const currentJobId = (error as any)?.jobIdForError; // A way to pass jobId if needed
+    // if (currentJobId) { await updateTaskStatus(currentJobId, 'failed', 'Unexpected check status error.'); }
+    return { error: error instanceof Error ? error.message : 'An unknown error occurred while checking video processing status.' };
+  }
+}
+
+// +++ END VIDEO PROCESSING ADDITIONS +++
 

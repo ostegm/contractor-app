@@ -239,7 +239,7 @@ async def extract_frames_node(state: VideoState) -> Dict[str, Any]:
         # storage_path needs to be unique and well-formed.
         # Using the generated filename.
         # Prepending with UUID to ensure uniqueness in Supabase.
-        storage_path = f"{state.project_id}/frames/{state.parent_file_id}/{frame_filename}"
+        storage_path = f"{state.project_id}/ai_generated/{state.parent_file_id}/frames/{frame_filename}"
         try:
             # Upload bytes directly
             upload_response = await supabase.storage.from_(SUPABASE_BUCKET_NAME).upload(
