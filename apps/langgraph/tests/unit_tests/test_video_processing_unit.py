@@ -105,14 +105,6 @@ async def test_extract_key_frames_locally():
         {"filename": "frame_01.png", "timestamp_s": 0.0, "description": "View of the bathroom from the left, showing wooden vanity cabinets with black handles and the edge of a mirror reflecting the person recording.\"\n    For estimating, this shows the vanity style and general bathroom context."},
         {"filename": "frame_02.png", "timestamp_s": 2.1, "description": "Panoramic view showing the double vanity countertop, sinks, faucets, mirror reflection of the person, and the free-standing tub.\"\n    For estimating, this shows the overall layout and major fixtures like the tub."},
         {"filename": "frame_03.png", "timestamp_s": 3.7, "description": "View showing the free-standing tub and the glass enclosure of the walk-in shower. Provides context of the shower's location relative to other fixtures."},
-        {"filename": "frame_04.png", "timestamp_s": 4.8, "description": "Inside the walk-in shower, showing the tiled walls (greyish square tiles), tiled floor (smaller white tiles), existing single fixed shower head, hand shower on a bar, and valve. Crucial for identifying tile types and the current shower configuration."},
-        {"filename": "frame_05.png", "timestamp_s": 6.3, "description": "Closer view of the existing shower head (large round black head) and the hand shower with hose on its adjustable bar mount. Identifies fixture types and finishes."},
-        {"filename": "frame_06.png", "timestamp_s": 8.1, "description": "View showing the shower valve (circular black handle), the hose connection for the hand shower, and the shower head pipe coming from the wall. Locates the primary plumbing control."},
-        {"filename": "frame_07.png", "timestamp_s": 9.2, "description": "View showing the tiled shower wall with a built-in niche containing bottles of toiletries. Provides context for existing wall features."},
-        {"filename": "frame_08.png", "timestamp_s": 10.8, "description": "View of the tiled wall where the second shower head is planned. Shows the tile pattern and condition clearly before the pointing begins."},
-        {"filename": "frame_10.png", "timestamp_s": 16.4, "description": "The person points towards the area of the existing shower valve and hose connection while explaining that the \"plumbing runs there and into that wall.\" Indicates the origin point of the current plumbing lines."},
-        {"filename": "frame_11.png", "timestamp_s": 20.2, "description": "The person gestures towards the tiled wall again, stating the need to \"open up this wall and remove some tile.\" Confirms that the wall where the new head is planned requires demolition and tile removal for plumbing access."},
-        {"filename": "frame_12.png", "timestamp_s": 21.9, "description": "Final view of the tiled shower wall, emphasizing the pattern and coverage, just before the video ends. Reinforces the tile material that needs to be dealt with."}
     ]
     key_frames_to_extract = [
         KeyFrame(filename=kf["filename"], timestamp_s=kf["timestamp_s"], description=kf["description"])
@@ -145,24 +137,24 @@ async def test_extract_key_frames_locally():
     finally:
         # Cleanup: Remove extracted frame files and the temporary project directory
         logger.info(f"Cleaning up temporary files for project {test_project_id} from {temp_extraction_path}")
-        # for _, frame_path in extracted_frames_info: # frames from the actual extraction call
-        #     if frame_path.exists():
-        #         try:
-        #             os.remove(frame_path)
-        #             logger.info(f"Removed temp frame: {frame_path}")
-        #         except OSError as e:
-        #             logger.error(f"Error removing temp frame {frame_path}: {e}")
+        for _, frame_path in extracted_frames_info: # frames from the actual extraction call
+            if frame_path.exists():
+                try:
+                    os.remove(frame_path)
+                    logger.info(f"Removed temp frame: {frame_path}")
+                except OSError as e:
+                    logger.error(f"Error removing temp frame {frame_path}: {e}")
         
-        # if temp_extraction_path.exists() and temp_extraction_path.is_dir():
-        #     try:
-        #         # Attempt to remove the directory itself if it's empty
-        #         # For a more robust cleanup, one might use shutil.rmtree, 
-        #         # but be cautious with rmtree.
-        #         # For this test, os.rmdir should be fine if all files are deleted.
-        #         if not any(temp_extraction_path.iterdir()): # Check if empty
-        #              os.rmdir(temp_extraction_path)
-        #              logger.info(f"Removed temp project directory: {temp_extraction_path}")
-        #         else:
-        #             logger.warning(f"Temp project directory {temp_extraction_path} was not empty. Manual cleanup might be needed.")
-        #     except OSError as e:
-        #         logger.error(f"Error removing temp project directory {temp_extraction_path}: {e}")
+        if temp_extraction_path.exists() and temp_extraction_path.is_dir():
+            try:
+                # Attempt to remove the directory itself if it's empty
+                # For a more robust cleanup, one might use shutil.rmtree, 
+                # but be cautious with rmtree.
+                # For this test, os.rmdir should be fine if all files are deleted.
+                if not any(temp_extraction_path.iterdir()): # Check if empty
+                     os.rmdir(temp_extraction_path)
+                     logger.info(f"Removed temp project directory: {temp_extraction_path}")
+                else:
+                    logger.warning(f"Temp project directory {temp_extraction_path} was not empty. Manual cleanup might be needed.")
+            except OSError as e:
+                logger.error(f"Error removing temp project directory {temp_extraction_path}: {e}")
