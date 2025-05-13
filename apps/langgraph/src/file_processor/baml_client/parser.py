@@ -37,6 +37,32 @@ class LlmResponseParser:
       self.__ctx_manager = ctx_manager
 
     
+    def AnalyzeVideo(
+        self,
+        llm_response: str,
+        baml_options: BamlCallOptions = {},
+    ) -> types.VideoAnalysis:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      parsed = self.__runtime.parse_llm_response(
+        "AnalyzeVideo",
+        llm_response,
+        types,
+        types,
+        partial_types,
+        False,
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+      )
+
+      return cast(types.VideoAnalysis, parsed)
+    
     def DetermineNextStep(
         self,
         llm_response: str,
@@ -115,32 +141,6 @@ class LlmResponseParser:
 
       return cast(str, parsed)
     
-    def ProcessVideo(
-        self,
-        llm_response: str,
-        baml_options: BamlCallOptions = {},
-    ) -> types.ProcessedVideo:
-      __tb__ = baml_options.get("tb", None)
-      if __tb__ is not None:
-        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
-      else:
-        tb = None
-      __cr__ = baml_options.get("client_registry", None)
-
-      parsed = self.__runtime.parse_llm_response(
-        "ProcessVideo",
-        llm_response,
-        types,
-        types,
-        partial_types,
-        False,
-        self.__ctx_manager.get(),
-        tb,
-        __cr__,
-      )
-
-      return cast(types.ProcessedVideo, parsed)
-    
 
 
 class LlmStreamParser:
@@ -151,6 +151,32 @@ class LlmStreamParser:
       self.__runtime = runtime
       self.__ctx_manager = ctx_manager
 
+    
+    def AnalyzeVideo(
+        self,
+        llm_response: str,
+        baml_options: BamlCallOptions = {},
+    ) -> partial_types.VideoAnalysis:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      parsed = self.__runtime.parse_llm_response(
+        "AnalyzeVideo",
+        llm_response,
+        types,
+        types,
+        partial_types,
+        True,
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+      )
+
+      return cast(partial_types.VideoAnalysis, parsed)
     
     def DetermineNextStep(
         self,
@@ -229,32 +255,6 @@ class LlmStreamParser:
       )
 
       return cast(Optional[str], parsed)
-    
-    def ProcessVideo(
-        self,
-        llm_response: str,
-        baml_options: BamlCallOptions = {},
-    ) -> partial_types.ProcessedVideo:
-      __tb__ = baml_options.get("tb", None)
-      if __tb__ is not None:
-        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
-      else:
-        tb = None
-      __cr__ = baml_options.get("client_registry", None)
-
-      parsed = self.__runtime.parse_llm_response(
-        "ProcessVideo",
-        llm_response,
-        types,
-        types,
-        partial_types,
-        True,
-        self.__ctx_manager.get(),
-        tb,
-        __cr__,
-      )
-
-      return cast(partial_types.ProcessedVideo, parsed)
     
 
 

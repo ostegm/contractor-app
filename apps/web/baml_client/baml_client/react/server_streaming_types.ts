@@ -18,14 +18,14 @@ $ pnpm add @boundaryml/baml
 import type { Check, Checked  } from "../types";
 import type { Image, Audio } from "@boundaryml/baml";
 
-import type {  AllowedTypes,  AssisantMessage,  BamlChatThread,  ConstructionProjectData,  EstimateLineItem,  Event,  InputFile,  ProcessedVideo,  UpdateEstimateRequest,  UpdateEstimateResponse,  UserInput,  VideoFrame } from "../types"
+import type {  AllowedTypes,  AssisantMessage,  BamlChatThread,  ConstructionProjectData,  EstimateLineItem,  Event,  InputFile,  KeyFrame,  UpdateEstimateRequest,  UpdateEstimateResponse,  UserInput,  VideoAnalysis } from "../types"
 
 import type * as types from "../types"
 import type { partial_types }from "../partial_types";
 
 export type StreamingServerTypes = {
+  AnalyzeVideo: partial_types.VideoAnalysis,
   DetermineNextStep: partial_types.Event,
   GenerateProjectEstimate: partial_types.ConstructionProjectData,
   ProcessAudio: string,
-  ProcessVideo: partial_types.ProcessedVideo,
 }

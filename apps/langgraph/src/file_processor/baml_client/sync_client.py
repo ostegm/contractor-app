@@ -98,6 +98,33 @@ class BamlSyncClient:
       return BamlSyncClient(self.__runtime, self.__ctx_manager, new_options)
 
     
+    def AnalyzeVideo(
+        self,
+        video_reference: str,
+        baml_options: BamlCallOptions = {},
+    ) -> types.VideoAnalysis:
+      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
+      __tb__ = options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = options.get("client_registry", None)
+      collector = options.get("collector", None)
+      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
+
+      raw = self.__runtime.call_function_sync(
+        "AnalyzeVideo",
+        {
+          "video_reference": video_reference,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        collectors,
+      )
+      return cast(types.VideoAnalysis, raw.cast_to(types, types, partial_types, False))
+    
     def DetermineNextStep(
         self,
         thread: types.BamlChatThread,current_estimate: types.ConstructionProjectData,
@@ -179,33 +206,6 @@ class BamlSyncClient:
       )
       return cast(str, raw.cast_to(types, types, partial_types, False))
     
-    def ProcessVideo(
-        self,
-        video: types.InputFile,
-        baml_options: BamlCallOptions = {},
-    ) -> types.ProcessedVideo:
-      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
-      __tb__ = options.get("tb", None)
-      if __tb__ is not None:
-        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
-      else:
-        tb = None
-      __cr__ = options.get("client_registry", None)
-      collector = options.get("collector", None)
-      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
-
-      raw = self.__runtime.call_function_sync(
-        "ProcessVideo",
-        {
-          "video": video,
-        },
-        self.__ctx_manager.get(),
-        tb,
-        __cr__,
-        collectors,
-      )
-      return cast(types.ProcessedVideo, raw.cast_to(types, types, partial_types, False))
-    
 
 
 
@@ -218,6 +218,40 @@ class BamlStreamClient:
       self.__ctx_manager = ctx_manager
       self.__baml_options = baml_options or {}
 
+    
+    def AnalyzeVideo(
+        self,
+        video_reference: str,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.BamlSyncStream[partial_types.VideoAnalysis, types.VideoAnalysis]:
+      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
+      __tb__ = options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = options.get("client_registry", None)
+      collector = options.get("collector", None)
+      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
+
+      raw = self.__runtime.stream_function_sync(
+        "AnalyzeVideo",
+        {
+          "video_reference": video_reference,
+        },
+        None,
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        collectors,
+      )
+
+      return baml_py.BamlSyncStream[partial_types.VideoAnalysis, types.VideoAnalysis](
+        raw,
+        lambda x: cast(partial_types.VideoAnalysis, x.cast_to(types, types, partial_types, True)),
+        lambda x: cast(types.VideoAnalysis, x.cast_to(types, types, partial_types, False)),
+        self.__ctx_manager.get(),
+      )
     
     def DetermineNextStep(
         self,
@@ -321,40 +355,6 @@ class BamlStreamClient:
         raw,
         lambda x: cast(Optional[str], x.cast_to(types, types, partial_types, True)),
         lambda x: cast(str, x.cast_to(types, types, partial_types, False)),
-        self.__ctx_manager.get(),
-      )
-    
-    def ProcessVideo(
-        self,
-        video: types.InputFile,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.BamlSyncStream[partial_types.ProcessedVideo, types.ProcessedVideo]:
-      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
-      __tb__ = options.get("tb", None)
-      if __tb__ is not None:
-        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
-      else:
-        tb = None
-      __cr__ = options.get("client_registry", None)
-      collector = options.get("collector", None)
-      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
-
-      raw = self.__runtime.stream_function_sync(
-        "ProcessVideo",
-        {
-          "video": video,
-        },
-        None,
-        self.__ctx_manager.get(),
-        tb,
-        __cr__,
-        collectors,
-      )
-
-      return baml_py.BamlSyncStream[partial_types.ProcessedVideo, types.ProcessedVideo](
-        raw,
-        lambda x: cast(partial_types.ProcessedVideo, x.cast_to(types, types, partial_types, True)),
-        lambda x: cast(types.ProcessedVideo, x.cast_to(types, types, partial_types, False)),
         self.__ctx_manager.get(),
       )
     

@@ -21,13 +21,31 @@ import { b } from '../index';
 import type { Check, Checked  } from "../types";
 import type { Image, Audio } from "@boundaryml/baml";
 
-import type {  AllowedTypes,  AssisantMessage,  BamlChatThread,  ConstructionProjectData,  EstimateLineItem,  Event,  InputFile,  ProcessedVideo,  UpdateEstimateRequest,  UpdateEstimateResponse,  UserInput,  VideoFrame } from "../types"
+import type {  AllowedTypes,  AssisantMessage,  BamlChatThread,  ConstructionProjectData,  EstimateLineItem,  Event,  InputFile,  KeyFrame,  UpdateEstimateRequest,  UpdateEstimateResponse,  UserInput,  VideoAnalysis } from "../types"
 
 import type * as types from "../types"
 
 /**
  * Regular BAML server actions that return direct responses.
  */
+
+/**
+ * Executes the "AnalyzeVideo" BAML action.
+ *
+ * This server action calls the underlying BAML function "AnalyzeVideo"
+ * with the specified parameters.
+ *
+ * @param { string } video_reference - Input parameter.
+ *
+ * @returns {Promise<VideoAnalysis>} A promise that resolves with the result of the action.
+ */
+export const AnalyzeVideo = async (
+  video_reference: string,
+): Promise<VideoAnalysis> => {
+  return b.AnalyzeVideo(
+    video_reference,
+  );
+};
 
 /**
  * Executes the "DetermineNextStep" BAML action.
@@ -89,23 +107,5 @@ export const ProcessAudio = async (
 ): Promise<string> => {
   return b.ProcessAudio(
     audio,
-  );
-};
-
-/**
- * Executes the "ProcessVideo" BAML action.
- *
- * This server action calls the underlying BAML function "ProcessVideo"
- * with the specified parameters.
- *
- * @param { InputFile } video - Input parameter.
- *
- * @returns {Promise<ProcessedVideo>} A promise that resolves with the result of the action.
- */
-export const ProcessVideo = async (
-  video: InputFile,
-): Promise<ProcessedVideo> => {
-  return b.ProcessVideo(
-    video,
   );
 };

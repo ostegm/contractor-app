@@ -90,9 +90,10 @@ class InputFile(BaseModel):
     image_data: Optional[baml_py.Image] = None
     audio_data: Optional[baml_py.Audio] = None
 
-class ProcessedVideo(BaseModel):
-    summary: str
-    frames: List["VideoFrame"]
+class KeyFrame(BaseModel):
+    filename: str
+    timestamp_s: float
+    description: str
 
 class UpdateEstimateRequest(BaseModel):
     changes_to_make: str
@@ -104,6 +105,6 @@ class UpdateEstimateResponse(BaseModel):
 class UserInput(BaseModel):
     message: str
 
-class VideoFrame(BaseModel):
-    timestamp: float
-    description: str
+class VideoAnalysis(BaseModel):
+    detailed_description: str
+    key_frames: List["KeyFrame"]

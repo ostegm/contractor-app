@@ -19,7 +19,7 @@ import type { BamlRuntime, FunctionResult, BamlCtxManager, Image, Audio, ClientR
 import { toBamlError, type HTTPRequest } from "@boundaryml/baml"
 import type { Checked, Check, RecursivePartialNull as MovedRecursivePartialNull } from "./types"
 import type * as types from "./types"
-import type {AllowedTypes, AssisantMessage, BamlChatThread, ConstructionProjectData, EstimateLineItem, Event, InputFile, ProcessedVideo, UpdateEstimateRequest, UpdateEstimateResponse, UserInput, VideoFrame} from "./types"
+import type {AllowedTypes, AssisantMessage, BamlChatThread, ConstructionProjectData, EstimateLineItem, Event, InputFile, KeyFrame, UpdateEstimateRequest, UpdateEstimateResponse, UserInput, VideoAnalysis} from "./types"
 import type TypeBuilder from "./type_builder"
 import { HttpRequest, HttpStreamRequest } from "./sync_request"
 import { LlmResponseParser, LlmStreamParser } from "./parser"
@@ -85,6 +85,29 @@ export class BamlSyncClient {
   }
 
   
+  AnalyzeVideo(
+      video_reference: string,
+      __baml_options__?: BamlCallOptions
+  ): VideoAnalysis {
+    try {
+      const options = { ...this.bamlOptions, ...(__baml_options__ || {}) }
+      const collector = options.collector ? (Array.isArray(options.collector) ? options.collector : [options.collector]) : [];
+      const raw = this.runtime.callFunctionSync(
+        "AnalyzeVideo",
+        {
+          "video_reference": video_reference
+        },
+        this.ctxManager.cloneContext(),
+        options.tb?.__tb(),
+        options.clientRegistry,
+        collector,
+      )
+      return raw.parsed(false) as VideoAnalysis
+    } catch (error: any) {
+      throw toBamlError(error);
+    }
+  }
+  
   DetermineNextStep(
       thread: BamlChatThread,current_estimate: ConstructionProjectData,
       __baml_options__?: BamlCallOptions
@@ -149,29 +172,6 @@ export class BamlSyncClient {
         collector,
       )
       return raw.parsed(false) as string
-    } catch (error: any) {
-      throw toBamlError(error);
-    }
-  }
-  
-  ProcessVideo(
-      video: InputFile,
-      __baml_options__?: BamlCallOptions
-  ): ProcessedVideo {
-    try {
-      const options = { ...this.bamlOptions, ...(__baml_options__ || {}) }
-      const collector = options.collector ? (Array.isArray(options.collector) ? options.collector : [options.collector]) : [];
-      const raw = this.runtime.callFunctionSync(
-        "ProcessVideo",
-        {
-          "video": video
-        },
-        this.ctxManager.cloneContext(),
-        options.tb?.__tb(),
-        options.clientRegistry,
-        collector,
-      )
-      return raw.parsed(false) as ProcessedVideo
     } catch (error: any) {
       throw toBamlError(error);
     }

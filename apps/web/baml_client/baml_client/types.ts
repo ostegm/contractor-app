@@ -108,9 +108,10 @@ export interface InputFile {
   
 }
 
-export interface ProcessedVideo {
-  summary: string
-  frames: VideoFrame[]
+export interface KeyFrame {
+  filename: string
+  timestamp_s: number
+  description: string
   
 }
 
@@ -130,8 +131,8 @@ export interface UserInput {
   
 }
 
-export interface VideoFrame {
-  timestamp: number
-  description: string
+export interface VideoAnalysis {
+  detailed_description: string
+  key_frames: KeyFrame[]
   
 }

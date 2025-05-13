@@ -19,7 +19,7 @@ import type { BamlRuntime, BamlCtxManager, ClientRegistry, Image, Audio } from "
 import { toBamlError, HTTPRequest } from "@boundaryml/baml"
 import type { Checked, Check } from "./types"
 import type * as types from "./types"
-import type {AllowedTypes, AssisantMessage, BamlChatThread, ConstructionProjectData, EstimateLineItem, Event, InputFile, ProcessedVideo, UpdateEstimateRequest, UpdateEstimateResponse, UserInput, VideoFrame} from "./types"
+import type {AllowedTypes, AssisantMessage, BamlChatThread, ConstructionProjectData, EstimateLineItem, Event, InputFile, KeyFrame, UpdateEstimateRequest, UpdateEstimateResponse, UserInput, VideoAnalysis} from "./types"
 import type TypeBuilder from "./type_builder"
 
 type BamlCallOptions = {
@@ -30,6 +30,26 @@ type BamlCallOptions = {
 export class AsyncHttpRequest {
   constructor(private runtime: BamlRuntime, private ctxManager: BamlCtxManager) {}
 
+  
+  async AnalyzeVideo(
+      video_reference: string,
+      __baml_options__?: BamlCallOptions
+  ): Promise<HTTPRequest> {
+    try {
+      return await this.runtime.buildRequest(
+        "AnalyzeVideo",
+        {
+          "video_reference": video_reference
+        },
+        this.ctxManager.cloneContext(),
+        __baml_options__?.tb?.__tb(),
+        __baml_options__?.clientRegistry,
+        false,
+      )
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
   
   async DetermineNextStep(
       thread: BamlChatThread,current_estimate: ConstructionProjectData,
@@ -80,26 +100,6 @@ export class AsyncHttpRequest {
         "ProcessAudio",
         {
           "audio": audio
-        },
-        this.ctxManager.cloneContext(),
-        __baml_options__?.tb?.__tb(),
-        __baml_options__?.clientRegistry,
-        false,
-      )
-    } catch (error) {
-      throw toBamlError(error);
-    }
-  }
-  
-  async ProcessVideo(
-      video: InputFile,
-      __baml_options__?: BamlCallOptions
-  ): Promise<HTTPRequest> {
-    try {
-      return await this.runtime.buildRequest(
-        "ProcessVideo",
-        {
-          "video": video
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),
@@ -117,6 +117,26 @@ export class AsyncHttpStreamRequest {
   constructor(private runtime: BamlRuntime, private ctxManager: BamlCtxManager) {}
 
   
+  async AnalyzeVideo(
+      video_reference: string,
+      __baml_options__?: BamlCallOptions
+  ): Promise<HTTPRequest> {
+    try {
+      return await this.runtime.buildRequest(
+        "AnalyzeVideo",
+        {
+          "video_reference": video_reference
+        },
+        this.ctxManager.cloneContext(),
+        __baml_options__?.tb?.__tb(),
+        __baml_options__?.clientRegistry,
+        true,
+      )
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
   async DetermineNextStep(
       thread: BamlChatThread,current_estimate: ConstructionProjectData,
       __baml_options__?: BamlCallOptions
@@ -166,26 +186,6 @@ export class AsyncHttpStreamRequest {
         "ProcessAudio",
         {
           "audio": audio
-        },
-        this.ctxManager.cloneContext(),
-        __baml_options__?.tb?.__tb(),
-        __baml_options__?.clientRegistry,
-        true,
-      )
-    } catch (error) {
-      throw toBamlError(error);
-    }
-  }
-  
-  async ProcessVideo(
-      video: InputFile,
-      __baml_options__?: BamlCallOptions
-  ): Promise<HTTPRequest> {
-    try {
-      return await this.runtime.buildRequest(
-        "ProcessVideo",
-        {
-          "video": video
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),

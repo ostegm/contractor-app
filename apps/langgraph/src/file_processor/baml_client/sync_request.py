@@ -37,6 +37,29 @@ class HttpRequest:
       self.__ctx_manager = ctx_manager
 
     
+    def AnalyzeVideo(
+        self,
+        video_reference: str,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "AnalyzeVideo",
+        {
+          "video_reference": video_reference,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        False,
+      )
+    
     def DetermineNextStep(
         self,
         thread: types.BamlChatThread,current_estimate: types.ConstructionProjectData,
@@ -99,29 +122,6 @@ class HttpRequest:
         "ProcessAudio",
         {
           "audio": audio,
-        },
-        self.__ctx_manager.get(),
-        tb,
-        __cr__,
-        False,
-      )
-    
-    def ProcessVideo(
-        self,
-        video: types.InputFile,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.HTTPRequest:
-      __tb__ = baml_options.get("tb", None)
-      if __tb__ is not None:
-        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
-      else:
-        tb = None
-      __cr__ = baml_options.get("client_registry", None)
-
-      return self.__runtime.build_request_sync(
-        "ProcessVideo",
-        {
-          "video": video,
         },
         self.__ctx_manager.get(),
         tb,
@@ -140,6 +140,29 @@ class HttpStreamRequest:
       self.__ctx_manager = ctx_manager
 
     
+    def AnalyzeVideo(
+        self,
+        video_reference: str,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "AnalyzeVideo",
+        {
+          "video_reference": video_reference,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        True,
+      )
+    
     def DetermineNextStep(
         self,
         thread: types.BamlChatThread,current_estimate: types.ConstructionProjectData,
@@ -202,29 +225,6 @@ class HttpStreamRequest:
         "ProcessAudio",
         {
           "audio": audio,
-        },
-        self.__ctx_manager.get(),
-        tb,
-        __cr__,
-        True,
-      )
-    
-    def ProcessVideo(
-        self,
-        video: types.InputFile,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.HTTPRequest:
-      __tb__ = baml_options.get("tb", None)
-      if __tb__ is not None:
-        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
-      else:
-        tb = None
-      __cr__ = baml_options.get("client_registry", None)
-
-      return self.__runtime.build_request_sync(
-        "ProcessVideo",
-        {
-          "video": video,
         },
         self.__ctx_manager.get(),
         tb,
