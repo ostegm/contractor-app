@@ -71,10 +71,13 @@ contractor-monorepo/
 
 ## TODOS
 - Export to CSV
-- Handle audio notes? Video input - video probably needs to be parsed into screenshots
+- Handle Video input - process into text file and images
+- Need to import into quickbooks (see chat gpt)
+- Review export/import functionality chatgpt - maybe add to app?
 - Mobile UX?
 - Auto name chats async after 2 messages (baml impl with 4.1nano)
 - Manual edit mode (clicking an item to edit)
+- Allow recording audio note in UI.
 - Cleanup polling (i think its happening due to chat thread polling)
 - Build test case for yard project
    - Plans from yard designer
@@ -84,10 +87,6 @@ contractor-monorepo/
 - How to make it faster (only produce sections of the aiestimate? Don't regenerate all of it)
 - Test cases from Lily
 - Test case from forrest
+- Revision history on estimate (with comparison notes from small model)
 - Schedule a Landscaper call for feedback
-- Need to import into quickbooks (see chat gpt)
-- Review export/import functionality chatgpt - maybe add to app?
-
-
 - Deploy to vercel/langgraph/supabase
-- Do we really need a two step pipeline - maybe remove langgraph?
