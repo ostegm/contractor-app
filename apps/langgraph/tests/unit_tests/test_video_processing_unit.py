@@ -1,4 +1,3 @@
-
 """Tests for the video processing workflow.
 
 uv run pytest tests/unit_tests/test_video_processing_unit.py -v --log-cli-level=INFO
@@ -43,10 +42,9 @@ from apps.langgraph.src.file_processor.baml_client import b # Import baml client
 logger = logging.getLogger(__name__)
 
 # --- Configuration for the test ---
-# IMPORTANT: This test uses an absolute path. 
-# Ensure this video file exists at this location when running the test,
-# or change it to a path accessible by your test environment.
-LOCAL_VIDEO_PATH_STR = "/Users/otto/Downloads/add_showerhead.mp4"
+# Video file for testing, located in the testdata directory relative to this test file.
+_testdata_dir = _test_file_dir.parent / "testdata"
+LOCAL_VIDEO_PATH_STR = str(_testdata_dir / "add_showerhead.mp4")
 LOCAL_VIDEO_PATH = Path(LOCAL_VIDEO_PATH_STR)
 
 
