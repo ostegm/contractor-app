@@ -72,8 +72,8 @@ export async function uploadFile(formData: FormData, projectId: string) {
 
     // Check file size
     const fileSizeInMB = file.size / (1024 * 1024)
-    if (fileSizeInMB > 8) {
-      return { error: `File size exceeds 8MB limit (${fileSizeInMB.toFixed(2)}MB)` }
+    if (fileSizeInMB > 500) {
+      return { error: `File size exceeds 500MB limit (${fileSizeInMB.toFixed(2)}MB)` }
     }
 
     const sanitizedFileName = sanitizeFileName(file.name)
@@ -89,27 +89,54 @@ export async function uploadFile(formData: FormData, projectId: string) {
       return { error: `Failed to upload file: ${uploadError.message}` }
     }
 
-    console.log(`File path: ${filePath}`);
-
-    // Try to insert with description and file path
-    const { error: dbError } = await supabase
+    // Insert file metadata into the database
+    const { data: newFileRecord, error: dbError } = await supabase
       .from('files')
       .insert({
         project_id: projectId,
-        file_name: file.name,
-        file_url: filePath,
+        file_name: file.name, // Store original filename
+        file_url: filePath,   // Store storage path
         description: description,
+        type: file.type || 'application/octet-stream', // Store MIME type
       })
+      .select('id, type') // Select id and type of the newly inserted record
+      .single();
 
-    // Check if the database insertion failed
-    if (dbError) {
+    if (dbError || !newFileRecord) {
       console.error('Error inserting file record into database:', dbError)
-      // Optional: Attempt to delete the orphaned file from storage?
-      // await supabase.storage.from(STORAGE_BUCKET).remove([filePath]);
-      return { error: `Failed to save file record to database: ${dbError.message}` }
+      // Optional: Attempt to delete the orphaned file from storage
+      await supabase.storage.from(STORAGE_BUCKET).remove([filePath]);
+      return { error: `Failed to save file record to database: ${dbError?.message}` }
     }
       
-    return { success: true, filePath, bucket: STORAGE_BUCKET }
+    // Check if the uploaded file is a video and start processing automatically
+    let videoProcessingInfo: { jobId?: string; error?: string, isVideo?: boolean } = { isVideo: false };
+    const isVideo = newFileRecord.type?.startsWith('video/');
+
+    if (isVideo) {
+      videoProcessingInfo.isVideo = true;
+      console.log(`Video file detected (${newFileRecord.id}), starting automatic processing...`);
+      const processingResult = await startVideoProcessing(projectId, newFileRecord.id);
+      if (processingResult.error) {
+        console.error(`Automatic video processing failed to start for file ${newFileRecord.id}:`, processingResult.error);
+        // Return success for upload, but include a warning/error about processing start failure
+        videoProcessingInfo.error = `File uploaded, but auto-processing failed: ${processingResult.error}`;
+      } else if (processingResult.jobId) {
+        videoProcessingInfo.jobId = processingResult.jobId;
+        console.log(`Automatic video processing started. Job ID: ${processingResult.jobId}`);
+      }
+    }
+    
+    revalidatePath(`/projects/${projectId}`); // Revalidate after file upload and potential job start
+    return { 
+      success: true, 
+      filePath, 
+      bucket: STORAGE_BUCKET, 
+      fileId: newFileRecord.id, 
+      isVideoProcessing: videoProcessingInfo.isVideo,
+      processingJobId: videoProcessingInfo.jobId,
+      processingError: videoProcessingInfo.error
+    };
   } catch (error) {
     console.error('Unexpected error during file upload:', error)
     return { error: error instanceof Error ? error.message : 'An unexpected error occurred' }
@@ -1214,23 +1241,30 @@ export async function startVideoProcessing(
     const langGraphRunId = runResult.run_id;
 
     // 6. Insert a task_job record
-    const { error: jobError } = await supabase.from('task_jobs').insert({
+    const { data: newTaskJob, error: jobError } = await supabase.from('task_jobs').insert({
       project_id: projectId,
       file_id: fileId, // Link to the original video file
       thread_id: langGraphThreadId,
       run_id: langGraphRunId,
       status: 'processing',
       job_type: 'video_process',
-    });
+    }).select('id').single(); // Select the ID of the new task job
 
-    if (jobError) {
+    if (jobError || !newTaskJob) {
       console.error('Error creating video processing task job:', jobError);
       // TODO: More robust error handling, e.g., alert if critical, attempt cleanup?
-      return { error: `Failed to create task job: ${jobError.message}` };
+      return { error: `Failed to create task job: ${jobError?.message}` };
     }
 
-    revalidatePath(`/projects/${projectId}`); // Revalidate to show pending status in UI
-    return { success: true, message: 'Video processing started.', run_id: langGraphRunId, thread_id: langGraphThreadId };
+    // Path revalidation will be done by uploadFile if called from there, or by UI trigger if called directly.
+    // revalidatePath(`/projects/${projectId}`); 
+    return { 
+      success: true, 
+      message: 'Video processing started.', 
+      jobId: newTaskJob.id, // Return the new task_job ID
+      run_id: langGraphRunId, 
+      thread_id: langGraphThreadId 
+    };
 
   } catch (error) {
     console.error('Unexpected error in startVideoProcessing:', error);
