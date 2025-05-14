@@ -635,7 +635,6 @@ export async function getChatEvents(threadId: string, sinceIsoTimestamp?: string
 /**
  * Start asynchronous estimate generation for a project
  */
-// MODIFIED: startEstimateGeneration (II.D)
 export async function startEstimateGeneration(
   projectId: string,
   requested_changes?: string,
@@ -675,29 +674,8 @@ export async function startEstimateGeneration(
     // Map UploadedFile to FileToProcess, now including MIME type and generating signed URL
     const supabaseForUrls = await createClient(); // Create client specifically for URL generation
     const filesToProcessPromises: Promise<FileToProcess>[] = uploadedFiles.map(async (file): Promise<FileToProcess> => {
-      // Determine MIME type (basic implementation based on extension)
-      let mimeType = 'application/octet-stream'; // Default
-      const extension = file.file_name.split('.').pop()?.toLowerCase();
-      if (extension) {
-        // Common Image Types
-        if (['jpg', 'jpeg'].includes(extension)) mimeType = 'image/jpeg';
-        else if (extension === 'png') mimeType = 'image/png';
-        else if (extension === 'gif') mimeType = 'image/gif';
-        else if (extension === 'webp') mimeType = 'image/webp';
-        // Common Audio Types
-        else if (['mp3'].includes(extension)) mimeType = 'audio/mpeg';
-        else if (extension === 'wav') mimeType = 'audio/wav';
-        else if (extension === 'ogg') mimeType = 'audio/ogg';
-        else if (extension === 'm4a') mimeType = 'audio/mp4'; // Added M4A support
-        // Common Text Types
-        else if (extension === 'txt') mimeType = 'text/plain';
-        else if (extension === 'md') mimeType = 'text/markdown';
-        else if (extension === 'csv') mimeType = 'text/csv';
-        // Common Video Types (Add as needed)
-        else if (extension === 'mp4') mimeType = 'video/mp4';
-        else if (extension === 'mov') mimeType = 'video/quicktime';
-        else if (extension === 'avi') mimeType = 'video/x-msvideo';
-      }
+      // USE the stored file.type directly, falling back if it happens to be null/undefined.
+      const mimeTypeToUse = file.type || 'application/octet-stream';
 
       // Generate signed URL
       let downloadUrl: string | undefined = undefined;
@@ -719,7 +697,7 @@ export async function startEstimateGeneration(
       }
 
       return {
-        type: mimeType, // Use determined MIME type
+        type: mimeTypeToUse, // Use the stored MIME type
         name: file.file_name,
         description: file.description || '',
         path: file.file_url,
