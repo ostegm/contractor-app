@@ -7,6 +7,17 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { VideoSummaryCard } from "@/components/video-summary-card"
 import { Badge } from "@/components/ui/badge"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Trash2, Upload, File, ArrowLeft, FileText, Play, ChevronDown, ChevronRight, StickyNote, Download, RefreshCw, LayoutDashboard, FolderOpen, TriangleAlert, Music, Video, Eye, EyeOff } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { uploadFile, clearProjectInfo, clearProjectEstimate, startEstimateGeneration, checkEstimateStatus, startVideoProcessing } from "./actions"
@@ -417,22 +428,28 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   }
 
   const handleDeleteFile = async (fileId: string) => {
-    const { error } = await supabase
-      .from('files')
-      .delete()
-      .eq('id', fileId)
+    // Import and use the deleteFile serverAction
+    const { deleteFile } = await import('./actions');
 
-    if (error) {
-      toast.error('Failed to delete file')
-      return
+    // Call the server action
+    const result = await deleteFile(fileId);
+
+    if (result.error) {
+      toast.error(`Failed to delete file: ${result.error}`);
+      return;
     }
 
-    setUploadedFiles(files => files.filter(f => f.id !== fileId))
-    toast.success('File deleted successfully')
-    
+    // Update UI state
+    setUploadedFiles(files => files.filter(f => f.id !== fileId));
+
+    // Also remove any child files from aiGeneratedFiles state
+    setAiGeneratedFiles(files => files.filter(f => f.parent_file_id !== fileId));
+
+    toast.success('File deleted successfully');
+
     // Mark estimate as outdated if it exists
     if (aiEstimate) {
-      setIsEstimateOutdated(true)
+      setIsEstimateOutdated(true);
     }
   }
 
@@ -1058,14 +1075,42 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                                       {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                                     </Button>
                                   )}
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteFile(file.id)}
-                                    className="text-red-400 hover:text-red-300 hover:bg-red-900/20 p-1 h-auto"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                  {/* Delete File Confirmation Dialog */}
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-red-400 hover:text-red-300 hover:bg-red-900/20 p-1 h-auto"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent className="bg-gray-800 border-gray-700">
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle className="text-white">Delete File</AlertDialogTitle>
+                                        <AlertDialogDescription className="text-gray-300">
+                                          Are you sure you want to delete "{file.file_name}"?
+                                          {isVideo && videoSummaryFile && (
+                                            <span className="block mt-2 text-yellow-400">
+                                              This will also delete all AI-generated content associated with this video.
+                                            </span>
+                                          )}
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel className="bg-gray-700 text-gray-200 border-gray-600 hover:bg-gray-600">
+                                          Cancel
+                                        </AlertDialogCancel>
+                                        <AlertDialogAction
+                                          className="bg-red-600 hover:bg-red-700 text-white"
+                                          onClick={() => handleDeleteFile(file.id)}
+                                        >
+                                          Delete
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
                                 </div>
                               </div>
 

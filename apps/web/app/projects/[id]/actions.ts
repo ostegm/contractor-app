@@ -1426,3 +1426,143 @@ export async function checkVideoProcessingStatus(jobId: string) {
 
 // +++ END VIDEO PROCESSING ADDITIONS +++
 
+/**
+ * Delete a file and its associated files (if it's a video with AI-generated files)
+ * Also removes the files from Supabase storage
+ */
+export async function deleteFile(fileId: string) {
+  const supabase = await createClient();
+
+  try {
+    // First, retrieve the file to get its file_url and check if it's a parent file
+    const { data: fileToDelete, error: fetchError } = await supabase
+      .from('files')
+      .select('file_url, project_id')
+      .eq('id', fileId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching file for deletion:', fetchError);
+      return { error: `Failed to find file with ID ${fileId}` };
+    }
+
+    // Next, find any AI-generated child files associated with this file
+    const { data: childFiles, error: childFilesError } = await supabase
+      .from('files')
+      .select('id, file_url')
+      .eq('parent_file_id', fileId);
+
+    if (childFilesError) {
+      console.error('Error fetching child files:', childFilesError);
+      // Proceed with deleting the main file even if we can't find children
+    }
+
+    // Gather all storage paths to delete
+    const storagePaths: string[] = [fileToDelete.file_url];
+
+    // Add child file paths to delete list
+    if (childFiles && childFiles.length > 0) {
+      childFiles.forEach(childFile => {
+        if (childFile.file_url) {
+          storagePaths.push(childFile.file_url);
+        }
+      });
+
+      // Delete child file records
+      const { error: deleteChildrenError } = await supabase
+        .from('files')
+        .delete()
+        .eq('parent_file_id', fileId);
+
+      if (deleteChildrenError) {
+        console.error('Error deleting child file records:', deleteChildrenError);
+        return { error: 'Failed to delete associated files' };
+      }
+    }
+
+    // First delete any task jobs associated with this file
+    // This needs to happen before deleting the file due to foreign key constraints
+
+    // Try a more comprehensive approach to delete all related task jobs
+    try {
+      // First try direct task_jobs by file_id
+      const { error: deleteTaskJobsError } = await supabase
+        .from('task_jobs')
+        .delete()
+        .eq('file_id', fileId);
+
+      if (deleteTaskJobsError) {
+        console.error('Error deleting task jobs by file_id:', deleteTaskJobsError);
+
+        // If that fails, try a more direct SQL approach using RPC if available
+        const { error: sqlError } = await supabase.rpc('force_delete_task_jobs', {
+          target_file_id: fileId
+        }).maybeSingle();
+
+        if (sqlError) {
+          console.error('Error using RPC to delete task jobs:', sqlError);
+
+          // Last resort: Debug and return information to determine what's preventing deletion
+          const { data: blockingTasks, error: blockingError } = await supabase
+            .from('task_jobs')
+            .select('id, job_type, thread_id, run_id')
+            .eq('file_id', fileId);
+
+          if (blockingError) {
+            console.error('Error finding blocking task jobs:', blockingError);
+          } else if (blockingTasks && blockingTasks.length > 0) {
+            console.error('Found blocking task jobs:', blockingTasks);
+            // Try one more method - use cascade if supported
+            await supabase.from('task_jobs').delete().eq('file_id', fileId).options({ cascade: true });
+          }
+
+          // If all else fails, let the user know what's blocking
+          return { error: 'Cannot delete file due to existing task references. Try again later.' };
+        }
+      }
+    } catch (taskJobError) {
+      console.error('Unexpected error deleting task jobs:', taskJobError);
+      return { error: 'Failed to delete associated task jobs' };
+    }
+
+    // Now that task jobs are deleted, delete the main file record
+    const { error: deleteFileError } = await supabase
+      .from('files')
+      .delete()
+      .eq('id', fileId);
+
+    if (deleteFileError) {
+      console.error('Error deleting file record:', deleteFileError);
+      return { error: 'Failed to delete file record' };
+    }
+
+    // Finally, remove the files from storage (in batches if there are many)
+    const MAX_BATCH_SIZE = 100;
+
+    for (let i = 0; i < storagePaths.length; i += MAX_BATCH_SIZE) {
+      const batch = storagePaths.slice(i, i + MAX_BATCH_SIZE);
+      try {
+        // Ignore removal errors as files might not exist in storage
+        const { error: storageError } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .remove(batch);
+
+        if (storageError) {
+          console.warn(`Storage removal warning for batch ${i}:`, storageError);
+          // Continue with deletion
+        }
+      } catch (err) {
+        console.warn(`Error during storage removal for batch ${i}:`, err);
+        // Continue with deletion
+      }
+    }
+
+    revalidatePath(`/projects/${fileToDelete.project_id}`);
+    return { success: true };
+
+  } catch (error) {
+    console.error('Unexpected error deleting file:', error);
+    return { error: error instanceof Error ? error.message : 'An unknown error occurred while deleting file' };
+  }
+}
+
