@@ -2,30 +2,49 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Using baml
- - Review BAML.md as needed for details on how to work with baml files.
+## Project Overview
+The Contractor App helps contractors generate detailed project estimates using AI. It analyzes project files (images, notes, audio, video) to create structured cost estimates with line items, timelines, and more.
+
+## Architecture
+- **Web UI (Next.js 13+)**: `apps/web/` - React app with App Router, Server Components, and Server Actions
+- **AI Service (LangGraph)**: `apps/langgraph/` - Python service handling AI requests using BAML
+- **BAML Definitions**: `baml_src/` - Schema and prompt definitions for AI interactions
 
 ## Build & Test Commands
-- Install dependencies: `pip install -e ".[dev]"`
+### Web App
+- Development: `npm run dev` (in `apps/web/`)
+- Lint: `npm run lint`
+- Test: `npm run test`
+
+### LangGraph/Python
+- Install: `pip install -e ".[dev]"`
 - Generate BAML client: `baml generate`
-- Run all tests: `pytest`
-- Run single test: `pytest tests/path_to_test.py::test_function_name -v`
-- Run tests with coverage: `pytest --cov=baml_client`
-- Lint code: `ruff check .`
+- Run tests: `pytest`
+- Lint: `ruff check .`
 - Type check: `mypy .`
 
 ## Code Style Guidelines
-- **Formatting**: Use Black for Python code formatting
-- **Imports**: Group imports in this order: standard library, third-party, local application
-- **Types**: Use type annotations for all functions and methods
-- **Naming**: 
-  - Classes: PascalCase
-  - Functions/methods: snake_case
-  - Constants: UPPER_SNAKE_CASE
-  - BAML entities: PascalCase (functions, clients, classes)
-- **Error Handling**: Use specific exceptions with helpful error messages
-- **BAML Patterns**: Keep prompt templates clean and well-structured see BAML.md for details.
-- **Tests**: Write test cases for all BAML functions to ensure prompt behavior
+- **TypeScript/Next.js**:
+  - Strict type checking
+  - Use React Server Components and Server Actions
+  - Keep components focused on single responsibility
+  - Use TailwindCSS with shadcn/ui components
+  - Error handling: return structured `{error?: string, success?: boolean}` objects
+
+- **Python/BAML**:
+  - Use Black formatting
+  - Type annotations for all functions
+  - PascalCase for classes and BAML entities
+  - snake_case for functions/methods
+  - Clean, well-structured prompt templates
+
+## Key Components
+- **Projects**: Dashboard lists projects, each with Estimate and Files views
+- **Files**: Upload and manage project files (images, PDFs, notes, audio, video)
+- **Estimate**: AI-generated project cost estimate with line items and details
+- **Chat**: Interactive refinement with AI assistant
+- **Supabase**: Authentication, database, and file storage
+- **BAML**: Domain-specific language for LLM prompts and schemas
 
 ## Core Functionality and Purpose
 
