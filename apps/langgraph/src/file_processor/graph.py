@@ -66,7 +66,7 @@ async def download_from_url(url: str, as_bytes: bool = False, expected_mime_type
         raise
 
 
-async def process_files(state: State, config: RunnableConfig) -> Dict[str, Any]:
+async def process_files(state: State) -> Dict[str, Any]:
     """Process the files by downloading content from URLs and preparing for BAML."""
     logger.info("Processing files by downloading content from URLs...")
     processed_files_for_baml: list[InputFile] = []
