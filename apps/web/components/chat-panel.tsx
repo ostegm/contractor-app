@@ -21,7 +21,7 @@ interface ChatPanelProps {
   threadId?: string | null; // Renamed from externalThreadId in previous plan, using this prop name
   forceNewChat?: boolean;
   onChatThreadCreated?: () => void; // ADDED: Callback when a new thread is successfully created
-  onEstimateUpdateTriggered?: () => void; // ADDED: Callback when estimate update is triggered
+  onEstimateUpdateTriggered?: (isPatch?: boolean, patchedFields?: string[]) => void; // ADDED: Callback when estimate update is triggered
 }
 
 export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadIdProp, forceNewChat = false, onChatThreadCreated, onEstimateUpdateTriggered }: ChatPanelProps) {
@@ -306,9 +306,14 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
           return newEventsList;
         });
 
-        // ---> ADDED: Trigger estimate update callback
+        // ---> ADDED: Trigger estimate update callback with patch info
         if (result.updateTriggered && onEstimateUpdateTriggered) {
-          onEstimateUpdateTriggered();
+          // Check if this is a patch operation
+          const isPatch = result.assistantResponseDisplayEvent?.type === 'PatchEstimateRequest';
+          const patchedFields = isPatch ?
+            (result.assistantResponseDisplayEvent?.data as BamlPatchEstimateRequest).patches.map(p => p.json_path) :
+            undefined;
+          onEstimateUpdateTriggered(isPatch, patchedFields);
         }
 
       } else {
@@ -329,9 +334,14 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
           return newEventsList;
         });
 
-        // ---> ADDED: Trigger estimate update callback
+        // ---> ADDED: Trigger estimate update callback with patch info
         if (result.updateTriggered && onEstimateUpdateTriggered) {
-          onEstimateUpdateTriggered();
+          // Check if this is a patch operation
+          const isPatch = result.assistantResponseDisplayEvent?.type === 'PatchEstimateRequest';
+          const patchedFields = isPatch ?
+            (result.assistantResponseDisplayEvent?.data as BamlPatchEstimateRequest).patches.map(p => p.json_path) :
+            undefined;
+          onEstimateUpdateTriggered(isPatch, patchedFields);
         }
 
         if (result.error) {

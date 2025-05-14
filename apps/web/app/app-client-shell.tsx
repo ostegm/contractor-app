@@ -15,9 +15,11 @@ const inter = Inter({ subsets: ["latin"] });
 interface ViewContextType {
   currentProjectView: 'estimate' | 'files';
   setCurrentProjectView: Dispatch<SetStateAction<'estimate' | 'files'>>;
-  // ADDED: Callback for chat-triggered estimate updates
-  onEstimateUpdateTriggeredByChat: (() => void) | null;
-  setOnEstimateUpdateTriggeredByChat: Dispatch<SetStateAction<(() => void) | null>>;
+  // Callback for chat-triggered estimate updates
+  // isPatch: whether this is a patch operation (fast update) or full regeneration
+  // patchedFields: if it's a patch, which fields were updated
+  onEstimateUpdateTriggeredByChat: ((isPatch?: boolean, patchedFields?: string[]) => void) | null;
+  setOnEstimateUpdateTriggeredByChat: Dispatch<SetStateAction<((isPatch?: boolean, patchedFields?: string[]) => void) | null>>;
 }
 
 export const ViewContext = createContext<ViewContextType | undefined>(undefined);
@@ -44,7 +46,7 @@ export default function AppClientShell({ children }: AppClientShellProps) {
   // ADDED: State to trigger sidebar refresh
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
   // ADDED: State to hold the callback from the project page
-  const [onEstimateUpdateTriggeredByChat, setOnEstimateUpdateTriggeredByChat] = useState<(() => void) | null>(null);
+  const [onEstimateUpdateTriggeredByChat, setOnEstimateUpdateTriggeredByChat] = useState<((isPatch?: boolean, patchedFields?: string[]) => void) | null>(null);
 
   // Get the current pathname from Next.js
   const pathname = usePathname();
@@ -140,7 +142,7 @@ export default function AppClientShell({ children }: AppClientShellProps) {
             threadId={currentChatThreadId}
             forceNewChat={currentChatThreadId === null && isChatPanelOpen}
             onChatThreadCreated={handleNewChatCreated}
-            onEstimateUpdateTriggered={onEstimateUpdateTriggeredByChat || undefined} // Pass callback to ChatPanel
+            onEstimateUpdateTriggered={onEstimateUpdateTriggeredByChat || undefined} // Pass callback to ChatPanel with patch info
           />
         )}
       </div>

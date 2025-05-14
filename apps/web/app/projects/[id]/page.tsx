@@ -87,11 +87,21 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   // Get context function to register the callback
   const { setOnEstimateUpdateTriggeredByChat } = useView();
 
+  // Track which fields were updated by a patch operation
+  const [patchedFields, setPatchedFields] = useState<string[]>([]);
+
   // Callback for chat component to trigger loading state
-  const handleEstimateUpdateTriggered = useCallback(() => {
-    setEstimateStatus('processing');
-    setEstimateError(null); // Clear previous errors
-    toast.info('Estimate update triggered by chat...');
+  const handleEstimateUpdateTriggered = useCallback((isPatch?: boolean, fields?: string[]) => {
+    if (isPatch && fields) {
+      // For patches, we don't show the loading state but track fields to highlight
+      setPatchedFields(fields);
+      toast.info('Quick patch in progress...', { duration: 2000 });
+    } else {
+      // For full updates, show the loading state
+      setEstimateStatus('processing');
+      setEstimateError(null); // Clear previous errors
+      toast.info('Estimate update triggered by chat...');
+    }
   }, []);
 
   // Register/unregister the callback with the context when project ID changes
@@ -283,6 +293,18 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
     return () => clearInterval(pollInterval);
   }, [estimateStatus, id, fetchProject]);
+
+  // Effect to clear patched fields after they've been displayed
+  useEffect(() => {
+    if (patchedFields.length > 0) {
+      // Give time for the UI to render and apply the flash animation
+      const clearTimer = setTimeout(() => {
+        setPatchedFields([]);
+      }, 2000); // Clear after 2 seconds to match animation duration
+
+      return () => clearTimeout(clearTimer);
+    }
+  }, [patchedFields]);
 
   // Poll for video processing status updates
   useEffect(() => {
@@ -797,13 +819,19 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       </Button>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
-                      <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                      <div className={`bg-gray-900/50 p-4 rounded-lg border border-gray-700 ${
+                          patchedFields.some(path => path.includes('estimated_total_min') || path.includes('estimated_total_max'))
+                            ? 'flash-highlight' : ''
+                        }`}>
                         <h4 className="text-sm font-medium text-gray-400 mb-1">Estimated Cost Range</h4>
                         <p className="text-xl font-bold text-green-400">
                           ${aiEstimate.estimated_total_min?.toLocaleString() ?? 'N/A'} - ${aiEstimate.estimated_total_max?.toLocaleString() ?? 'N/A'}
                         </p>
                       </div>
-                      <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                      <div className={`bg-gray-900/50 p-4 rounded-lg border border-gray-700 ${
+                          patchedFields.some(path => path.includes('estimated_timeline_days'))
+                            ? 'flash-highlight' : ''
+                        }`}>
                         <h4 className="text-sm font-medium text-gray-400 mb-1">Estimated Timeline</h4>
                         <p className="text-xl font-bold text-blue-400">
                           {aiEstimate.estimated_timeline_days ? `${aiEstimate.estimated_timeline_days} days` : 'Not specified'}
@@ -812,7 +840,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     </div>
                     <div className="mb-4">
                       <h3 className="text-sm font-medium text-gray-400 mb-2">Project Description</h3>
-                      <div className="text-gray-300 bg-gray-900/30 p-3 rounded-lg border border-gray-700 text-sm prose prose-sm prose-invert max-w-none">
+                      <div className={`text-gray-300 bg-gray-900/30 p-3 rounded-lg border border-gray-700 text-sm prose prose-sm prose-invert max-w-none ${
+                          patchedFields.some(path => path.includes('project_description'))
+                            ? 'flash-highlight' : ''
+                        }`}>
                          <ReactMarkdown>{aiEstimate.project_description}</ReactMarkdown>
                       </div>
                     </div>
@@ -852,7 +883,13 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         <tbody className="divide-y divide-gray-800">
                           {aiEstimate.estimate_items?.length > 0 ? (
                             aiEstimate.estimate_items.map((item: EstimateLineItem, index: number) => (
-                              <tr key={index} className="hover:bg-gray-700/20">
+                              <tr
+                                key={index}
+                                className={`hover:bg-gray-700/20 ${
+                                  // Apply flash animation if this line item was patched
+                                  item.uid && patchedFields.some(path => path.includes(item.uid)) ? 'flash-highlight' : ''
+                                }`}
+                              >
                                 <td className="py-3 pr-4">
                                   <div className="font-medium text-gray-200">{item.description}</div>
                                   {item.notes && <div className="text-xs text-gray-400 mt-1 prose prose-xs prose-invert max-w-none"><ReactMarkdown>{item.notes}</ReactMarkdown></div>}

@@ -924,18 +924,70 @@ export async function applyPatchAndPersist(
     let estimate = project.ai_estimate;
     const results: BamlPatchResult[] = [];
 
+    console.log(`Estimate JSON before patch: Type=${typeof estimate}, Length=${typeof estimate === 'string' ? estimate.length : 'N/A'}`);
+
     // Apply patches one by one and track results
     for (const patch of patches) {
       try {
-        // Convert the BAML patch format to JSON Patch format
-        const jsonPatch = {
-          op: patch.operation.toLowerCase(), // Convert Add/Remove/Replace to add/remove/replace
-          path: patch.json_path,
-          value: patch.operation !== 'Remove' ? patch.new_value : undefined
-        };
+        // First, make sure we're working with a parsed object
+        let parsedEstimate;
+        if (typeof estimate === 'string') {
+          try {
+            parsedEstimate = JSON.parse(estimate);
+          } catch (parseError) {
+            // If the estimate is already a stringified JSON string (double stringified)
+            // Try parsing once more with the contents of the string
+            if (estimate.startsWith('"') && estimate.endsWith('"')) {
+              try {
+                // Remove outer quotes and try to parse
+                const innerJson = estimate.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+                parsedEstimate = JSON.parse(innerJson);
+              } catch (innerParseError) {
+                throw new Error(`Failed to parse estimate: ${parseError.message}`);
+              }
+            } else {
+              throw parseError;
+            }
+          }
+        } else {
+          parsedEstimate = estimate;
+        }
 
-        // Apply the patch
-        estimate = applyPatch(estimate, [jsonPatch]).newDocument;
+        // Check if we're dealing with a line item patch (contains /estimate_items/UID/ pattern)
+        const lineItemUidMatch = patch.json_path.match(/\/estimate_items\/([^\/]+)\/(.+)/);
+
+        if (lineItemUidMatch) {
+          // This is a line item patch targeting a specific UID
+          const uid = lineItemUidMatch[1];
+          const propertyPath = lineItemUidMatch[2];
+
+          // Find the index of the line item with this UID
+          const itemIndex = parsedEstimate.estimate_items.findIndex((item: any) => item.uid === uid);
+
+          if (itemIndex === -1) {
+            throw new Error(`Line item with UID "${uid}" not found in the estimate`);
+          }
+
+          // Create a new JSON Patch that uses array indices instead of UIDs
+          const convertedPatch = {
+            op: patch.operation.toLowerCase(),
+            path: `/estimate_items/${itemIndex}/${propertyPath}`,
+            value: patch.operation !== 'Remove' ? patch.new_value : undefined
+          };
+
+          // Apply the converted patch
+          estimate = applyPatch(parsedEstimate, [convertedPatch]).newDocument;
+        } else {
+          // Standard patch for non-line item properties
+          const jsonPatch = {
+            op: patch.operation.toLowerCase(),
+            path: patch.json_path,
+            value: patch.operation !== 'Remove' ? patch.new_value : undefined
+          };
+
+          // Apply the patch
+          estimate = applyPatch(parsedEstimate, [jsonPatch]).newDocument;
+        }
 
         // Validate estimate structure (basic check)
         if (!estimate || !estimate.project_description || !Array.isArray(estimate.estimate_items)) {
@@ -964,8 +1016,8 @@ export async function applyPatchAndPersist(
         .map(p => `${p.operation} ${p.json_path}${p.new_value ? ' to ' + p.new_value : ''}`)
         .join('; ');
 
-      // TODO: Uncomment this after checking things work...
-        // await startEstimateGeneration(
+      // Run full estimate generation as fallback
+      // await startEstimateGeneration(
       //   projectId,
       //   `Please apply these changes: ${patchesToText}`,
       //   threadId
@@ -974,9 +1026,12 @@ export async function applyPatchAndPersist(
     }
 
     // If all patches succeeded, persist the updated estimate
+    // Make sure we're storing a stringified JSON, not an object
+    const estimateToStore = typeof estimate === 'string' ? estimate : JSON.stringify(estimate);
+
     const { error: updateError } = await supabase
       .from('projects')
-      .update({ ai_estimate: estimate })
+      .update({ ai_estimate: estimateToStore })
       .eq('id', projectId);
 
     if (updateError) {
