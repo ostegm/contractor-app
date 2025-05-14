@@ -1,6 +1,7 @@
 """File processor for understanding a project from a set of files."""
 
 # Standard library imports
+import asyncio
 import base64
 import logging
 import os
@@ -22,6 +23,60 @@ from .state import Configuration, State
 # Set up logging
 logger = logging.getLogger(__name__)
 
+def _process_pdf_to_image_input_files_sync(
+    pdf_bytes: bytes, 
+    original_file_name: str, 
+    original_file_description: str | None
+) -> list[InputFile]:
+    """
+    Synchronously converts PDF bytes to a list of image InputFile objects.
+    This function contains blocking calls and is intended to be run in a thread.
+    """
+    logger.info(f"Starting synchronous PDF to image conversion for {original_file_name}")
+    page_input_files: list[InputFile] = []
+    try:
+        pil_images = convert_from_bytes(pdf_bytes, dpi=150)
+    except Exception as conversion_error:
+        logger.error(f"PDF to image conversion (convert_from_bytes) failed for {original_file_name}: {conversion_error}")
+        raise
+
+    if not pil_images:
+        logger.warning(f"PDF file {original_file_name} resulted in no images after conversion.")
+        raise Exception(f"PDF file {original_file_name} converted to zero pages/images.")
+
+    for i, pil_page_image in enumerate(pil_images):
+        page_num = i + 1
+        base_name, _ = os.path.splitext(original_file_name)
+        safe_base_name = "".join(c if c.isalnum() or c in (' ', '.', '_') else '_' for c in base_name).rstrip()
+        page_file_name = f"{safe_base_name}_page_{page_num}.png"
+        
+        page_description_text = f"Page {page_num} of PDF document: {original_file_description or original_file_name}"
+        
+        img_byte_arr = io.BytesIO()
+        try:
+            pil_page_image.save(img_byte_arr, format='PNG')
+        except Exception as save_error:
+            logger.error(f"Failed to save page {page_num} of PDF {original_file_name} to BytesIO: {save_error}")
+            raise
+
+        image_page_bytes = img_byte_arr.getvalue()
+        
+        if not image_page_bytes:
+            logger.warning(f"Page {page_num} of PDF {original_file_name} resulted in empty bytes after save. This page will be skipped.")
+            continue 
+
+        image_page_b64 = base64.b64encode(image_page_bytes).decode('utf-8')
+        
+        page_as_input_file = InputFile(
+            name=page_file_name,
+            type="image/png", 
+            description=page_description_text,
+            image_data=Image.from_base64(media_type="image/png", base64=image_page_b64)
+        )
+        page_input_files.append(page_as_input_file)
+    
+    logger.info(f"Successfully converted PDF {original_file_name} ({len(pil_images)} pages) to {len(page_input_files)} image InputFiles synchronously.")
+    return page_input_files
 
 async def download_from_url(url: str, as_bytes: bool = False, expected_mime_type_prefix: str | None = None) -> Union[str, bytes]:
     """Download content from a URL.
@@ -89,41 +144,18 @@ async def process_files(state: State) -> Dict[str, Any]:
                 logger.info(f"Processing PDF file {file.name} by converting pages to images.")
                 pdf_bytes = await download_from_url(file.download_url, as_bytes=True, expected_mime_type_prefix="application/pdf")
                 
-                # Convert PDF bytes to a list of PIL images
-                # Using a moderate DPI. Adjust if needed for quality vs. size/performance.
-                pil_images = convert_from_bytes(pdf_bytes, dpi=150) 
-                
-                if not pil_images:
-                    logger.warning(f"PDF file {file.name} resulted in no images after conversion.")
-                    # Depending on strictness, this could be an error or just an empty PDF.
-                    # For now, if no images, we add nothing, effectively skipping content.
-                    # User wants an error if PDF processing fails, so an empty PDF might be a failure case.
-                    raise Exception(f"PDF file {file.name} converted to zero pages/images.")
-
-                for i, pil_page_image in enumerate(pil_images):
-                    page_num = i + 1
-                    # Create a more unique name based on original file name, ensuring it's a valid filename
-                    base_name, _ = os.path.splitext(file.name)
-                    safe_base_name = "".join(c if c.isalnum() or c in (' ', '.', '_') else '_' for c in base_name).rstrip()
-                    page_file_name = f"{safe_base_name}_page_{page_num}.png"
-                    
-                    page_description = f"Page {page_num} of PDF document: {file.description or file.name}"
-                    
-                    img_byte_arr = io.BytesIO()
-                    pil_page_image.save(img_byte_arr, format='PNG') # Save as PNG
-                    image_page_bytes = img_byte_arr.getvalue()
-                    
-                    image_page_b64 = base64.b64encode(image_page_bytes).decode('utf-8')
-                    
-                    page_as_input_file = InputFile(
-                        name=page_file_name,
-                        type="image/png", 
-                        description=page_description,
-                        image_data=Image.from_base64(media_type="image/png", base64=image_page_b64)
-                        # download_url is not applicable for these generated images
+                try:
+                    # Call the synchronous helper function in a separate thread
+                    page_image_files = await asyncio.to_thread(
+                        _process_pdf_to_image_input_files_sync,
+                        pdf_bytes,
+                        file.name, # pass original name
+                        file.description # pass original description
                     )
-                    processed_files_for_baml.append(page_as_input_file)
-                logger.info(f"Successfully converted PDF {file.name} ({len(pil_images)} pages) to image InputFiles.")
+                    processed_files_for_baml.extend(page_image_files)
+                except Exception as pdf_processing_error:
+                    logger.error(f"Overall PDF processing in thread failed for {file.name}: {pdf_processing_error}")
+                    raise # Propagate error
 
             elif file.type.startswith("image/"):
                 file_baml_img = InputFile(name=file.name, type=file.type, description=file.description, download_url=file.download_url)
