@@ -76,6 +76,11 @@ export async function uploadFile(formData: FormData, projectId: string) {
       return { error: `File size exceeds 500MB limit (${fileSizeInMB.toFixed(2)}MB)` }
     }
 
+    // For video files, warn if they're large but still allowed
+    if (file.type?.startsWith('video/') && fileSizeInMB > 100) {
+      console.warn(`Large video file being uploaded: ${fileSizeInMB.toFixed(2)}MB. This may take some time to process.`)
+    }
+
     const sanitizedFileName = sanitizeFileName(file.name)
     const filePath = `${projectId}/${sanitizedFileName}`
 

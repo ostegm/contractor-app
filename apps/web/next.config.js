@@ -22,7 +22,7 @@ const nextConfig = {
   },
   experimental: {
     serverActions: {
-      bodySizeLimit: '10mb', // Increase the body size limit to 10MB
+      bodySizeLimit: '500mb', // Increase the body size limit to 500MB for video uploads
     },
   },
 }

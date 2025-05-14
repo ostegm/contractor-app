@@ -5,3 +5,8 @@ ADD COLUMN parent_file_id UUID REFERENCES files(id);
 
 -- Create index for parent_file_id
 CREATE INDEX IF NOT EXISTS files_parent_idx ON files(parent_file_id);
+
+
+-- Add file_id to task_jobs table
+ALTER TABLE task_jobs
+ADD COLUMN file_id UUID REFERENCES files(id) DEFAULT NULL;

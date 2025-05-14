@@ -5,9 +5,11 @@ import { useView, ViewContext } from "../../app-client-shell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Trash2, Upload, File, ArrowLeft, FileText, Play, ChevronDown, ChevronRight, StickyNote, Download, RefreshCw, LayoutDashboard, FolderOpen, TriangleAlert, Music } from "lucide-react"
+import { VideoSummaryCard } from "@/components/video-summary-card"
+import { Badge } from "@/components/ui/badge"
+import { Trash2, Upload, File, ArrowLeft, FileText, Play, ChevronDown, ChevronRight, StickyNote, Download, RefreshCw, LayoutDashboard, FolderOpen, TriangleAlert, Music, Video, Eye, EyeOff } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { uploadFile, clearProjectInfo, clearProjectEstimate, startEstimateGeneration, checkEstimateStatus } from "./actions"
+import { uploadFile, clearProjectInfo, clearProjectEstimate, startEstimateGeneration, checkEstimateStatus, startVideoProcessing } from "./actions"
 import { ConstructionProjectData, InputFile, EstimateLineItem } from "@/baml_client/baml_client/types"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -27,6 +29,8 @@ interface UploadedFile {
   type?: string
   file_url: string
   uploaded_at: string
+  origin?: string
+  parent_file_id?: string
 }
 
 interface Project {
@@ -41,6 +45,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const { id } = use(params)
   const { currentProjectView } = useView()
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
+  const [aiGeneratedFiles, setAiGeneratedFiles] = useState<UploadedFile[]>([])
+  const [showAiFiles, setShowAiFiles] = useState<boolean>(false)
+  const [processingVideoIds, setProcessingVideoIds] = useState<Record<string, string>>({})
+  const [videoProcessingErrors, setVideoProcessingErrors] = useState<Record<string, string>>({})
   const [isUploading, setIsUploading] = useState(false)
   const [estimateStatus, setEstimateStatus] = useState<'not_started' | 'processing' | 'completed' | 'failed'>('not_started')
   const [estimateError, setEstimateError] = useState<string | null>(null)
@@ -126,17 +134,34 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   
   // useCallback for fetchFiles
   const fetchFiles = useCallback(async () => {
-    const { data: files, error } = await supabase
+    // Fetch user-uploaded files
+    const { data: userFiles, error: userFilesError } = await supabase
       .from('files')
       .select('*')
       .eq('project_id', id)
+      .eq('origin', 'user')
+      .is('parent_file_id', null) // Only get original files, not derived ones
 
-    if (error) {
-      console.error('Error fetching files:', error)
+    if (userFilesError) {
+      console.error('Error fetching user files:', userFilesError)
       return
     }
 
-    setUploadedFiles(files || [])
+    setUploadedFiles(userFiles || [])
+
+    // Fetch AI-generated files separately
+    const { data: aiFiles, error: aiFilesError } = await supabase
+      .from('files')
+      .select('*')
+      .eq('project_id', id)
+      .eq('origin', 'ai')
+
+    if (aiFilesError) {
+      console.error('Error fetching AI-generated files:', aiFilesError)
+      return
+    }
+
+    setAiGeneratedFiles(aiFiles || [])
   }, [id, supabase]);
 
   useEffect(() => {
@@ -152,7 +177,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   // Initialize estimate status when the page loads
   useEffect(() => {
     if (!id || isLoading) return;
-    
+
     const checkStatusAndUpdate = async () => {
       const result = await checkEstimateStatus(id);
       if (result.status) {
@@ -170,17 +195,59 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         }
       }
     };
-    
+
     checkStatusAndUpdate();
-  }, [id, isLoading, fetchProject, aiEstimate]);
+
+    // Check for video processing jobs
+    const checkVideoProcessingJobs = async () => {
+      // Get all video files
+      const videoFiles = uploadedFiles.filter(file => file.type?.startsWith('video/') || isVideoFile(file.file_name));
+      if (videoFiles.length === 0) return;
+
+      // For each video file, check if there's an active processing job
+      const newProcessingIds: Record<string, string> = {};
+      const newErrors: Record<string, string> = {};
+
+      const { data: jobs, error: jobsError } = await supabase
+        .from('task_jobs')
+        .select('*')
+        .eq('project_id', id)
+        .eq('job_type', 'video_process')
+        .in('status', ['processing', 'pending', 'failed']);
+
+      if (jobsError) {
+        console.error('Error fetching video processing jobs:', jobsError);
+        return;
+      }
+
+      if (jobs && jobs.length > 0) {
+        for (const job of jobs) {
+          // Check if the job has a file_id field (might be called just file_id)
+          const fileId = job.file_id;
+          if (fileId) {
+            if (job.status === 'failed') {
+              newErrors[fileId] = job.error_message || 'Video processing failed';
+            } else if (job.status === 'processing' || job.status === 'pending') {
+              newProcessingIds[fileId] = job.id;
+            }
+          }
+        }
+      }
+
+      setProcessingVideoIds(newProcessingIds);
+      setVideoProcessingErrors(newErrors);
+    };
+
+    checkVideoProcessingJobs();
+  }, [id, isLoading, fetchProject, aiEstimate, uploadedFiles]);
   
-  // Poll for status updates when processing
+  // Poll for status updates when processing estimates
   useEffect(() => {
     if (estimateStatus !== 'processing') return;
-    
+
     const pollInterval = setInterval(async () => {
       const result = await checkEstimateStatus(id);
-      
+
       if (result.status === 'completed') {
         setEstimateStatus('completed');
         // Refresh the page to get the updated estimate
@@ -192,9 +259,67 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         toast.error(`Estimate generation failed: ${result.error || 'Unknown error'}`);
       }
     }, 5000); // Poll every 5 seconds
-    
+
     return () => clearInterval(pollInterval);
   }, [estimateStatus, id, fetchProject]);
+
+  // Poll for video processing status updates
+  useEffect(() => {
+    // Check if we have any videos being processed
+    const hasProcessingVideos = Object.keys(processingVideoIds).length > 0;
+    if (!hasProcessingVideos) return;
+
+    // Import at the beginning of polling to ensure it's defined
+    const { checkVideoProcessingStatus } = require('./actions');
+
+    const pollInterval = setInterval(async () => {
+      console.log("Polling for video processing status...", processingVideoIds);
+      // For each processing video, check its status
+      for (const [fileId, jobId] of Object.entries(processingVideoIds)) {
+        console.log(`Polling status for video job ${jobId} (file: ${fileId})...`);
+        try {
+          const result = await checkVideoProcessingStatus(jobId);
+          console.log(`Video processing status for job ${jobId}:`, result);
+
+          if (result.status === 'completed') {
+            // Successfully completed processing
+            console.log(`Video processing completed for file ${fileId}, job ${jobId}`);
+            // Remove from processing list
+            setProcessingVideoIds(prev => {
+              const newState = {...prev};
+              delete newState[fileId];
+              return newState;
+            });
+            // Refresh files to get the AI-generated files
+            await fetchFiles();
+            toast.success('Video processing completed');
+          } else if (result.status === 'failed') {
+            // Processing failed
+            console.error(`Video processing failed for file ${fileId}, job ${jobId}:`, result.error);
+            // Update the errors map
+            setVideoProcessingErrors(prev => ({
+              ...prev,
+              [fileId]: result.error || 'Unknown error during video processing'
+            }));
+            // Remove from processing list
+            setProcessingVideoIds(prev => {
+              const newState = {...prev};
+              delete newState[fileId];
+              return newState;
+            });
+            toast.error(`Video processing failed: ${result.error || 'Unknown error'}`);
+            // Still refresh files in case there are partial results
+            await fetchFiles();
+          }
+          // If still processing, keep polling
+        } catch (err) {
+          console.error(`Error checking video processing status for job ${jobId}:`, err);
+        }
+      }
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [processingVideoIds, fetchFiles]);
 
   // Track when files change to mark estimate as outdated
   useEffect(() => {
@@ -225,22 +350,49 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     if (!fileToUpload) return
 
     setIsUploading(true)
+
+    // Check if it's a large video file and show special notice
+    const isLargeVideo = fileToUpload.type.startsWith('video/') &&
+                        (fileToUpload.size / (1024 * 1024)) > 30; // 30MB threshold
+
+    if (isLargeVideo) {
+      // Show a persistent toast for large videos
+      toast.info(
+        `Uploading large video file (${(fileToUpload.size / (1024 * 1024)).toFixed(1)}MB). This may take a while...`,
+        { duration: 10000, id: 'large-video-upload' }
+      );
+    }
+
     try {
       const formData = new FormData()
       formData.append('file', fileToUpload)
       formData.append('description', fileDescription)
-      
+
       const result = await uploadFile(formData, id)
-      
+
       if (result.error) {
         toast.error(`Failed to upload ${fileToUpload.name}: ${result.error}`)
       } else {
         toast.success(`Successfully uploaded ${fileToUpload.name}`)
+
+        // If it's a video that was successfully uploaded and automatic processing started
+        if (fileToUpload.type.startsWith('video/') && result.isVideoProcessing) {
+          toast.success(`Video processing started${result.processingError ? ' with warnings' : ''}`, {
+            description: result.processingError || 'Your video is being analyzed. This may take several minutes.',
+            duration: 5000
+          });
+
+          // Add to the processing videos state immediately for better UX
+          if (result.processingJobId) {
+            setProcessingVideoIds(prev => ({ ...prev, [result.fileId]: result.processingJobId }));
+          }
+        }
+
         setUploadDialogOpen(false)
         setFileToUpload(null)
         setFileDescription("")
         fetchFiles() // Refresh the files list
-        
+
         // Mark estimate as outdated if it exists
         if (aiEstimate) {
           setIsEstimateOutdated(true)
@@ -251,6 +403,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       toast.error('Failed to upload file')
     } finally {
       setIsUploading(false)
+      // Dismiss the large video upload toast if it exists
+      if (isLargeVideo) {
+        toast.dismiss('large-video-upload');
+      }
     }
   }
 
@@ -395,21 +551,41 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     }
   };
 
+  const handleStartVideoProcessing = async (fileId: string) => {
+    try {
+      const startResult = await startVideoProcessing(id, fileId);
+      if (startResult.error) {
+        toast.error(`Failed to start video processing: ${startResult.error}`);
+      } else {
+        toast.success('Video processing started');
+        // Add to processing videos immediately for better UX
+        setProcessingVideoIds(prev => ({ ...prev, [fileId]: startResult.jobId || 'pending' }));
+        // Refresh after a delay to get latest status
+        setTimeout(() => {
+          fetchFiles();
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Error starting video processing:', error);
+      toast.error('Failed to start video processing');
+    }
+  };
+
   const handleFileClick = async (file: UploadedFile, e: React.MouseEvent) => {
     e.preventDefault();
-    
+
     // Set the file to preview
     setPreviewFile(file);
     setFileContent(null);
     setSignedImageUrl('');
     setSignedAudioUrl('');
     setFilePreviewDialogOpen(true);
-    
+
     // If it's an image file, get the signed URL
     if (isImageFile(file.file_name)) {
       const url = await getFileSignedUrl(file);
       setSignedImageUrl(url);
-    } 
+    }
     // If it's an audio file, get the signed URL
     else if (isAudioFile(file.file_name)) {
       const url = await getFileSignedUrl(file);
@@ -421,31 +597,31 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       try {
         // Use the stored file path if available
         const filePath = file.file_url;
-        
+
         if (!filePath) {
           toast.error('File path not available. This file may need to be re-uploaded.');
           setIsLoadingPreview(false);
           return;
         }
-        
+
         // Create a signed URL for the file
         const { data, error } = await supabase.storage
           .from(STORAGE_BUCKET_NAME)
           .createSignedUrl(filePath, 3600); // 1 hour expiration
-        
+
         if (error) {
           console.error(`Error creating signed URL for ${file.file_name}:`, error);
           toast.error('Failed to generate secure access link');
           setIsLoadingPreview(false);
           return;
         }
-        
+
         // Fetch the content using the signed URL
         const response = await fetch(data.signedUrl);
         if (!response.ok) {
           throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
         }
-        
+
         // Convert the response to text
         const content = await response.text();
         setFileContent(content);
@@ -459,10 +635,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   };
 
   const isTextFile = (fileName: string) => {
-    return fileName.endsWith('.txt') || fileName.endsWith('.md') || 
-           fileName.endsWith('.js') || fileName.endsWith('.ts') || 
-           fileName.endsWith('.jsx') || fileName.endsWith('.tsx') || 
-           fileName.endsWith('.html') || fileName.endsWith('.css') || 
+    return fileName.endsWith('.txt') || fileName.endsWith('.md') ||
+           fileName.endsWith('.js') || fileName.endsWith('.ts') ||
+           fileName.endsWith('.jsx') || fileName.endsWith('.tsx') ||
+           fileName.endsWith('.html') || fileName.endsWith('.css') ||
            fileName.endsWith('.json') || fileName.endsWith('.csv');
   };
 
@@ -472,6 +648,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   const isAudioFile = (fileName: string) => {
     return fileName.match(/\.(mp3|wav|ogg|m4a|aac)$/i) !== null;
+  };
+
+  const isVideoFile = (fileName: string) => {
+    return fileName.match(/\.(mp4|webm|ogg|mov|avi|wmv|flv|mkv|m4v)$/i) !== null;
   };
 
   const handleClearProjectInfo = async () => {
@@ -733,6 +913,18 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     <Button size="sm" variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-700" disabled={isUploading} onClick={() => document.getElementById('file-upload-input-main')?.click()}>
                       {isUploading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />} Upload File
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="border-none text-gray-400 hover:text-gray-300 hover:bg-gray-700"
+                      onClick={() => setShowAiFiles(!showAiFiles)}
+                    >
+                      {showAiFiles ? (
+                        <><EyeOff className="h-3.5 w-3.5 mr-1.5" /> Hide AI Files</>
+                      ) : (
+                        <><Eye className="h-3.5 w-3.5 mr-1.5" /> Show AI Files</>
+                      )}
+                    </Button>
                   </div>
                 </div>
                 <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-1">
@@ -742,22 +934,240 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       <p className="text-xs">Upload construction plans, images, or notes.</p>
                     </div>
                   ) : (
-                    uploadedFiles.map((file) => (
-                      <div key={file.id} className="flex items-center justify-between bg-gray-700/30 hover:bg-gray-700/50 p-3 rounded-md transition-colors">
-                        <div className="flex items-center overflow-hidden">
-                          {isMarkdownFile(file.file_name) && file.description === 'Project note' ? <StickyNote className="mr-2 h-4 w-4 text-yellow-400 flex-shrink-0" /> 
-                           : isImageFile(file.file_name) ? <File className="mr-2 h-4 w-4 text-purple-400 flex-shrink-0" />
-                           : isAudioFile(file.file_name) ? <Music className="mr-2 h-4 w-4 text-green-400 flex-shrink-0" />
-                           : <File className="mr-2 h-4 w-4 text-blue-400 flex-shrink-0" />}
-                          <button onClick={(e) => handleFileClick(file, e)} className="text-gray-200 hover:text-blue-400 bg-transparent border-0 p-0 cursor-pointer truncate text-sm">
-                            {file.file_name}
-                          </button>
+                    <>
+                      {/* User uploaded files */}
+                      {uploadedFiles.map((file) => {
+                        const isProcessing = !!processingVideoIds[file.id];
+                        const processingError = videoProcessingErrors[file.id];
+                        const isVideo = file.type?.startsWith('video/');
+
+                        // If the file is a video with processing jobs, first find AI summary and frames
+                        let videoSummaryFile = null;
+                        let videoFrames: UploadedFile[] = [];
+
+                        if (isVideo && (isProcessing || processingError || file.type?.startsWith('video/'))) {
+                          // Find summary file and frames
+                          videoSummaryFile = aiGeneratedFiles.find(aiFile =>
+                            aiFile.parent_file_id === file.id &&
+                            aiFile.file_name.includes('summary')
+                          );
+
+                          // Get frames and log them for debugging
+                          videoFrames = aiGeneratedFiles.filter(aiFile => {
+                            const isFrame = aiFile.parent_file_id === file.id &&
+                                           !aiFile.file_name.includes('summary') &&
+                                           isImageFile(aiFile.file_name);
+
+                            if (isFrame) {
+                              console.log(`Found frame for video ${file.id}:`, {
+                                id: aiFile.id,
+                                file_name: aiFile.file_name,
+                                description: aiFile.description,
+                                file_url: aiFile.file_url
+                              });
+                            }
+
+                            return isFrame;
+                          });
+
+                          console.log(`Found ${videoFrames.length} frames for video ${file.id}`);
+
+                          // If debug needed, log the first frame's details
+                          if (videoFrames.length > 0) {
+                            console.log('First frame details:', videoFrames[0]);
+                          }
+                        }
+
+                        return (
+                          <React.Fragment key={file.id}>
+                            <div className="flex items-center justify-between bg-gray-700/30 hover:bg-gray-700/50 p-3 rounded-md transition-colors">
+                              <div className="flex items-center overflow-hidden">
+                                {isMarkdownFile(file.file_name) && file.description === 'Project note' ? (
+                                  <StickyNote className="mr-2 h-4 w-4 text-yellow-400 flex-shrink-0" />
+                                ) : isImageFile(file.file_name) ? (
+                                  <File className="mr-2 h-4 w-4 text-purple-400 flex-shrink-0" />
+                                ) : isAudioFile(file.file_name) ? (
+                                  <Music className="mr-2 h-4 w-4 text-green-400 flex-shrink-0" />
+                                ) : isVideo ? (
+                                  <Video className="mr-2 h-4 w-4 text-blue-400 flex-shrink-0" />
+                                ) : (
+                                  <File className="mr-2 h-4 w-4 text-blue-400 flex-shrink-0" />
+                                )}
+                                <button
+                                  onClick={(e) => handleFileClick(file, e)}
+                                  className="text-gray-200 hover:text-blue-400 bg-transparent border-0 p-0 cursor-pointer truncate text-sm"
+                                >
+                                  {file.file_name}
+                                </button>
+
+                                {/* Status indicators for video files */}
+                                {isVideo && (
+                                  <div className="ml-2 flex">
+                                    {isProcessing ? (
+                                      <Badge variant="outline" className="ml-2 bg-blue-900/30 text-blue-400 border-blue-700 flex items-center">
+                                        <RefreshCw className="h-3 w-3 mr-1 animate-spin" /> Processing
+                                      </Badge>
+                                    ) : processingError ? (
+                                      <div className="flex items-center">
+                                        <Badge variant="outline" className="ml-2 bg-red-900/30 text-red-400 border-red-700">
+                                          Failed
+                                        </Badge>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleStartVideoProcessing(file.id);
+                                          }}
+                                          className="ml-2 p-1 h-6 text-blue-400 hover:text-blue-300"
+                                        >
+                                          Retry
+                                        </Button>
+                                      </div>
+                                    ) : videoSummaryFile ? (
+                                      <Badge variant="outline" className="ml-2 bg-green-900/30 text-green-400 border-green-700">
+                                        Analyzed
+                                      </Badge>
+                                    ) : (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleStartVideoProcessing(file.id);
+                                        }}
+                                        className="ml-2 p-1 h-6 text-blue-400 hover:text-blue-300 flex items-center"
+                                      >
+                                        <Video className="h-3 w-3 mr-1" /> Analyze
+                                      </Button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteFile(file.id)}
+                                className="text-red-400 hover:text-red-300 hover:bg-red-900/20 ml-1 p-1 h-auto"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+
+                            {/* Video Summary Card - only shown for videos with available summary */}
+                            {isVideo && !isProcessing && !processingError && videoSummaryFile && (
+                              <div className="ml-6 mr-2 mt-2 mb-4">
+                                <VideoSummaryCard
+                                  videoId={file.id}
+                                  videoFileName={file.file_name}
+                                  summaryFile={videoSummaryFile}
+                                  frames={videoFrames.map(frame => {
+                                    console.log(`Passing frame to VideoSummaryCard: ${frame.file_name}, URL: ${frame.file_url}`);
+                                    return {
+                                      id: frame.id,
+                                      file_name: frame.file_name,
+                                      description: frame.description || '',
+                                      file_url: frame.file_url
+                                    };
+                                  })}
+                                  storageBucket={STORAGE_BUCKET_NAME}
+                                />
+                              </div>
+                            )}
+
+                            {/* Processing indicator for videos being analyzed */}
+                            {isVideo && isProcessing && (
+                              <div className="ml-6 mr-2 mt-2 mb-4">
+                                <VideoSummaryCard
+                                  videoId={file.id}
+                                  videoFileName={file.file_name}
+                                  summaryFile={null}
+                                  frames={[]}
+                                  isProcessing={true}
+                                  storageBucket={STORAGE_BUCKET_NAME}
+                                />
+                              </div>
+                            )}
+
+                            {/* Error indicator for failed video processing */}
+                            {isVideo && processingError && (
+                              <div className="ml-6 mr-2 mt-2 mb-4">
+                                <VideoSummaryCard
+                                  videoId={file.id}
+                                  videoFileName={file.file_name}
+                                  summaryFile={null}
+                                  frames={[]}
+                                  processingError={processingError}
+                                  storageBucket={STORAGE_BUCKET_NAME}
+                                />
+                              </div>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+
+                      {/* AI-generated files that aren't explicitly linked to videos */}
+                      {showAiFiles && (
+                        <div className="mt-4 pt-4 border-t border-gray-700">
+                          <h3 className="text-sm font-medium text-gray-400 mb-2 flex items-center">
+                            AI-Generated Files
+                            <Badge className="ml-2 bg-purple-900/30 text-purple-400 border-purple-700">
+                              {aiGeneratedFiles.length}
+                            </Badge>
+                          </h3>
+
+                          {aiGeneratedFiles.length === 0 ? (
+                            <div className="text-gray-500 text-sm text-center py-3">
+                              No AI-generated files available
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {/* Only show AI files that don't have a parent already in the list */}
+                              {aiGeneratedFiles
+                                .filter(file => {
+                                  // Skip files that are already shown in VideoSummaryCards
+                                  const parentIsDisplayedVideo = !!uploadedFiles.find(parentFile =>
+                                    parentFile.id === file.parent_file_id &&
+                                    parentFile.type?.startsWith('video/')
+                                  );
+                                  return !parentIsDisplayedVideo;
+                                })
+                                .map(file => (
+                                  <div key={file.id} className="flex items-center justify-between bg-gray-700/20 hover:bg-gray-700/40 p-3 rounded-md transition-colors">
+                                    <div className="flex items-center overflow-hidden">
+                                      {isImageFile(file.file_name) ? (
+                                        <File className="mr-2 h-4 w-4 text-purple-400 flex-shrink-0" />
+                                      ) : isTextFile(file.file_name) ? (
+                                        <FileText className="mr-2 h-4 w-4 text-blue-400 flex-shrink-0" />
+                                      ) : (
+                                        <File className="mr-2 h-4 w-4 text-gray-400 flex-shrink-0" />
+                                      )}
+                                      <button
+                                        onClick={(e) => handleFileClick(file, e)}
+                                        className="text-gray-300 hover:text-blue-400 bg-transparent border-0 p-0 cursor-pointer truncate text-sm"
+                                      >
+                                        {file.file_name}
+                                      </button>
+                                      <Badge variant="outline" className="ml-2 bg-purple-900/30 text-purple-400 border-purple-700">
+                                        AI
+                                      </Badge>
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteFile(file.id)}
+                                      className="text-red-400 hover:text-red-300 hover:bg-red-900/20 ml-1 p-1 h-auto"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))
+                              }
+                            </div>
+                          )}
                         </div>
-                        <Button variant="ghost" size="sm" onClick={() => handleDeleteFile(file.id)} className="text-red-400 hover:text-red-300 hover:bg-red-900/20 ml-1 p-1 h-auto">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -767,7 +1177,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       </div>
 
       {/* Upload File Dialog - Corrected Usage */}
-      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+      <Dialog open={uploadDialogOpen} onOpenChange={(open) => {
+        if (!isUploading) {
+          setUploadDialogOpen(open);
+        } else if (!open) {
+          // If trying to close while uploading, show warning
+          toast.error('Upload in progress. Please wait until it completes.');
+        }
+      }}>
         <DialogContent className="bg-gray-800 text-white border-gray-700">
           <DialogHeader>
             <DialogTitle>Upload File</DialogTitle>
@@ -780,30 +1197,84 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               <Label htmlFor="file-upload-input" className="text-right">
                 File
               </Label>
-              <Input 
-                id="file-upload-input" 
-                type="file" 
-                onChange={(e) => setFileToUpload(e.target.files ? e.target.files[0] : null)} 
+              <Input
+                id="file-upload-input"
+                type="file"
+                onChange={(e) => {
+                  const selectedFile = e.target.files ? e.target.files[0] : null;
+                  setFileToUpload(selectedFile);
+
+                  // Show info about large video files
+                  if (selectedFile && selectedFile.type.startsWith('video/')) {
+                    const fileSizeMB = selectedFile.size / (1024 * 1024);
+                    if (fileSizeMB > 30) {
+                      toast.info(`Large video file selected (${fileSizeMB.toFixed(1)}MB). Upload and processing may take some time.`);
+                    }
+                  }
+                }}
                 className="col-span-3 bg-gray-700 border-gray-600 file:text-white"
+                disabled={isUploading}
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="file-description" className="text-right">
                 Description
               </Label>
-              <Textarea 
-                id="file-description" 
-                value={fileDescription} 
-                onChange={(e) => setFileDescription(e.target.value)} 
-                placeholder="Optional: Describe the file content" 
+              <Textarea
+                id="file-description"
+                value={fileDescription}
+                onChange={(e) => setFileDescription(e.target.value)}
+                placeholder="Optional: Describe the file content"
                 className="col-span-3 bg-gray-700 border-gray-600"
+                disabled={isUploading}
               />
             </div>
+
+            {fileToUpload && fileToUpload.type.startsWith('video/') && (
+              <div className="col-span-4 bg-blue-900/20 p-3 rounded-md border border-blue-700">
+                <div className="flex items-start">
+                  <Video className="h-5 w-5 text-blue-400 mt-0.5 mr-2 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm text-blue-300 font-medium">Video File Processing</p>
+                    <p className="text-xs text-gray-300 mt-1">
+                      After upload, your video will be automatically analyzed to extract frames and generate a detailed summary.
+                      This processing happens in the background and may take several minutes depending on the file size.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {isUploading && (
+              <div className="col-span-4 flex flex-col items-center justify-center">
+                <div className="w-full bg-gray-700 h-2 rounded-full overflow-hidden">
+                  <div className="bg-blue-500 h-2 rounded-full animate-pulse" style={{ width: '100%' }}></div>
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  Uploading file... Please keep this window open.
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setUploadDialogOpen(false)} className="text-gray-300 border-gray-600 hover:bg-gray-700">Cancel</Button>
-            <Button onClick={handleFileUpload} disabled={isUploading || !fileToUpload} className="bg-blue-600 hover:bg-blue-700">
-              {isUploading ? 'Uploading...' : 'Upload'}
+            <Button
+              variant="outline"
+              onClick={() => setUploadDialogOpen(false)}
+              className="text-gray-300 border-gray-600 hover:bg-gray-700"
+              disabled={isUploading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleFileUpload}
+              disabled={isUploading || !fileToUpload || !fileDescription}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {isUploading ? (
+                <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Uploading...</>
+              ) : (
+                'Upload'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -977,6 +1448,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     </div>
   );
 }
+
 
 function CollapsibleMarkdown({ content }: { content: string }) {
   // Parse the markdown content to identify headers
