@@ -186,28 +186,28 @@ export function VideoSummaryCard({
   }
 
   return (
-    <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-      {/* Header */}
-      <div 
-        className={`bg-gray-800 p-4 border-b border-gray-700 flex justify-between items-center ${isCollapsible ? 'cursor-pointer' : ''}`}
-        onClick={toggleExpanded}
-      >
-        <div className="flex items-center space-x-2">
-          <Video className="h-5 w-5 text-blue-400" />
-          <h3 className="font-medium text-lg text-gray-200">{videoFileName}</h3>
-          <Badge variant="outline" className="ml-2 bg-blue-900/30 text-blue-400 border-blue-700">
-            AI Summary
-          </Badge>
-        </div>
-        {isCollapsible && (
+    <div className={`${isCollapsible ? 'bg-gray-800 rounded-lg border border-gray-700' : 'bg-gray-800/50 rounded-md border border-gray-700/50'} overflow-hidden`}>
+      {/* Header - Only shown when component is being used standalone (isCollapsible=true) */}
+      {isCollapsible && (
+        <div
+          className={`bg-gray-800 p-4 border-b border-gray-700 flex justify-between items-center ${isCollapsible ? 'cursor-pointer' : ''}`}
+          onClick={toggleExpanded}
+        >
+          <div className="flex items-center space-x-2">
+            <Video className="h-5 w-5 text-blue-400" />
+            <h3 className="font-medium text-lg text-gray-200">{videoFileName}</h3>
+            <Badge variant="outline" className="ml-2 bg-blue-900/30 text-blue-400 border-blue-700">
+              AI Summary
+            </Badge>
+          </div>
           <Button variant="ghost" size="icon" className="h-8 w-8 p-0 text-gray-400">
             {isExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
           </Button>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Collapsible content */}
-      {isExpanded && (
+      {/* Content - Always show if not collapsible, or conditional based on expanded state */}
+      {(!isCollapsible || isExpanded) && (
         <div className="p-5 space-y-6">
           {/* Summary Section */}
           <div>

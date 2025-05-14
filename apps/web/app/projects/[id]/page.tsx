@@ -132,6 +132,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     }
   }, [id, supabase]);
   
+  // State for expanded video files
+  const [expandedVideoId, setExpandedVideoId] = useState<string | null>(null);
+
+  // Function to toggle expansion of a video file
+  const toggleVideoExpansion = useCallback((fileId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setExpandedVideoId(prev => prev === fileId ? null : fileId);
+  }, []);
+
   // useCallback for fetchFiles
   const fetchFiles = useCallback(async () => {
     // Fetch user-uploaded files
@@ -958,40 +968,68 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
                         }
 
+                        // Using hooks from component level
+
+                        // Check if this file is expanded
+                        const isExpanded = file.id === expandedVideoId;
+
+                        // Has a summary that could be expanded
+                        const hasExpandableContent = isVideo && !isProcessing && !processingError && videoSummaryFile;
+
                         return (
                           <React.Fragment key={file.id}>
-                            <div className="flex items-center justify-between bg-gray-700/30 hover:bg-gray-700/50 p-3 rounded-md transition-colors">
-                              <div className="flex items-center overflow-hidden">
-                                {isMarkdownFile(file.file_name) && file.description === 'Project note' ? (
-                                  <StickyNote className="mr-2 h-4 w-4 text-yellow-400 flex-shrink-0" />
-                                ) : isImageFile(file.file_name) ? (
-                                  <File className="mr-2 h-4 w-4 text-purple-400 flex-shrink-0" />
-                                ) : isAudioFile(file.file_name) ? (
-                                  <Music className="mr-2 h-4 w-4 text-green-400 flex-shrink-0" />
-                                ) : isVideo ? (
-                                  <Video className="mr-2 h-4 w-4 text-blue-400 flex-shrink-0" />
-                                ) : (
-                                  <File className="mr-2 h-4 w-4 text-blue-400 flex-shrink-0" />
-                                )}
-                                <button
-                                  onClick={(e) => handleFileClick(file, e)}
-                                  className="text-gray-200 hover:text-blue-400 bg-transparent border-0 p-0 cursor-pointer truncate text-sm"
-                                >
-                                  {file.file_name}
-                                </button>
+                            <div className="flex flex-col bg-gray-700/30 hover:bg-gray-700/50 rounded-md overflow-hidden transition-colors">
+                              {/* File item header */}
+                              <div className="flex items-center justify-between p-3">
+                                <div className="flex items-center overflow-hidden flex-grow">
+                                  {isMarkdownFile(file.file_name) && file.description === 'Project note' ? (
+                                    <StickyNote className="mr-2 h-4 w-4 text-yellow-400 flex-shrink-0" />
+                                  ) : isImageFile(file.file_name) ? (
+                                    <File className="mr-2 h-4 w-4 text-purple-400 flex-shrink-0" />
+                                  ) : isAudioFile(file.file_name) ? (
+                                    <Music className="mr-2 h-4 w-4 text-green-400 flex-shrink-0" />
+                                  ) : isVideo ? (
+                                    <Video className="mr-2 h-4 w-4 text-blue-400 flex-shrink-0" />
+                                  ) : (
+                                    <File className="mr-2 h-4 w-4 text-blue-400 flex-shrink-0" />
+                                  )}
 
-                                {/* Status indicators for video files */}
-                                {isVideo && (
-                                  <div className="ml-2 flex">
-                                    {isProcessing ? (
-                                      <Badge variant="outline" className="ml-2 bg-blue-900/30 text-blue-400 border-blue-700 flex items-center">
-                                        <RefreshCw className="h-3 w-3 mr-1 animate-spin" /> Processing
-                                      </Badge>
-                                    ) : processingError ? (
-                                      <div className="flex items-center">
-                                        <Badge variant="outline" className="ml-2 bg-red-900/30 text-red-400 border-red-700">
-                                          Failed
+                                  <button
+                                    onClick={(e) => hasExpandableContent ? toggleVideoExpansion(file.id, e) : handleFileClick(file, e)}
+                                    className="text-gray-200 hover:text-blue-400 bg-transparent border-0 p-0 cursor-pointer truncate text-sm"
+                                  >
+                                    {file.file_name}
+                                  </button>
+
+                                  {/* Status indicators for video files */}
+                                  {isVideo && (
+                                    <div className="ml-2 flex">
+                                      {isProcessing ? (
+                                        <Badge variant="outline" className="ml-2 bg-blue-900/30 text-blue-400 border-blue-700 flex items-center">
+                                          <RefreshCw className="h-3 w-3 mr-1 animate-spin" /> Processing
                                         </Badge>
+                                      ) : processingError ? (
+                                        <div className="flex items-center">
+                                          <Badge variant="outline" className="ml-2 bg-red-900/30 text-red-400 border-red-700">
+                                            Failed
+                                          </Badge>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleStartVideoProcessing(file.id);
+                                            }}
+                                            className="ml-2 p-1 h-6 text-blue-400 hover:text-blue-300"
+                                          >
+                                            Retry
+                                          </Button>
+                                        </div>
+                                      ) : videoSummaryFile ? (
+                                        <Badge variant="outline" className="ml-2 bg-green-900/30 text-green-400 border-green-700">
+                                          Analyzed
+                                        </Badge>
+                                      ) : (
                                         <Button
                                           variant="ghost"
                                           size="sm"
@@ -999,88 +1037,89 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                                             e.stopPropagation();
                                             handleStartVideoProcessing(file.id);
                                           }}
-                                          className="ml-2 p-1 h-6 text-blue-400 hover:text-blue-300"
+                                          className="ml-2 p-1 h-6 text-blue-400 hover:text-blue-300 flex items-center"
                                         >
-                                          Retry
+                                          <Video className="h-3 w-3 mr-1" /> Analyze
                                         </Button>
-                                      </div>
-                                    ) : videoSummaryFile ? (
-                                      <Badge variant="outline" className="ml-2 bg-green-900/30 text-green-400 border-green-700">
-                                        Analyzed
-                                      </Badge>
-                                    ) : (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleStartVideoProcessing(file.id);
-                                        }}
-                                        className="ml-2 p-1 h-6 text-blue-400 hover:text-blue-300 flex items-center"
-                                      >
-                                        <Video className="h-3 w-3 mr-1" /> Analyze
-                                      </Button>
-                                    )}
-                                  </div>
-                                )}
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Right side controls - chevron for expandable items + delete button */}
+                                <div className="flex items-center">
+                                  {hasExpandableContent && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={(e) => toggleVideoExpansion(file.id, e)}
+                                      className="text-gray-400 hover:text-gray-300 hover:bg-gray-700/50 p-1 h-auto mr-1"
+                                    >
+                                      {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteFile(file.id)}
+                                    className="text-red-400 hover:text-red-300 hover:bg-red-900/20 p-1 h-auto"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteFile(file.id)}
-                                className="text-red-400 hover:text-red-300 hover:bg-red-900/20 ml-1 p-1 h-auto"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+
+                              {/* Expandable content */}
+                              {isVideo && !isProcessing && !processingError && videoSummaryFile && isExpanded && (
+                                <div className="px-3 pb-3">
+                                  <VideoSummaryCard
+                                    videoId={file.id}
+                                    videoFileName={file.file_name}
+                                    summaryFile={videoSummaryFile}
+                                    frames={videoFrames.map(frame => {
+                                      return {
+                                        id: frame.id,
+                                        file_name: frame.file_name,
+                                        description: frame.description || '',
+                                        file_url: frame.file_url
+                                      };
+                                    })}
+                                    isCollapsible={false}
+                                    storageBucket={STORAGE_BUCKET_NAME}
+                                  />
+                                </div>
+                              )}
+
+                              {/* Processing indicator for videos being analyzed */}
+                              {isVideo && isProcessing && (
+                                <div className="px-3 pb-3">
+                                  <VideoSummaryCard
+                                    videoId={file.id}
+                                    videoFileName={file.file_name}
+                                    summaryFile={null}
+                                    frames={[]}
+                                    isProcessing={true}
+                                    isCollapsible={false}
+                                    storageBucket={STORAGE_BUCKET_NAME}
+                                  />
+                                </div>
+                              )}
+
+                              {/* Error indicator for failed video processing */}
+                              {isVideo && processingError && (
+                                <div className="px-3 pb-3">
+                                  <VideoSummaryCard
+                                    videoId={file.id}
+                                    videoFileName={file.file_name}
+                                    summaryFile={null}
+                                    frames={[]}
+                                    processingError={processingError}
+                                    isCollapsible={false}
+                                    storageBucket={STORAGE_BUCKET_NAME}
+                                  />
+                                </div>
+                              )}
                             </div>
-
-                            {/* Video Summary Card - only shown for videos with available summary */}
-                            {isVideo && !isProcessing && !processingError && videoSummaryFile && (
-                              <div className="ml-6 mr-2 mt-2 mb-4">
-                                <VideoSummaryCard
-                                  videoId={file.id}
-                                  videoFileName={file.file_name}
-                                  summaryFile={videoSummaryFile}
-                                  frames={videoFrames.map(frame => {
-                                    return {
-                                      id: frame.id,
-                                      file_name: frame.file_name,
-                                      description: frame.description || '',
-                                      file_url: frame.file_url
-                                    };
-                                  })}
-                                  storageBucket={STORAGE_BUCKET_NAME}
-                                />
-                              </div>
-                            )}
-
-                            {/* Processing indicator for videos being analyzed */}
-                            {isVideo && isProcessing && (
-                              <div className="ml-6 mr-2 mt-2 mb-4">
-                                <VideoSummaryCard
-                                  videoId={file.id}
-                                  videoFileName={file.file_name}
-                                  summaryFile={null}
-                                  frames={[]}
-                                  isProcessing={true}
-                                  storageBucket={STORAGE_BUCKET_NAME}
-                                />
-                              </div>
-                            )}
-
-                            {/* Error indicator for failed video processing */}
-                            {isVideo && processingError && (
-                              <div className="ml-6 mr-2 mt-2 mb-4">
-                                <VideoSummaryCard
-                                  videoId={file.id}
-                                  videoFileName={file.file_name}
-                                  summaryFile={null}
-                                  frames={[]}
-                                  processingError={processingError}
-                                  storageBucket={STORAGE_BUCKET_NAME}
-                                />
-                              </div>
-                            )}
                           </React.Fragment>
                         );
                       })}
