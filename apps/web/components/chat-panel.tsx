@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { X, Send, RefreshCw, ChevronDown, ChevronRight, ChevronUp } from 'lucide-react';
+import { X, Send, RefreshCw, ChevronDown, ChevronUp, GripVertical } from 'lucide-react';
 import { getChatThreadDetails, createChatThreadAndPostMessage, postChatMessage, getChatEvents, DisplayableBamlEvent } from '@/app/projects/[id]/actions';
 import type { UserInput as BamlUserInput, AssisantMessage as BamlAssistantMessage, UpdateEstimateRequest as BamlUpdateEstimateRequest, UpdateEstimateResponse as BamlUpdateEstimateResponse, AllowedTypes } from '@/baml_client/baml_client/types';
+import ReactMarkdown from 'react-markdown';
 
 interface ChatPanelProps {
   isOpen: boolean;
@@ -27,9 +28,52 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
   const [isLoadingThread, setIsLoadingThread] = useState<boolean>(false); // Changed initial to false, will set true during load
   // ADDED: State for managing expansion of UpdateEstimateRequest events
   const [expandedUpdateRequests, setExpandedUpdateRequests] = useState<Record<string, boolean>>({});
+  // Add state for panel width
+  const [panelWidth, setPanelWidth] = useState<number>(384); // Default width: 96 from 'w-96' (384px)
+  const [isResizing, setIsResizing] = useState<boolean>(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Handle start resizing
+  const startResizing = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    // Store the initial coordinates
+    const initialX = e.clientX;
+    const initialWidth = panelWidth;
+    console.log('Resize started at X:', initialX, 'with initial width:', initialWidth);
+
+    setIsResizing(true);
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      // Calculate how far we've moved and in which direction
+      const deltaX = initialX - moveEvent.clientX;
+      // Increase the width when dragging left, decrease when dragging right
+      const newWidth = initialWidth + deltaX;
+
+      // Apply constraints
+      const windowWidth = window.innerWidth;
+      const minWidth = 300;
+      const maxWidth = Math.min(800, windowWidth * 0.75);
+      const constrainedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+
+      console.log('Mouse moved to:', moveEvent.clientX, 'Delta:', deltaX, 'New width:', constrainedWidth);
+      setPanelWidth(constrainedWidth);
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      setIsResizing(false);
+      console.log('Resize ended, final width:', panelWidth);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [panelWidth]);
+
+
 
   // Auto-resize textarea
   useEffect(() => {
@@ -174,6 +218,26 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [events]);
 
+  // Cleanup event listeners when component unmounts
+  useEffect(() => {
+    return () => {
+      // Cleanup is now handled within the startResizing function
+    };
+  }, []);
+
+  // Update body cursor during resize
+  useEffect(() => {
+    if (isResizing) {
+      document.body.style.cursor = 'ew-resize';
+    } else {
+      document.body.style.cursor = '';
+    }
+
+    return () => {
+      document.body.style.cursor = '';
+    };
+  }, [isResizing]);
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || isSending) return;
@@ -285,20 +349,26 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
       case 'UserInput':
         return <p>{(event.data as BamlUserInput).message}</p>;
       case 'AssisantMessage': // Corrected to AssisantMessage if that is the type from BAML
-        return <p>{(event.data as BamlAssistantMessage).message}</p>;
+        return (
+          <div className="prose prose-invert max-w-none prose-p:my-2 prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700 prose-headings:text-blue-400 prose-headings:border-b prose-headings:border-gray-700 prose-headings:pb-1 prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline prose-code:text-blue-300 prose-code:bg-gray-900/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none">
+            <ReactMarkdown>
+              {(event.data as BamlAssistantMessage).message}
+            </ReactMarkdown>
+          </div>
+        );
       case 'UpdateEstimateRequest':
         const requestData = event.data as BamlUpdateEstimateRequest;
         const isExpanded = expandedUpdateRequests[event.id];
         return (
           <div>
             <p><strong>System:</strong> Agent updating estimate.</p>
-            <Button 
+            <Button
               variant="ghost"
               size="sm"
               onClick={() => toggleUpdateRequestExpansion(event.id)}
               className="text-blue-400 hover:text-blue-300 px-1 py-0 h-auto text-xs mt-1 flex items-center"
             >
-              {isExpanded ? <ChevronUp className="h-3 w-3 mr-1" /> : <ChevronDown className="h-3 w-3 mr-1" />} 
+              {isExpanded ? <ChevronUp className="h-3 w-3 mr-1" /> : <ChevronDown className="h-3 w-3 mr-1" />}
               {isExpanded ? 'Hide Details' : 'Show Details'}
             </Button>
             {isExpanded && (
@@ -324,16 +394,22 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
   // Conditional rendering based on whether it's a new, uninitialized chat
   const isNewUninitializedChat = !activeThreadId && !isLoadingThread && (forceNewChat || !initialThreadIdProp);
 
+  // Make sure all hooks are called unconditionally before any early returns
   if (!isOpen) {
     return null;
   }
+
 
   if (isLoadingThread) {
     return (
       <div
         className="fixed top-0 right-0 h-full bg-gray-800 text-white shadow-xl transition-transform duration-300 ease-in-out flex flex-col z-40
-                  w-full md:w-96 border-l border-gray-700"
-        style={{ marginTop: 'var(--header-height, 64px)', height: 'calc(100% - var(--header-height, 64px))' }}
+                  border-l border-gray-700"
+        style={{
+          marginTop: 'var(--header-height, 64px)',
+          height: 'calc(100% - var(--header-height, 64px))',
+          width: `${panelWidth}px`,
+        }}
       >
         <div className="flex items-center justify-between p-4 border-b border-gray-700">
           <h2 className="text-lg font-semibold">Loading Chat...</h2>
@@ -354,11 +430,32 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
   }
 
   return (
-    <div
-      className={`fixed top-0 right-0 h-full bg-gray-800 text-white shadow-xl transition-transform duration-300 ease-in-out flex flex-col z-40
-                  ${isOpen ? 'translate-x-0' : 'translate-x-full'} w-full md:w-96 border-l border-gray-700`}
-      style={{ marginTop: 'var(--header-height, 64px)', height: 'calc(100% - var(--header-height, 64px))' }}
-    >
+    <React.Fragment>
+      {/* Resize handle */}
+      <div
+        className={`fixed top-0 bottom-0 z-50 w-5 cursor-ew-resize ${isResizing ? 'bg-blue-500/50' : 'bg-transparent hover:bg-blue-500/20'} transition-opacity`}
+        style={{
+          left: `calc(100% - ${panelWidth}px - 4px)`,
+          marginTop: 'var(--header-height, 64px)',
+          height: 'calc(100% - var(--header-height, 64px))'
+        }}
+        onMouseDown={startResizing}
+      >
+        <div className="absolute left-0 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-blue-500 rounded-full p-1">
+          <GripVertical className="h-4 w-4 text-white" />
+        </div>
+      </div>
+
+      <div
+        ref={panelRef}
+        className={`fixed top-0 right-0 h-full bg-gray-800 text-white shadow-xl transition-transform duration-300 ease-in-out flex flex-col z-40
+                  ${isOpen ? 'translate-x-0' : 'translate-x-full'} border-l border-gray-700`}
+        style={{
+          marginTop: 'var(--header-height, 64px)',
+          height: 'calc(100% - var(--header-height, 64px))',
+          width: `${panelWidth}px`,
+        }}
+      >
       <div className="flex items-center justify-between p-4 border-b border-gray-700">
         <h2 className="text-lg font-semibold">
           {isLoadingThread ? 'Loading Chat...' : (threadName || (isNewUninitializedChat ? 'New Chat' : 'Chat'))}
@@ -381,22 +478,22 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
 
       {!isLoadingThread && (
         <>
-          <div className="flex-grow p-4 space-y-3 overflow-y-auto bg-gray-900/80 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-900">
+          <div className="flex-grow p-4 space-y-4 overflow-y-auto bg-gray-900/80 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-900">
             {isNewUninitializedChat && events.length === 0 && (
               <div className="text-center text-gray-400 pt-10">
                 <p>Send a message to start the conversation.</p>
               </div>
             )}
             {events.map(event => (
-              <div key={event.id} className={`flex ${event.type === 'UserInput' ? 'justify-end' : 'justify-start'}`}>
+              <div key={event.id} className={`flex ${event.type === 'UserInput' ? 'justify-end' : 'justify-start'} mb-4`}>
                 <div
-                  className={`max-w-[70%] p-3 rounded-lg shadow-lg
+                  className={`max-w-[85%] p-4 rounded-lg shadow-lg
                     ${event.type === 'UserInput' ? 'bg-blue-600 text-white border border-blue-700/50' : 'bg-gray-800 text-gray-200 border border-gray-700'}
                     ${event.type === 'UpdateEstimateRequest' || event.type === 'UpdateEstimateResponse' ? 'bg-yellow-900/30 border border-yellow-700 text-yellow-400 w-full' : ''}
                   `}
                 >
                   {renderEventData(event)}
-                  <div className="text-xs mt-1 opacity-70">
+                  <div className="text-xs mt-2 opacity-70">
                     {new Date(event.createdAt).toLocaleTimeString()} - {new Date(event.createdAt).toLocaleDateString()}
                   </div>
                 </div>
@@ -446,5 +543,6 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
         </>
       )}
     </div>
+    </React.Fragment>
   );
 } 

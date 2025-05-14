@@ -89,6 +89,21 @@ export default {
             },
             code: {
               color: 'white',
+              backgroundColor: '#1e293b',
+              borderRadius: '0.25rem',
+              padding: '0.125rem 0.25rem',
+            },
+            'pre code': {
+              backgroundColor: 'transparent',
+              padding: 0,
+              borderRadius: 0,
+            },
+            pre: {
+              backgroundColor: '#1e293b',
+              color: 'white',
+              borderRadius: '0.5rem',
+              padding: '1rem',
+              overflowX: 'auto',
             },
             figcaption: {
               color: '#94a3b8',
