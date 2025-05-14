@@ -1252,70 +1252,122 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           <DialogHeader>
             <DialogTitle>Upload File</DialogTitle>
             <DialogDescription>
-              Select a file and add an optional description.
+              Select a file and add a description.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
+            {/* File selection area */}
+            <div className="grid grid-cols-4 items-center gap-4 mb-4">
               <Label htmlFor="file-upload-input" className="text-right">
-                File
+                File <span className="text-red-400 font-bold">*</span>
               </Label>
-              <Input
-                id="file-upload-input"
-                type="file"
-                onChange={(e) => {
-                  const selectedFile = e.target.files ? e.target.files[0] : null;
-                  setFileToUpload(selectedFile);
-
-                  // Show info about large video files
-                  if (selectedFile && selectedFile.type.startsWith('video/')) {
-                    const fileSizeMB = selectedFile.size / (1024 * 1024);
-                    if (fileSizeMB > 30) {
-                      toast.info(`Large video file selected (${fileSizeMB.toFixed(1)}MB). Upload and processing may take some time.`);
-                    }
-                  }
-                }}
-                className="col-span-3 bg-gray-700 border-gray-600 file:text-white"
-                disabled={isUploading}
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="file-description" className="text-right">
-                Description
-              </Label>
-              <Textarea
-                id="file-description"
-                value={fileDescription}
-                onChange={(e) => setFileDescription(e.target.value)}
-                placeholder="Optional: Describe the file content"
-                className="col-span-3 bg-gray-700 border-gray-600"
-                disabled={isUploading}
-              />
-            </div>
-
-            {fileToUpload && fileToUpload.type.startsWith('video/') && (
-              <div className="col-span-4 bg-blue-900/20 p-3 rounded-md border border-blue-700">
-                <div className="flex items-start">
-                  <Video className="h-5 w-5 text-blue-400 mt-0.5 mr-2 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm text-blue-300 font-medium">Video File Processing</p>
-                    <p className="text-xs text-gray-300 mt-1">
-                      After upload, your video will be automatically analyzed to extract frames and generate a detailed summary.
-                      This processing happens in the background and may take several minutes depending on the file size.
-                    </p>
+              <div className="col-span-3">
+                {fileToUpload ? (
+                  <div className="p-3 bg-gray-700/50 rounded-md border border-gray-600 flex items-center">
+                    {fileToUpload.type?.startsWith('image/') ? (
+                      <File className="h-6 w-6 text-purple-400 mr-3 flex-shrink-0" />
+                    ) : fileToUpload.type?.startsWith('video/') ? (
+                      <Video className="h-6 w-6 text-blue-400 mr-3 flex-shrink-0" />
+                    ) : fileToUpload.type?.startsWith('audio/') ? (
+                      <Music className="h-6 w-6 text-green-400 mr-3 flex-shrink-0" />
+                    ) : (
+                      <File className="h-6 w-6 text-gray-400 mr-3 flex-shrink-0" />
+                    )}
+                    <div className="overflow-hidden flex-1">
+                      <p className="text-sm text-white truncate font-medium">{fileToUpload.name}</p>
+                      <p className="text-xs text-gray-400">
+                        {(fileToUpload.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-1 text-gray-400 hover:text-gray-300 flex-shrink-0"
+                      onClick={() => setFileToUpload(null)}
+                      type="button"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </Button>
                   </div>
-                </div>
-              </div>
-            )}
+                ) : (
+                  <div className="relative">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 w-full flex justify-center py-2"
+                      onClick={() => document.getElementById('hidden-file-input')?.click()}
+                      disabled={isUploading}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Select File
+                    </Button>
+                    <input
+                      id="hidden-file-input"
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => {
+                        const selectedFile = e.target.files ? e.target.files[0] : null;
+                        if (selectedFile) {
+                          setFileToUpload(selectedFile);
 
-            {isUploading && (
-              <div className="col-span-4 flex flex-col items-center justify-center">
-                <div className="w-full bg-gray-700 h-2 rounded-full overflow-hidden">
-                  <div className="bg-blue-500 h-2 rounded-full animate-pulse" style={{ width: '100%' }}></div>
+                          // Show info about large video files
+                          if (selectedFile.type?.startsWith('video/')) {
+                            const fileSizeMB = selectedFile.size / (1024 * 1024);
+                            if (fileSizeMB > 30) {
+                              toast.info(`Large video file selected (${fileSizeMB.toFixed(1)}MB). Upload and processing may take some time.`);
+                            }
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Description text area - spacing adjusted */}
+            <div className="grid grid-cols-4 items-start gap-4 mb-4">
+              <Label htmlFor="file-description" className="text-right pt-2">
+                <span className="text-red-400 font-bold mr-1">*</span>Description
+              </Label>
+              <div className="col-span-3">
+                <div className="relative">
+                  <textarea
+                    id="file-description"
+                    value={fileDescription}
+                    onChange={(e) => setFileDescription(e.target.value)}
+                    placeholder="Describe the file content (required)"
+                    className="w-full bg-gray-700 border-gray-600 text-white p-3 rounded-md text-sm"
+                    rows={6}
+                    disabled={isUploading}
+                  />
                 </div>
-                <p className="text-xs text-gray-400 mt-2">
-                  Uploading file... Please keep this window open.
-                </p>
+                <p className="text-xs text-red-400/80 mt-1">Required field</p>
+              </div>
+            </div>
+
+            {/* Video processing info box removed */}
+
+            {/* Clean upload confirmation screen */}
+            {isUploading && (
+              <div className="fixed inset-0 z-50 bg-gray-900/90 flex flex-col items-center justify-center">
+                <div className="bg-gray-800 p-8 rounded-lg border border-gray-700 shadow-lg max-w-md w-full text-center">
+                  <RefreshCw className="h-10 w-10 mb-4 mx-auto animate-spin text-blue-400" />
+                  <h3 className="text-xl font-medium text-white mb-2">Uploading File</h3>
+                  <p className="text-gray-300 mb-6">
+                    {fileToUpload?.name && (
+                      <span className="block font-mono text-sm mt-1 text-blue-300 truncate max-w-full">
+                        {fileToUpload.name}
+                      </span>
+                    )}
+                  </p>
+                  <div className="w-full bg-gray-700 h-2 rounded-full overflow-hidden mb-2">
+                    <div className="bg-blue-500 h-2 rounded-full animate-pulse" style={{ width: '100%' }}></div>
+                  </div>
+                  <p className="text-sm text-gray-400">
+                    Please keep this window open until the upload completes...
+                  </p>
+                </div>
               </div>
             )}
           </div>
