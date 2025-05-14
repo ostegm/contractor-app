@@ -9,6 +9,10 @@ import {
   type AssisantMessage as BamlAssistantMessage,
   type UpdateEstimateRequest as BamlUpdateEstimateRequest,
   type UpdateEstimateResponse as BamlUpdateEstimateResponse,
+  type PatchEstimateRequest as BamlPatchEstimateRequest,
+  type PatchEstimateResponse as BamlPatchEstimateResponse,
+  type Patch as BamlPatch,
+  type PatchResult as BamlPatchResult,
   type Event as BamlEvent,
   type BamlChatThread,
   type ConstructionProjectData,
@@ -371,6 +375,17 @@ async function _handleBamlResponse(
       console.error('Error starting estimate generation from chat (_handleBamlResponse):', estimateResult.error);
        // Potentially append estimate error to errorMsg? Needs careful handling depending on desired UX
        // For now, the error is logged, and the main error message (if any) from saving will be returned.
+    } else {
+      updateTriggered = true;
+    }
+  }
+  // 3. Handle PatchEstimateRequest for fast updates
+  else if (bamlEventOutput.type === "PatchEstimateRequest") {
+    const requestData = bamlEventOutput.data as BamlPatchEstimateRequest;
+    // Apply patches directly without going through LangGraph
+    const patchResult = await applyPatchAndPersist(projectId, requestData.patches, threadId);
+    if (patchResult.error) {
+      console.error('Error applying patches from chat (_handleBamlResponse):', patchResult.error);
     } else {
       updateTriggered = true;
     }
@@ -852,6 +867,133 @@ async function recordChatEstimateUpdateResponse(
 
   if (error) {
     console.error('Error recording UpdateEstimateResponse to chat:', error);
+  }
+}
+
+/**
+ * Record the patch response in the chat thread
+ */
+async function recordChatPatchResponse(
+  threadId: string,
+  patchResults: BamlPatchResult[]
+) {
+  const supabase = await createClient();
+  const responseData: BamlPatchEstimateResponse = {
+    patch_results: patchResults
+  };
+
+  const { error } = await supabase.from('chat_events').insert({
+    thread_id: threadId,
+    event_type: 'PatchEstimateResponse',
+    data: responseData,
+  });
+
+  if (error) {
+    console.error('Error recording PatchEstimateResponse to chat:', error);
+  }
+}
+
+/**
+ * Apply JSON patches to an estimate directly in the database
+ */
+export async function applyPatchAndPersist(
+  projectId: string,
+  patches: BamlPatch[],
+  threadId: string
+): Promise<{ success: boolean; error?: string }> {
+  console.log(`Applying ${patches.length} patches to estimate for project ${projectId}`);
+
+  try {
+    const supabase = await createClient();
+
+    // Fetch current estimate
+    const { data: project, error: fetchError } = await supabase
+      .from('projects')
+      .select('ai_estimate')
+      .eq('id', projectId)
+      .single();
+
+    if (fetchError || !project) {
+      console.error('Error fetching project estimate:', fetchError);
+      return { success: false, error: 'Failed to fetch current estimate' };
+    }
+
+    // Import dynamically to avoid SSR issues
+    const { applyPatch } = await import('fast-json-patch');
+
+    let estimate = project.ai_estimate;
+    const results: BamlPatchResult[] = [];
+
+    // Apply patches one by one and track results
+    for (const patch of patches) {
+      try {
+        // Convert the BAML patch format to JSON Patch format
+        const jsonPatch = {
+          op: patch.operation.toLowerCase(), // Convert Add/Remove/Replace to add/remove/replace
+          path: patch.json_path,
+          value: patch.operation !== 'Remove' ? patch.new_value : undefined
+        };
+
+        // Apply the patch
+        estimate = applyPatch(estimate, [jsonPatch]).newDocument;
+
+        // Validate estimate structure (basic check)
+        if (!estimate || !estimate.project_description || !Array.isArray(estimate.estimate_items)) {
+          throw new Error('Invalid estimate structure after patch');
+        }
+
+        results.push({ success: true });
+      } catch (e) {
+        console.error('Patch application failed:', e);
+        results.push({
+          success: false,
+          error_message: e instanceof Error ? e.message : 'Unknown error during patch'
+        });
+      }
+    }
+
+    // Check if any patches failed or if there are too many patches (fallback criteria)
+    const failCount = results.filter(r => !r.success).length;
+    if (failCount > 0 || patches.length > 8) {
+      console.log(`Falling back to full re-estimate: ${failCount} failures out of ${patches.length} patches`);
+      // Record the failure and fallback to full update
+      await recordChatPatchResponse(threadId, results);
+
+      // Start the full update process with all requested changes
+      const patchesToText = patches
+        .map(p => `${p.operation} ${p.json_path}${p.new_value ? ' to ' + p.new_value : ''}`)
+        .join('; ');
+
+      // TODO: Uncomment this after checking things work...
+        // await startEstimateGeneration(
+      //   projectId,
+      //   `Please apply these changes: ${patchesToText}`,
+      //   threadId
+      // );
+      return { success: true };
+    }
+
+    // If all patches succeeded, persist the updated estimate
+    const { error: updateError } = await supabase
+      .from('projects')
+      .update({ ai_estimate: estimate })
+      .eq('id', projectId);
+
+    if (updateError) {
+      console.error('Error updating project estimate:', updateError);
+      return { success: false, error: 'Failed to persist updated estimate' };
+    }
+
+    // Record the successful patch response in the chat thread
+    await recordChatPatchResponse(threadId, results);
+
+    return { success: true };
+  } catch (e) {
+    console.error('Error in applyPatchAndPersist:', e);
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : 'Unknown error occurred'
+    };
   }
 }
 

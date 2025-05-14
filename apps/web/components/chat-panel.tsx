@@ -3,7 +3,15 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { X, Send, RefreshCw, ChevronDown, ChevronUp, GripVertical } from 'lucide-react';
 import { getChatThreadDetails, createChatThreadAndPostMessage, postChatMessage, getChatEvents, DisplayableBamlEvent } from '@/app/projects/[id]/actions';
-import type { UserInput as BamlUserInput, AssisantMessage as BamlAssistantMessage, UpdateEstimateRequest as BamlUpdateEstimateRequest, UpdateEstimateResponse as BamlUpdateEstimateResponse, AllowedTypes } from '@/baml_client/baml_client/types';
+import type {
+  UserInput as BamlUserInput,
+  AssisantMessage as BamlAssistantMessage,
+  UpdateEstimateRequest as BamlUpdateEstimateRequest,
+  UpdateEstimateResponse as BamlUpdateEstimateResponse,
+  PatchEstimateRequest as BamlPatchEstimateRequest,
+  PatchEstimateResponse as BamlPatchEstimateResponse,
+  AllowedTypes
+} from '@/baml_client/baml_client/types';
 import ReactMarkdown from 'react-markdown';
 
 interface ChatPanelProps {
@@ -199,7 +207,7 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
               }
             });
             newEvents.forEach(event => {
-              if (event.type === 'UpdateEstimateResponse') {
+              if (event.type === 'UpdateEstimateResponse' || event.type === 'PatchEstimateResponse') {
                 setIsAssistantUpdatingEstimate(false);
               }
             });
@@ -290,7 +298,8 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
           if (result.userInputDisplayEvent) newEventsList.push(result.userInputDisplayEvent);
           if (result.assistantResponseDisplayEvent) {
             newEventsList.push(result.assistantResponseDisplayEvent);
-            if (result.assistantResponseDisplayEvent.type === 'UpdateEstimateRequest') {
+            if (result.assistantResponseDisplayEvent.type === 'UpdateEstimateRequest' ||
+                result.assistantResponseDisplayEvent.type === 'PatchEstimateRequest') {
               setIsAssistantUpdatingEstimate(true);
             }
           }
@@ -312,7 +321,8 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
           newEventsList.push(result.userInputDisplayEvent);
           if (result.assistantResponseDisplayEvent) {
             newEventsList.push(result.assistantResponseDisplayEvent);
-            if (result.assistantResponseDisplayEvent.type === 'UpdateEstimateRequest') {
+            if (result.assistantResponseDisplayEvent.type === 'UpdateEstimateRequest' ||
+                result.assistantResponseDisplayEvent.type === 'PatchEstimateRequest') {
               setIsAssistantUpdatingEstimate(true);
             }
           }
@@ -354,6 +364,48 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
             <ReactMarkdown>
               {(event.data as BamlAssistantMessage).message}
             </ReactMarkdown>
+          </div>
+        );
+      case 'PatchEstimateRequest':
+        const patchRequestData = event.data as BamlPatchEstimateRequest;
+        const isPatchExpanded = expandedUpdateRequests[event.id];
+        return (
+          <div>
+            <p><strong>System:</strong> ⚡ Quick patch in progress...</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => toggleUpdateRequestExpansion(event.id)}
+              className="text-blue-400 hover:text-blue-300 px-1 py-0 h-auto text-xs mt-1 flex items-center"
+            >
+              {isPatchExpanded ? <ChevronUp className="h-3 w-3 mr-1" /> : <ChevronDown className="h-3 w-3 mr-1" />}
+              {isPatchExpanded ? 'Hide Details' : 'Show Details'}
+            </Button>
+            {isPatchExpanded && (
+              <div className="mt-2 pt-2 border-t border-yellow-600/30">
+                <p className="text-sm italic">
+                  Patches: {patchRequestData.patches.map(p =>
+                    `${p.operation} ${p.json_path}${p.new_value ? ' to ' + p.new_value : ''}`
+                  ).join(', ')}
+                </p>
+              </div>
+            )}
+          </div>
+        );
+      case 'PatchEstimateResponse':
+        const patchResponseData = event.data as BamlPatchEstimateResponse;
+        const allPatchesSucceeded = patchResponseData.patch_results.every(r => r.success);
+        if (allPatchesSucceeded) {
+          return <p><strong>System:</strong> ✅ Estimate updated.</p>;
+        }
+        return (
+          <div>
+            <p><strong>System:</strong> ⚠️ Some patches failed. Falling back to full update.</p>
+            <div className="mt-2 text-sm text-red-400">
+              {patchResponseData.patch_results
+                .filter(r => !r.success)
+                .map((r, i) => <p key={i}>Error: {r.error_message}</p>)}
+            </div>
           </div>
         );
       case 'UpdateEstimateRequest':
@@ -490,6 +542,8 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
                   className={`max-w-[85%] p-4 rounded-lg shadow-lg
                     ${event.type === 'UserInput' ? 'bg-blue-600 text-white border border-blue-700/50' : 'bg-gray-800 text-gray-200 border border-gray-700'}
                     ${event.type === 'UpdateEstimateRequest' || event.type === 'UpdateEstimateResponse' ? 'bg-yellow-900/30 border border-yellow-700 text-yellow-400 w-full' : ''}
+                    ${event.type === 'PatchEstimateRequest' ? 'bg-blue-900/30 border border-blue-700 text-blue-400 w-full' : ''}
+                    ${event.type === 'PatchEstimateResponse' ? 'bg-green-900/30 border border-green-700 text-green-400 w-full' : ''}
                   `}
                 >
                   {renderEventData(event)}
