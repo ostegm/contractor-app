@@ -62,3 +62,12 @@ lint.ignore = [
 "tests/*" = ["D", "UP"]
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "../.."  # Add the project root (2 levels up from apps/langgraph) to sys.path
+]
+addopts = "-v --log-cli-level=INFO" # You can move your CLI opts here too
+testpaths = [
+    "tests" # Specifies where to find tests relative to this pyproject.toml
+]
