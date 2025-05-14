@@ -111,11 +111,11 @@ BEGIN
     VALUES (user_id_val, 'Bathroom Renovation (Estimated)', '1990s bathroom remodel with modern features, estimate complete.', project1_info, project1_estimate)
     RETURNING id INTO project1_id;
 
-    INSERT INTO files (project_id, file_name, file_url, description)
+    INSERT INTO files (project_id, file_name, file_url, description, type)
     VALUES
-        (project1_id, 'client_notes.txt', 'project1/client_notes.txt', 'Client requirements and budget for bathroom renovation.'),
-        (project1_id, 'current_bathroom.png', 'project1/current_bathroom.png', 'Current bathroom photo.'),
-        (project1_id, 'measurements.txt', 'project1/measurements.txt', 'Bathroom dimensions and layout details.');
+        (project1_id, 'client_notes.txt', 'project1/client_notes.txt', 'Client requirements and budget for bathroom renovation.', 'text/plain'),
+        (project1_id, 'current_bathroom.png', 'project1/current_bathroom.png', 'Current bathroom photo.', 'image/png'),
+        (project1_id, 'measurements.txt', 'project1/measurements.txt', 'Bathroom dimensions and layout details.', 'text/plain');
 
     -- Mark estimate as complete for Project 1
     INSERT INTO task_jobs (project_id, status, job_type)
@@ -126,12 +126,12 @@ BEGIN
     VALUES (user_id_val, 'Kitchen Refresh (Files Uploaded)', 'Major kitchen refresh project, files uploaded, awaiting estimate.', project2_info, NULL)
     RETURNING id INTO project2_id;
 
-    INSERT INTO files (project_id, file_name, file_url, description)
+    INSERT INTO files (project_id, file_name, file_url, description, type)
     VALUES
-        (project2_id, 'current_kitchen.png', 'project2/current_kitchen.png', 'Current kitchen photo.'),
-        (project2_id, 'desired_kitchen.png', 'project2/desired_kitchen.png', 'Hypothetical end state showing goal of project.'),
-        (project2_id, 'walkthrough_video.m4a', 'project2/walkthrough_notes.m4a', 'Audio notes of walkthrough of the kitchen.'),
-        (project2_id, 'walkthrough_notes.txt', 'project2/walkthrough_notes.txt', 'Additional notes from walkthrough of the kitchen.');
+        (project2_id, 'current_kitchen.png', 'project2/current_kitchen.png', 'Current kitchen photo.', 'image/png'),
+        (project2_id, 'desired_kitchen.png', 'project2/desired_kitchen.png', 'Hypothetical end state showing goal of project.', 'image/png'),
+        (project2_id, 'walkthrough_video.m4a', 'project2/walkthrough_notes.m4a', 'Audio notes of walkthrough of the kitchen.', 'audio/m4a'),
+        (project2_id, 'walkthrough_notes.txt', 'project2/walkthrough_notes.txt', 'Additional notes from walkthrough of the kitchen.', 'text/plain');
 
 
     RAISE NOTICE 'Seeding complete. Project 1 ID: %, Project 2 ID: %', project1_id, project2_id;

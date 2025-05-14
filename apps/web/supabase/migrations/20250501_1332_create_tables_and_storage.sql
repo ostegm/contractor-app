@@ -36,6 +36,7 @@ CREATE TABLE files (
     file_name TEXT NOT NULL,
     file_url TEXT NOT NULL,
     description TEXT, -- Added from 20240624 migration
+    type TEXT NOT NULL,
     uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
