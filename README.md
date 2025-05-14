@@ -74,6 +74,7 @@ contractor-monorepo/
 - Fast updates https://chatgpt.com/c/6822a808-f118-8001-8efe-94bf6c8408be
 - Export to CSV
 - Ability to make chat wider, render Mardown in chat messages
+- Seed AI generated video card example.
 - Delete video cascades to ai gen files.
 - Rename file_url column to storage_path, type to mimetype
 - Need to import into quickbooks (see chat gpt)

@@ -250,6 +250,7 @@ export function VideoSummaryCard({
                   <div className="relative aspect-video bg-gray-950">
                     {frameUrls[frame.id] ? (
                       <Image
+                        key={frame.id}
                         src={frameUrls[frame.id]}
                         alt={frame.description || `Frame from ${videoFileName}`}
                         fill

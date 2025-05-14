@@ -273,17 +273,13 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     const { checkVideoProcessingStatus } = require('./actions');
 
     const pollInterval = setInterval(async () => {
-      console.log("Polling for video processing status...", processingVideoIds);
       // For each processing video, check its status
       for (const [fileId, jobId] of Object.entries(processingVideoIds)) {
-        console.log(`Polling status for video job ${jobId} (file: ${fileId})...`);
         try {
           const result = await checkVideoProcessingStatus(jobId);
-          console.log(`Video processing status for job ${jobId}:`, result);
 
           if (result.status === 'completed') {
             // Successfully completed processing
-            console.log(`Video processing completed for file ${fileId}, job ${jobId}`);
             // Remove from processing list
             setProcessingVideoIds(prev => {
               const newState = {...prev};
@@ -957,25 +953,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                             const isFrame = aiFile.parent_file_id === file.id &&
                                            !aiFile.file_name.includes('summary') &&
                                            isImageFile(aiFile.file_name);
-
-                            if (isFrame) {
-                              console.log(`Found frame for video ${file.id}:`, {
-                                id: aiFile.id,
-                                file_name: aiFile.file_name,
-                                description: aiFile.description,
-                                file_url: aiFile.file_url
-                              });
-                            }
-
                             return isFrame;
                           });
 
-                          console.log(`Found ${videoFrames.length} frames for video ${file.id}`);
-
-                          // If debug needed, log the first frame's details
-                          if (videoFrames.length > 0) {
-                            console.log('First frame details:', videoFrames[0]);
-                          }
                         }
 
                         return (
@@ -1062,7 +1042,6 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                                   videoFileName={file.file_name}
                                   summaryFile={videoSummaryFile}
                                   frames={videoFrames.map(frame => {
-                                    console.log(`Passing frame to VideoSummaryCard: ${frame.file_name}, URL: ${frame.file_url}`);
                                     return {
                                       id: frame.id,
                                       file_name: frame.file_name,

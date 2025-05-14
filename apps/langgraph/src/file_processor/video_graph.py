@@ -136,7 +136,6 @@ async def _extract_key_frames_locally(
             "ffmpeg",
             "-ss", str(key_frame.timestamp_s),
             "-i", local_video_path,
-            "-vf", "thumbnail", 
             "-vframes", "1",
             "-f", "image2pipe", # Output format is image2pipe
             "-c:v", "png", # Codec is png
