@@ -3,7 +3,7 @@ client<llm> OpenaiFallback {
   provider fallback
   options {
     // This will try the clients in order until one succeeds
-    strategy [GPT41MiniWith2Retries, GPT41With2Retries]
+    strategy [GPT41With2Retries, GPT41MiniWith2Retries]
   }
 }
 

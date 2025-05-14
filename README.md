@@ -70,11 +70,14 @@ contractor-monorepo/
 
 
 ## TODOS
-- Export to CSV
 - Handle Video input - process into text file and images
+- Fast updates https://chatgpt.com/c/6822a808-f118-8001-8efe-94bf6c8408be
+- Export to CSV
+- Ability to make chat wider, render Mardown in chat messages
 - Delete video cascades to ai gen files.
-- Rename file_url column to storage_path
+- Rename file_url column to storage_path, type to mimetype
 - Need to import into quickbooks (see chat gpt)
+- New project view - show button to open files view
 - Review export/import functionality chatgpt - maybe add to app?
 - Mobile UX?
 - Auto name chats async after 2 messages (baml impl with 4.1nano)
@@ -86,7 +89,6 @@ contractor-monorepo/
    - Web search for Pricing per plant
    - How many grasses of type x are there in this project?
 - How to enable web search (firecrawl?) 
-- How to make it faster (only produce sections of the aiestimate? Don't regenerate all of it)
 - Test cases from Lily
 - Test case from forrest
 - Revision history on estimate (with comparison notes from small model)
