@@ -563,7 +563,7 @@ export async function postChatMessage(
     try {
         // Ensure currentEstimate is not null before passing, BAML might require it
         // Assuming BAML handles null or we pass an empty object if needed.
-        nextBamlEventOutput = await b.DetermineNextStep(currentThreadState, currentEstimate ?? {} as ConstructionProjectData);
+        nextBamlEventOutput = await b.DetermineNextStep(currentThreadState, currentEstimate as ConstructionProjectData ?? undefined);
     } catch (bamlError) {
         console.error('BAML DetermineNextStep error:', bamlError);
         return { userInputDisplayEvent, updateTriggered: false, error: 'AI failed to determine next step.' };
@@ -1480,52 +1480,7 @@ export async function deleteFile(fileId: string) {
       }
     }
 
-    // First delete any task jobs associated with this file
-    // This needs to happen before deleting the file due to foreign key constraints
-
-    // Try a more comprehensive approach to delete all related task jobs
-    try {
-      // First try direct task_jobs by file_id
-      const { error: deleteTaskJobsError } = await supabase
-        .from('task_jobs')
-        .delete()
-        .eq('file_id', fileId);
-
-      if (deleteTaskJobsError) {
-        console.error('Error deleting task jobs by file_id:', deleteTaskJobsError);
-
-        // If that fails, try a more direct SQL approach using RPC if available
-        const { error: sqlError } = await supabase.rpc('force_delete_task_jobs', {
-          target_file_id: fileId
-        }).maybeSingle();
-
-        if (sqlError) {
-          console.error('Error using RPC to delete task jobs:', sqlError);
-
-          // Last resort: Debug and return information to determine what's preventing deletion
-          const { data: blockingTasks, error: blockingError } = await supabase
-            .from('task_jobs')
-            .select('id, job_type, thread_id, run_id')
-            .eq('file_id', fileId);
-
-          if (blockingError) {
-            console.error('Error finding blocking task jobs:', blockingError);
-          } else if (blockingTasks && blockingTasks.length > 0) {
-            console.error('Found blocking task jobs:', blockingTasks);
-            // Try one more method - use cascade if supported
-            await supabase.from('task_jobs').delete().eq('file_id', fileId).options({ cascade: true });
-          }
-
-          // If all else fails, let the user know what's blocking
-          return { error: 'Cannot delete file due to existing task references. Try again later.' };
-        }
-      }
-    } catch (taskJobError) {
-      console.error('Unexpected error deleting task jobs:', taskJobError);
-      return { error: 'Failed to delete associated task jobs' };
-    }
-
-    // Now that task jobs are deleted, delete the main file record
+    // Deleting the main file record will trigger ON DELETE CASCADE for associated task_jobs
     const { error: deleteFileError } = await supabase
       .from('files')
       .delete()

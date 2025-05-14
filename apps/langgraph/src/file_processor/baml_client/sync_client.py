@@ -127,7 +127,7 @@ class BamlSyncClient:
     
     def DetermineNextStep(
         self,
-        thread: types.BamlChatThread,current_estimate: types.ConstructionProjectData,
+        thread: types.BamlChatThread,current_estimate: Optional[types.ConstructionProjectData],
         baml_options: BamlCallOptions = {},
     ) -> types.Event:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -256,7 +256,7 @@ class BamlStreamClient:
     
     def DetermineNextStep(
         self,
-        thread: types.BamlChatThread,current_estimate: types.ConstructionProjectData,
+        thread: types.BamlChatThread,current_estimate: Optional[types.ConstructionProjectData],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.BamlSyncStream[partial_types.Event, types.Event]:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}

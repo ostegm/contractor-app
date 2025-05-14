@@ -412,7 +412,7 @@ export function useAnalyzeVideo(
  *
  * - thread: BamlChatThread
  *
- * - current_estimate: ConstructionProjectData
+ * - current_estimate (optional): ConstructionProjectData | null
  *
  *
  * **Return Type:**

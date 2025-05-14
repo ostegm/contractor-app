@@ -73,7 +73,7 @@ contractor-monorepo/
 - Handle Video input - process into text file and images
 - Fast updates https://chatgpt.com/c/6822a808-f118-8001-8efe-94bf6c8408be
 - Export to CSV
-- Ability to make chat wider, render Mardown in chat messages
+- ~~Ability to make chat wider, render Markdown in chat messages~~ (Completed)
 - Seed AI generated video card example.
 - Delete video cascades to ai gen files.
 - Rename file_url column to storage_path, type to mimetype

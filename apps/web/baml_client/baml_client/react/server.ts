@@ -57,13 +57,13 @@ export const AnalyzeVideo = async (
  * with the specified parameters.
  *
  * @param { BamlChatThread } thread - Input parameter.
- * @param { ConstructionProjectData } current_estimate - Input parameter.
+ * @param { ConstructionProjectData | null } current_estimate (optional) - Input parameter.
  *
  * @returns {Promise<Event>} A promise that resolves with the result of the action.
  */
 export const DetermineNextStep = async (
   thread: BamlChatThread,
-  current_estimate: ConstructionProjectData,
+  current_estimate?: ConstructionProjectData | null,
 ): Promise<Event> => {
   return b.DetermineNextStep(
     thread,

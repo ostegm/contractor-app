@@ -107,7 +107,7 @@ export class BamlAsyncClient {
   }
   
   async DetermineNextStep(
-      thread: BamlChatThread,current_estimate: ConstructionProjectData,
+      thread: BamlChatThread,current_estimate?: ConstructionProjectData | null,
       __baml_options__?: BamlCallOptions
   ): Promise<Event> {
     try {
@@ -116,7 +116,7 @@ export class BamlAsyncClient {
       const raw = await this.runtime.callFunction(
         "DetermineNextStep",
         {
-          "thread": thread,"current_estimate": current_estimate
+          "thread": thread,"current_estimate": current_estimate?? null
         },
         this.ctxManager.cloneContext(),
         options.tb?.__tb(),
@@ -219,7 +219,7 @@ class BamlStreamClient {
   }
   
   DetermineNextStep(
-      thread: BamlChatThread,current_estimate: ConstructionProjectData,
+      thread: BamlChatThread,current_estimate?: ConstructionProjectData | null,
       __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry, collector?: Collector | Collector[] }
   ): BamlStream<partial_types.Event, Event> {
     try {
@@ -228,7 +228,7 @@ class BamlStreamClient {
       const raw = this.runtime.streamFunction(
         "DetermineNextStep",
         {
-          "thread": thread,"current_estimate": current_estimate
+          "thread": thread,"current_estimate": current_estimate ?? null
         },
         undefined,
         this.ctxManager.cloneContext(),

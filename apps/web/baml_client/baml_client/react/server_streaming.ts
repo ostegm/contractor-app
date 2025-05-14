@@ -58,13 +58,13 @@ export const AnalyzeVideo = async (
  * BAML stream function. The returned stream yields incremental updates.
  *
  * @param { BamlChatThread } thread - Input parameter.
- * @param { ConstructionProjectData } current_estimate - Input parameter.
+ * @param { ConstructionProjectData | null } current_estimate (optional) - Input parameter.
  *
  * @returns {ReadableStream<Uint8Array>} A stream that yields incremental updates from the action.
  */
 export const DetermineNextStep = async (
   thread: BamlChatThread,
-  current_estimate: ConstructionProjectData,
+  current_estimate?: ConstructionProjectData | null,
 ): Promise<ReadableStream<Uint8Array>> => {
   const stream = b.stream.DetermineNextStep(
     thread,

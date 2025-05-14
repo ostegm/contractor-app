@@ -63,7 +63,7 @@ class AsyncHttpRequest:
     
     async def DetermineNextStep(
         self,
-        thread: types.BamlChatThread,current_estimate: types.ConstructionProjectData,
+        thread: types.BamlChatThread,current_estimate: Optional[types.ConstructionProjectData],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -170,7 +170,7 @@ class AsyncHttpStreamRequest:
     
     async def DetermineNextStep(
         self,
-        thread: types.BamlChatThread,current_estimate: types.ConstructionProjectData,
+        thread: types.BamlChatThread,current_estimate: Optional[types.ConstructionProjectData],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
