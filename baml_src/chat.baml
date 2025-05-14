@@ -5,7 +5,7 @@ class BamlChatThread {
 
 class Event {
     type AllowedTypes
-    data (UserInput | AssisantMessage | UpdateEstimateRequest | UpdateEstimateResponse)
+    data (UserInput | AssisantMessage | UpdateEstimateRequest | UpdateEstimateResponse | PatchEstimateRequest | PatchEstimateResponse)
 }
 
 // Event Types
@@ -14,6 +14,14 @@ enum AllowedTypes {
     AssisantMessage
     UpdateEstimateRequest
     UpdateEstimateResponse
+    PatchEstimateRequest
+    PatchEstimateResponse
+}
+
+enum PatchOperation {
+    Add
+    Remove
+    Replace
 }
 
 class UserInput {
@@ -34,6 +42,25 @@ class UpdateEstimateResponse {
     error_message string @description("The error message if the update was not successful")
 }
 
+class Patch {
+    json_path string @description("Path to the field being patched, e.g. /estimate_items/[uid]/cost_max")
+    operation PatchOperation @description("Type of patch operation to perform")
+    new_value string? @description("New value to set (for Add or Replace operations)")
+}
+
+class PatchEstimateRequest {
+    patches Patch[] @description("List of patches to apply to the estimate")
+}
+
+class PatchResult {
+    success bool @description("Whether the patch was successful")
+    error_message string? @description("The error message if the patch was not successful")
+}
+
+class PatchEstimateResponse {
+    patch_results PatchResult[] @description("Results of applying each patch")
+}
+
 
 function DetermineNextStep(thread: BamlChatThread, current_estimate: ConstructionProjectData?) -> Event {
     client OpenaiFallback
@@ -46,7 +73,7 @@ function DetermineNextStep(thread: BamlChatThread, current_estimate: Constructio
     {{ current_estimate }}
     </current_estimate>
     {% endif %}
-    
+
     <conversation_history>
     {% for event in thread.events %}
     <{{ event.type }}>
@@ -54,9 +81,40 @@ function DetermineNextStep(thread: BamlChatThread, current_estimate: Constructio
     </{{ event.type }}>
     {% endfor %}
     </conversation_history>
+
+    ## Response Types
+    You can respond in one of three ways:
+    1. Return an AssisantMessage with a regular text response to the user
+    2. Return a PatchEstimateRequest when the user requests a small numeric or textual change (≤5 items)
+    3. Return an UpdateEstimateRequest when the change affects many items or requires recalculating totals
+
+    ## Fast Patching Guidelines
+    If the user requests a simple change like modifying a cost, description, or quantity of a specific line item, use PatchEstimateRequest with precise JSON patches.
+
+    Example - User: "Change the plumbing line item cost to $400"
+    Response: PatchEstimateRequest with:
+    ```
+    {
+      "patches": [
+        {
+          "json_path": "/estimate_items/[uid-of-plumbing-item]/cost_range_min",
+          "operation": "Replace",
+          "new_value": "400"
+        },
+        {
+          "json_path": "/estimate_items/[uid-of-plumbing-item]/cost_range_max",
+          "operation": "Replace",
+          "new_value": "400"
+        }
+      ]
+    }
+    ```
+
+    For more complex changes that would affect multiple items or require recalculating totals, use UpdateEstimateRequest with a description of the changes.
+
     {{ ctx.output_format }}
     "#
-    
+
 }
 
 

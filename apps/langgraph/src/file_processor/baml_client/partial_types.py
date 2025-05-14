@@ -54,6 +54,7 @@ class ConstructionProjectData(BaseModel):
     key_risks: List[str]
 
 class EstimateLineItem(BaseModel):
+    uid: Optional[str] = None
     description: Optional[str] = None
     category: Optional[str] = None
     subcategory: Optional[str] = None
@@ -67,7 +68,7 @@ class EstimateLineItem(BaseModel):
 
 class Event(BaseModel):
     type: Optional[types.AllowedTypes] = None
-    data: Optional[Union["UserInput", "AssisantMessage", "UpdateEstimateRequest", "UpdateEstimateResponse"]] = None
+    data: Optional[Union["UserInput", "AssisantMessage", "UpdateEstimateRequest", "UpdateEstimateResponse", "PatchEstimateRequest", "PatchEstimateResponse"]] = None
 
 class InputFile(BaseModel):
     name: Optional[str] = None
@@ -82,6 +83,21 @@ class KeyFrame(BaseModel):
     filename: Optional[str] = None
     timestamp_s: Optional[float] = None
     description: Optional[str] = None
+
+class Patch(BaseModel):
+    json_path: Optional[str] = None
+    operation: Optional[types.PatchOperation] = None
+    new_value: Optional[str] = None
+
+class PatchEstimateRequest(BaseModel):
+    patches: List["Patch"]
+
+class PatchEstimateResponse(BaseModel):
+    patch_results: List["PatchResult"]
+
+class PatchResult(BaseModel):
+    success: Optional[bool] = None
+    error_message: Optional[str] = None
 
 class UpdateEstimateRequest(BaseModel):
     changes_to_make: Optional[str] = None

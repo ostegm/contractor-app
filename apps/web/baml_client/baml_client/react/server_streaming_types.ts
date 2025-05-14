@@ -18,7 +18,7 @@ $ pnpm add @boundaryml/baml
 import type { Check, Checked  } from "../types";
 import type { Image, Audio } from "@boundaryml/baml";
 
-import type {  AllowedTypes,  AssisantMessage,  BamlChatThread,  ConstructionProjectData,  EstimateLineItem,  Event,  InputFile,  KeyFrame,  UpdateEstimateRequest,  UpdateEstimateResponse,  UserInput,  VideoAnalysis } from "../types"
+import type {  AllowedTypes,  AssisantMessage,  BamlChatThread,  ConstructionProjectData,  EstimateLineItem,  Event,  InputFile,  KeyFrame,  Patch,  PatchEstimateRequest,  PatchEstimateResponse,  PatchOperation,  PatchResult,  UpdateEstimateRequest,  UpdateEstimateResponse,  UserInput,  VideoAnalysis } from "../types"
 
 import type * as types from "../types"
 import type { partial_types }from "../partial_types";

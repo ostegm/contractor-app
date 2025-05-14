@@ -1,6 +1,7 @@
 // BAML file: apps/langgraph/src/file_processor/baml_src/file_processor.baml
 
 class EstimateLineItem {
+  uid string @description("Unique identifier for the line item")
   description string @description("Description of the work item or material")
   category string @description("Category of the item (e.g., Demo, Plumbing, Electrical, etc.)")
   subcategory string? @description("Subcategory for further classification")
@@ -71,6 +72,10 @@ function GenerateProjectEstimate(files: InputFile[], existing_estimate: Construc
 
   Based *solely* on the provided information, generate a detailed estimate including a project description, total estimated cost, and a list of line items with their individual costs.
   Output the estimate as a JSON object conforming to the specified schema.
+
+  IMPORTANT: For each EstimateLineItem, you MUST include a "uid" field with a random UUID-like string (e.g., "abc123def456").
+  If an existing_estimate is provided with line items that have uids, REUSE those uids for any items that remain unchanged or are only slightly modified.
+  This ensures continuity between estimate versions.
 
   {{ ctx.output_format }}
   "#

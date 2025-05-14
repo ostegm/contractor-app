@@ -46,6 +46,14 @@ class AllowedTypes(str, Enum):
     AssisantMessage = "AssisantMessage"
     UpdateEstimateRequest = "UpdateEstimateRequest"
     UpdateEstimateResponse = "UpdateEstimateResponse"
+    PatchEstimateRequest = "PatchEstimateRequest"
+    PatchEstimateResponse = "PatchEstimateResponse"
+
+class PatchOperation(str, Enum):
+    
+    Add = "Add"
+    Remove = "Remove"
+    Replace = "Replace"
 
 class AssisantMessage(BaseModel):
     message: str
@@ -66,6 +74,7 @@ class ConstructionProjectData(BaseModel):
     key_risks: List[str]
 
 class EstimateLineItem(BaseModel):
+    uid: str
     description: str
     category: str
     subcategory: Optional[str] = None
@@ -79,7 +88,7 @@ class EstimateLineItem(BaseModel):
 
 class Event(BaseModel):
     type: "AllowedTypes"
-    data: Union["UserInput", "AssisantMessage", "UpdateEstimateRequest", "UpdateEstimateResponse"]
+    data: Union["UserInput", "AssisantMessage", "UpdateEstimateRequest", "UpdateEstimateResponse", "PatchEstimateRequest", "PatchEstimateResponse"]
 
 class InputFile(BaseModel):
     name: str
@@ -94,6 +103,21 @@ class KeyFrame(BaseModel):
     filename: str
     timestamp_s: float
     description: str
+
+class Patch(BaseModel):
+    json_path: str
+    operation: "PatchOperation"
+    new_value: Optional[str] = None
+
+class PatchEstimateRequest(BaseModel):
+    patches: List["Patch"]
+
+class PatchEstimateResponse(BaseModel):
+    patch_results: List["PatchResult"]
+
+class PatchResult(BaseModel):
+    success: bool
+    error_message: Optional[str] = None
 
 class UpdateEstimateRequest(BaseModel):
     changes_to_make: str

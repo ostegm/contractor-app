@@ -51,6 +51,14 @@ export enum AllowedTypes {
   AssisantMessage = "AssisantMessage",
   UpdateEstimateRequest = "UpdateEstimateRequest",
   UpdateEstimateResponse = "UpdateEstimateResponse",
+  PatchEstimateRequest = "PatchEstimateRequest",
+  PatchEstimateResponse = "PatchEstimateResponse",
+}
+
+export enum PatchOperation {
+  Add = "Add",
+  Remove = "Remove",
+  Replace = "Replace",
 }
 
 export interface AssisantMessage {
@@ -78,6 +86,7 @@ export interface ConstructionProjectData {
 }
 
 export interface EstimateLineItem {
+  uid: string
   description: string
   category: string
   subcategory?: string | null
@@ -93,7 +102,7 @@ export interface EstimateLineItem {
 
 export interface Event {
   type: AllowedTypes
-  data: UserInput | AssisantMessage | UpdateEstimateRequest | UpdateEstimateResponse
+  data: UserInput | AssisantMessage | UpdateEstimateRequest | UpdateEstimateResponse | PatchEstimateRequest | PatchEstimateResponse
   
 }
 
@@ -112,6 +121,29 @@ export interface KeyFrame {
   filename: string
   timestamp_s: number
   description: string
+  
+}
+
+export interface Patch {
+  json_path: string
+  operation: PatchOperation
+  new_value?: string | null
+  
+}
+
+export interface PatchEstimateRequest {
+  patches: Patch[]
+  
+}
+
+export interface PatchEstimateResponse {
+  patch_results: PatchResult[]
+  
+}
+
+export interface PatchResult {
+  success: boolean
+  error_message?: string | null
   
 }
 
