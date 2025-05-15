@@ -43,9 +43,9 @@ class UpdateEstimateResponse {
 }
 
 class Patch {
-    json_path string @description("Path to the field being patched, e.g. /estimate_items/[uid]/cost_max")
+    json_path string @description("Path to the field being patched, e.g. /estimate_items/[uid]/cost_max or to replace a full line item /estimate_items/[uid] or to add a new line item to the end of the array /estimate_items/-")
     operation PatchOperation @description("Type of patch operation to perform")
-    new_value string? @description("New value to set (for Add or Replace operations)")
+    new_value string? | EstimateLineItem @description("Either a full estimate line item or a specific value to set (for Add or Replace operations on line item fields)")
 }
 
 class PatchEstimateRequest {
@@ -117,6 +117,14 @@ function DetermineNextStep(thread: BamlChatThread, current_estimate: Constructio
     {{ ctx.output_format }}
     "#
 
+}
+
+
+function ParseLineItem() -> EstimateLineItem {
+    client OpenaiFallback
+    prompt #"
+        This is just a placeholder function used in typscript to parse line items returned inside PatchEstimateRequest.
+    "#
 }
 
 

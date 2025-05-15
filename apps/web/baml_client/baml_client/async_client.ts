@@ -152,6 +152,29 @@ export class BamlAsyncClient {
     }
   }
   
+  async ParseLineItem(
+      
+      __baml_options__?: BamlCallOptions
+  ): Promise<EstimateLineItem> {
+    try {
+      const options = { ...this.bamlOptions, ...(__baml_options__ || {}) }
+      const collector = options.collector ? (Array.isArray(options.collector) ? options.collector : [options.collector]) : [];
+      const raw = await this.runtime.callFunction(
+        "ParseLineItem",
+        {
+          
+        },
+        this.ctxManager.cloneContext(),
+        options.tb?.__tb(),
+        options.clientRegistry,
+        collector,
+      )
+      return raw.parsed(false) as EstimateLineItem
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
   async ProcessAudio(
       audio: InputFile,
       __baml_options__?: BamlCallOptions
@@ -269,6 +292,35 @@ class BamlStreamClient {
         raw,
         (a): partial_types.ConstructionProjectData => a,
         (a): ConstructionProjectData => a,
+        this.ctxManager.cloneContext(),
+      )
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
+  ParseLineItem(
+      
+      __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry, collector?: Collector | Collector[] }
+  ): BamlStream<partial_types.EstimateLineItem, EstimateLineItem> {
+    try {
+      const options = { ...this.bamlOptions, ...(__baml_options__ || {}) }
+      const collector = options.collector ? (Array.isArray(options.collector) ? options.collector : [options.collector]) : [];
+      const raw = this.runtime.streamFunction(
+        "ParseLineItem",
+        {
+          
+        },
+        undefined,
+        this.ctxManager.cloneContext(),
+        options.tb?.__tb(),
+        options.clientRegistry,
+        collector,
+      )
+      return new BamlStream<partial_types.EstimateLineItem, EstimateLineItem>(
+        raw,
+        (a): partial_types.EstimateLineItem => a,
+        (a): EstimateLineItem => a,
         this.ctxManager.cloneContext(),
       )
     } catch (error) {

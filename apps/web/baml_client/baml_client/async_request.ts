@@ -91,6 +91,26 @@ export class AsyncHttpRequest {
     }
   }
   
+  async ParseLineItem(
+      
+      __baml_options__?: BamlCallOptions
+  ): Promise<HTTPRequest> {
+    try {
+      return await this.runtime.buildRequest(
+        "ParseLineItem",
+        {
+          
+        },
+        this.ctxManager.cloneContext(),
+        __baml_options__?.tb?.__tb(),
+        __baml_options__?.clientRegistry,
+        false,
+      )
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
   async ProcessAudio(
       audio: InputFile,
       __baml_options__?: BamlCallOptions
@@ -166,6 +186,26 @@ export class AsyncHttpStreamRequest {
         "GenerateProjectEstimate",
         {
           "files": files,"existing_estimate": existing_estimate?? null,"requested_changes": requested_changes?? null
+        },
+        this.ctxManager.cloneContext(),
+        __baml_options__?.tb?.__tb(),
+        __baml_options__?.clientRegistry,
+        true,
+      )
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
+  async ParseLineItem(
+      
+      __baml_options__?: BamlCallOptions
+  ): Promise<HTTPRequest> {
+    try {
+      return await this.runtime.buildRequest(
+        "ParseLineItem",
+        {
+          
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),

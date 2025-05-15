@@ -81,6 +81,24 @@ export class LlmResponseParser {
     }
   }
   
+  ParseLineItem(
+      llmResponse: string,
+      __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry }
+  ): EstimateLineItem {
+    try {
+      return this.runtime.parseLlmResponse(
+        "ParseLineItem",
+        llmResponse,
+        false,
+        this.ctxManager.cloneContext(),
+        __baml_options__?.tb?.__tb(),
+        __baml_options__?.clientRegistry,
+      ) as EstimateLineItem
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
   ProcessAudio(
       llmResponse: string,
       __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry }
@@ -154,6 +172,24 @@ export class LlmStreamParser {
         __baml_options__?.tb?.__tb(),
         __baml_options__?.clientRegistry,
       ) as partial_types.ConstructionProjectData
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
+  ParseLineItem(
+      llmResponse: string,
+      __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry }
+  ): partial_types.EstimateLineItem {
+    try {
+      return this.runtime.parseLlmResponse(
+        "ParseLineItem",
+        llmResponse,
+        true,
+        this.ctxManager.cloneContext(),
+        __baml_options__?.tb?.__tb(),
+        __baml_options__?.clientRegistry,
+      ) as partial_types.EstimateLineItem
     } catch (error) {
       throw toBamlError(error);
     }

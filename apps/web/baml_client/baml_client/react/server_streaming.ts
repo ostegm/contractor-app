@@ -99,6 +99,22 @@ export const GenerateProjectEstimate = async (
 };
 
 /**
+ * Executes the streaming variant of the "ParseLineItem" BAML action.
+ *
+ * This action initiates a streaming response by calling the corresponding
+ * BAML stream function. The returned stream yields incremental updates.
+ *
+ *
+ * @returns {ReadableStream<Uint8Array>} A stream that yields incremental updates from the action.
+ */
+export const ParseLineItem = async (
+): Promise<ReadableStream<Uint8Array>> => {
+  const stream = b.stream.ParseLineItem(
+  );
+  return Promise.resolve(stream.toStreamable());
+};
+
+/**
  * Executes the streaming variant of the "ProcessAudio" BAML action.
  *
  * This action initiates a streaming response by calling the corresponding

@@ -508,6 +508,52 @@ export function useGenerateProjectEstimate(
   return useBamlAction(action, props)
 }
 /**
+ * A specialized hook for the ParseLineItem BAML function that supports both streaming and non‑streaming responses.
+ *
+ * **Input Types:**
+ *
+ *
+ * **Return Type:**
+ * - **Non‑streaming:** EstimateLineItem
+ * - **Streaming Partial:** partial_types.EstimateLineItem
+ * - **Streaming Final:** EstimateLineItem
+ *
+ * **Usage Patterns:**
+ * 1. **Non‑streaming (Default)**
+ *    - Best for quick responses and simple UI updates.
+ * 2. **Streaming**
+ *    - Ideal for long‑running operations or real‑time feedback.
+ *
+ * **Edge Cases:**
+ * - Ensure robust error handling via `onError`.
+ * - Handle cases where partial data may be incomplete or missing.
+ *
+ * @example
+ * ```tsx
+ * // Basic non‑streaming usage:
+ * const { data, error, isLoading, mutate } = useParseLineItem({ stream: false});
+ *
+ * // Streaming usage:
+ * const { data, streamData, isLoading, error, mutate } = useParseLineItem({
+ *   stream: true | undefined,
+ *   onStreamData: (partial) => console.log('Partial update:', partial),
+ *   onFinalData: (final) => console.log('Final result:', final),
+ *   onError: (err) => console.error('Error:', err),
+ * });
+ * ```
+ */
+export function useParseLineItem(props: HookInput<'ParseLineItem', { stream: false }>): HookOutput<'ParseLineItem', { stream: false }>
+export function useParseLineItem(props?: HookInput<'ParseLineItem', { stream?: true }>): HookOutput<'ParseLineItem', { stream: true }>
+export function useParseLineItem(
+  props: HookInput<'ParseLineItem', { stream?: boolean }> = {},
+): HookOutput<'ParseLineItem', { stream: true }> | HookOutput<'ParseLineItem', { stream: false }> {
+  let action = Actions.ParseLineItem;
+  if (isStreamingProps(props)) {
+    action = StreamingActions.ParseLineItem;
+  }
+  return useBamlAction(action, props)
+}
+/**
  * A specialized hook for the ProcessAudio BAML function that supports both streaming and non‑streaming responses.
  *
  * **Input Types:**

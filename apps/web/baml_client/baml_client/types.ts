@@ -127,7 +127,7 @@ export interface KeyFrame {
 export interface Patch {
   json_path: string
   operation: PatchOperation
-  new_value?: string | null
+  new_value?: string | null | EstimateLineItem
   
 }
 

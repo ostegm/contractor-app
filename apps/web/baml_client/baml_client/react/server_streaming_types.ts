@@ -27,5 +27,6 @@ export type StreamingServerTypes = {
   AnalyzeVideo: partial_types.VideoAnalysis,
   DetermineNextStep: partial_types.Event,
   GenerateProjectEstimate: partial_types.ConstructionProjectData,
+  ParseLineItem: partial_types.EstimateLineItem,
   ProcessAudio: string,
 }

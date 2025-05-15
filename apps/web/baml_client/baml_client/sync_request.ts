@@ -91,6 +91,26 @@ export class HttpRequest {
     }
   }
   
+  ParseLineItem(
+      
+      __baml_options__?: BamlCallOptions
+  ): HTTPRequest {
+    try {
+      return this.runtime.buildRequestSync(
+        "ParseLineItem",
+        {
+          
+        },
+        this.ctxManager.cloneContext(),
+        __baml_options__?.tb?.__tb(),
+        __baml_options__?.clientRegistry,
+        false,
+      )
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
   ProcessAudio(
       audio: InputFile,
       __baml_options__?: BamlCallOptions
@@ -166,6 +186,26 @@ export class HttpStreamRequest {
         "GenerateProjectEstimate",
         {
           "files": files,"existing_estimate": existing_estimate?? null,"requested_changes": requested_changes?? null
+        },
+        this.ctxManager.cloneContext(),
+        __baml_options__?.tb?.__tb(),
+        __baml_options__?.clientRegistry,
+        true,
+      )
+    } catch (error) {
+      throw toBamlError(error);
+    }
+  }
+  
+  ParseLineItem(
+      
+      __baml_options__?: BamlCallOptions
+  ): HTTPRequest {
+    try {
+      return this.runtime.buildRequestSync(
+        "ParseLineItem",
+        {
+          
         },
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),

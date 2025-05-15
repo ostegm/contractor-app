@@ -96,6 +96,21 @@ export const GenerateProjectEstimate = async (
 };
 
 /**
+ * Executes the "ParseLineItem" BAML action.
+ *
+ * This server action calls the underlying BAML function "ParseLineItem"
+ * with the specified parameters.
+ *
+ *
+ * @returns {Promise<EstimateLineItem>} A promise that resolves with the result of the action.
+ */
+export const ParseLineItem = async (
+): Promise<EstimateLineItem> => {
+  return b.ParseLineItem(
+  );
+};
+
+/**
  * Executes the "ProcessAudio" BAML action.
  *
  * This server action calls the underlying BAML function "ProcessAudio"

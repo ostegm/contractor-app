@@ -87,7 +87,7 @@ class KeyFrame(BaseModel):
 class Patch(BaseModel):
     json_path: Optional[str] = None
     operation: Optional[types.PatchOperation] = None
-    new_value: Optional[str] = None
+    new_value: Optional[Union[Optional[str], "EstimateLineItem"]] = None
 
 class PatchEstimateRequest(BaseModel):
     patches: List["Patch"]

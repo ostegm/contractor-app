@@ -106,6 +106,29 @@ class HttpRequest:
         False,
       )
     
+    def ParseLineItem(
+        self,
+        
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "ParseLineItem",
+        {
+          
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        False,
+      )
+    
     def ProcessAudio(
         self,
         audio: types.InputFile,
@@ -202,6 +225,29 @@ class HttpStreamRequest:
         "GenerateProjectEstimate",
         {
           "files": files,"existing_estimate": existing_estimate,"requested_changes": requested_changes,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        True,
+      )
+    
+    def ParseLineItem(
+        self,
+        
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "ParseLineItem",
+        {
+          
         },
         self.__ctx_manager.get(),
         tb,

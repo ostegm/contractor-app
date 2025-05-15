@@ -93,7 +93,7 @@ export namespace partial_types {
     export interface Patch {
         json_path?: (string | null)
         operation?: (PatchOperation | null)
-        new_value: ((string | null) | null)
+        new_value?: (((string | null) | null) | (partial_types.EstimateLineItem | null) | null)
     }
     
     export interface PatchEstimateRequest {
