@@ -93,14 +93,13 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   // Callback for chat component to trigger loading state
   const handleEstimateUpdateTriggered = useCallback((isPatch?: boolean, fields?: string[]) => {
     if (isPatch && fields) {
-      // For patches, we don't show the loading state but track fields to highlight
-      setPatchedFields(fields);
-      toast.info('Quick patch in progress...', { duration: 2000 });
+      // For patches we don't need a loading state, just a small indicator
+      console.log('PATCH TRIGGERED from chat with fields:', fields);
+      // We'll apply the flash effect after the patch is detected in polling
     } else {
       // For full updates, show the loading state
       setEstimateStatus('processing');
       setEstimateError(null); // Clear previous errors
-      toast.info('Estimate update triggered by chat...');
     }
   }, []);
 
@@ -209,6 +208,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   useEffect(() => {
     if (!id || isLoading) return;
 
+    // Ensure we don't have any patched fields highlighted on initial load
+    setPatchedFields([]);
+
     const checkStatusAndUpdate = async () => {
       const result = await checkEstimateStatus(id);
       if (result.status) {
@@ -282,7 +284,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       if (result.status === 'completed') {
         setEstimateStatus('completed');
         // Refresh the page to get the updated estimate
-        fetchProject();
+        await fetchProject();
         toast.success('Estimate generation completed');
       } else if (result.status === 'failed') {
         setEstimateStatus('failed');
@@ -293,14 +295,47 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
     return () => clearInterval(pollInterval);
   }, [estimateStatus, id, fetchProject]);
+  
+  // Effect to handle patch responses (no polling)
+  useEffect(() => {
+    // This runs once when a patch is triggered from chat component
+    const handlePatchCompletion = async (patchedPaths: string[]) => {
+      
+      // Let's be sure we have the latest data
+      await fetchProject();
+      
+      // Delay briefly to ensure the data is loaded and rendered
+      setTimeout(() => {
+        // Set the patched fields to trigger the flash animation
+        setPatchedFields(patchedPaths);
+      }, 100);
+    };
+    
+    // Define the event handler as a named function so we can remove it properly
+    const patchEventHandler = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { fields } = customEvent.detail;
+      if (fields && Array.isArray(fields)) {
+        handlePatchCompletion(fields);
+      }
+    };
+    
+    // Register a global event listener for patch completion
+    window.addEventListener('patchCompleted', patchEventHandler);
+    
+    // Clean up the event listener when component unmounts
+    return () => {
+      window.removeEventListener('patchCompleted', patchEventHandler);
+    };
+  }, [fetchProject]);
 
   // Effect to clear patched fields after they've been displayed
   useEffect(() => {
     if (patchedFields.length > 0) {
-      // Give time for the UI to render and apply the flash animation
+      // Give time for the UI to render and complete the flash animation
       const clearTimer = setTimeout(() => {
         setPatchedFields([]);
-      }, 2000); // Clear after 2 seconds to match animation duration
+      }, 3000); // Clear after 6 seconds to match our 5s animation
 
       return () => clearTimeout(clearTimer);
     }
@@ -312,7 +347,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     const hasProcessingVideos = Object.keys(processingVideoIds).length > 0;
     if (!hasProcessingVideos) return;
 
-    // Import at the beginning of polling to ensure it's defined
+    // Dynamic import to avoid circular dependencies
     const { checkVideoProcessingStatus } = require('./actions');
 
     const pollInterval = setInterval(async () => {

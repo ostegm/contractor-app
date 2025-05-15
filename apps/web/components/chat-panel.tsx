@@ -44,6 +44,13 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // Helper function to check if there's an active patch request without a response
+  const hasActivePatchRequest = useCallback(() => {
+    return events.some(e => e.type === 'PatchEstimateRequest' && 
+                    !events.some(r => r.type === 'PatchEstimateResponse' && 
+                                  new Date(r.createdAt) > new Date(e.createdAt)));
+  }, [events]);
+
   // Handle start resizing
   const startResizing = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -193,7 +200,9 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
   useEffect(() => {
     if (!isOpen || !activeThreadId) return;
 
-    const intervalId = setInterval(async () => {
+    // Function to check for new events - pulled out to allow immediate check after patch request
+    // This helps unblock the chat input as soon as a patch response is received, rather than waiting for next poll
+    const checkForNewEvents = async () => {
       try {
         const lastEventTimestamp = events.length > 0 ? events[events.length - 1].createdAt : undefined;
         // Pass activeThreadId to getChatEvents
@@ -206,18 +215,57 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
                 allEvents.push(newEvent);
               }
             });
-            newEvents.forEach(event => {
-              if (event.type === 'UpdateEstimateResponse' || event.type === 'PatchEstimateResponse') {
-                setIsAssistantUpdatingEstimate(false);
-              }
-            });
             return allEvents;
+          });
+
+          // Process response events immediately to unblock chat input
+          newEvents.forEach(event => {
+            if (event.type === 'UpdateEstimateResponse') {
+              console.log('Found UpdateEstimateResponse event, unblocking chat input');
+              setIsAssistantUpdatingEstimate(false);
+            }
+            else if (event.type === 'PatchEstimateResponse') {
+              setIsAssistantUpdatingEstimate(false);
+              
+              // Find the corresponding request event to get the patch fields
+              const requestEvent = events.find(e => 
+                e.type === 'PatchEstimateRequest' && 
+                new Date(e.createdAt) < new Date(event.createdAt) &&
+                // Find the most recent request before this response
+                !events.some(other => 
+                  other.type === 'PatchEstimateResponse' &&
+                  new Date(other.createdAt) < new Date(event.createdAt) &&
+                  new Date(other.createdAt) > new Date(e.createdAt)
+                )
+              );
+              
+              if (requestEvent && requestEvent.data) {
+                const requestData = requestEvent.data as any;
+                if (requestData.patches) {
+                  // Extract field paths that were patched
+                  const patchedPaths = requestData.patches.map((patch: any) => patch.json_path);
+                  
+                  // Dispatch custom event to trigger flash animation
+                  const customEvent = new CustomEvent('patchCompleted', {
+                    detail: { fields: patchedPaths }
+                  });
+                  
+                  window.dispatchEvent(customEvent);
+                }
+              }
+            }
           });
         }
       } catch (err) {
         console.warn('Polling for chat events failed:', err);
       }
-    }, 3000);
+    };
+
+    // Initial check when component mounts or activeThreadId changes
+    checkForNewEvents();
+
+    // Regular polling interval
+    const intervalId = setInterval(checkForNewEvents, 3000);
 
     return () => clearInterval(intervalId);
   }, [activeThreadId, events, isOpen]); // Depends on activeThreadId
@@ -568,8 +616,24 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
 
           {error && <div className="p-2 text-red-500 border-t border-gray-700">Error: {error}</div>}
           {isAssistantUpdatingEstimate && (
-            <div className="p-2 text-blue-400 border-t border-gray-700 bg-blue-900/30">
-              Assistant is updating the estimate...
+            <div className="p-2 border-t border-gray-700">
+              {hasActivePatchRequest() ? (
+                <div className="text-blue-400 bg-blue-900/30 p-2 rounded flex items-center">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Applying quick patch...
+                </div>
+              ) : (
+                <div className="text-blue-400 bg-blue-900/30 p-2 rounded flex items-center">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Updating estimate...
+                </div>
+              )}
             </div>
           )}
 
@@ -584,7 +648,9 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
                 }}
                 placeholder={isNewUninitializedChat && !projectId ? "Select a project to start chat" : "Type your message... (Shift+Enter for new line)"}
                 className="flex-grow px-3 py-4 bg-gray-700 border border-gray-600 rounded-md text-gray-200 resize-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 placeholder:text-gray-400"
-                disabled={isSending || isAssistantUpdatingEstimate || (isNewUninitializedChat && !projectId) }
+                disabled={isSending || 
+                    (isAssistantUpdatingEstimate && !hasActivePatchRequest()) || 
+                    (isNewUninitializedChat && !projectId) }
                 rows={3} // Start with 3 rows instead of 1
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -598,7 +664,9 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
                 type="submit"
                 variant="ghost"
                 className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                disabled={isSending || !newMessage.trim() || isAssistantUpdatingEstimate || (isNewUninitializedChat && !projectId)}
+                disabled={isSending || !newMessage.trim() || 
+                          (isAssistantUpdatingEstimate && !hasActivePatchRequest()) || 
+                          (isNewUninitializedChat && !projectId)}
               >
                 {isSending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
