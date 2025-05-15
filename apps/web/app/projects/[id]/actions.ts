@@ -905,6 +905,17 @@ export async function applyPatchAndPersist(
   threadId: string
 ): Promise<{ success: boolean; error?: string }> {
   console.log(`Applying ${patches.length} patches to estimate for project ${projectId}`);
+  
+  // Log patch details for debugging
+  patches.forEach((patch, index) => {
+    console.log(`Patch ${index + 1}:`, {
+      path: patch.json_path,
+      operation: patch.operation,
+      ...(patch.operation !== 'Remove' && { value_preview: typeof patch.new_value === 'string' 
+        ? (patch.new_value.length > 100 ? patch.new_value.substring(0, 100) + '...' : patch.new_value) 
+        : JSON.stringify(patch.new_value).substring(0, 100) })
+    });
+  });
 
   try {
     const supabase = await createClient();
@@ -921,10 +932,13 @@ export async function applyPatchAndPersist(
       return { success: false, error: 'Failed to fetch current estimate' };
     }
 
-    // Import dynamically to avoid SSR issues
-    const { applyPatch } = await import('fast-json-patch');
+    // Import utility functions
+    const { 
+      applyEstimatePatches, 
+      calculateEstimateTotals 
+    } = await import('@/lib/estimate-patch-utils');
 
-    let currentEstimateObject: any; // Initialize as any, will be parsed ConstructionProjectData
+    let currentEstimateObject: any;
     if (typeof project.ai_estimate === 'string') {
       try {
         currentEstimateObject = JSON.parse(project.ai_estimate);
@@ -937,78 +951,15 @@ export async function applyPatchAndPersist(
         return { success: false, error: errorMessage };
       }
     } else if (project.ai_estimate === null || project.ai_estimate === undefined) {
-      // Handle case where estimate is explicitly null or not yet set
-      // This might mean we need a default structure or error out if patching a non-existent estimate
       console.error('Cannot apply patches: Current estimate is null or undefined.');
       return { success: false, error: 'Cannot apply patches to a non-existent estimate.' };
     } else {
-      // If it's already an object (though Supabase usually returns string or null)
       currentEstimateObject = project.ai_estimate;
     }
     
-    const results: BamlPatchResult[] = [];
-    // Apply patches one by one and track results
-    for (const patch of patches) {
-      try {
-        // currentEstimateObject is now guaranteed to be an object (or we'd have returned an error)
-        
-        // Check if we're dealing with a line item patch (contains /estimate_items/UID/ pattern)
-        const lineItemUidMatch = patch.json_path.match(/\/estimate_items\/([^\/]+)\/(.+)/);
-
-        let patchedDocument;
-        if (lineItemUidMatch) {
-          // This is a line item patch targeting a specific UID
-          const uid = lineItemUidMatch[1];
-          const propertyPath = lineItemUidMatch[2];
-
-          // Find the index of the line item with this UID
-          // Ensure estimate_items exists and is an array
-          if (!currentEstimateObject.estimate_items || !Array.isArray(currentEstimateObject.estimate_items)) {
-            throw new Error('Invalid estimate structure: estimate_items is missing or not an array.');
-          }
-          const itemIndex = currentEstimateObject.estimate_items.findIndex((item: any) => item.uid === uid);
-
-          if (itemIndex === -1) {
-            throw new Error(`Line item with UID "${uid}" not found in the estimate`);
-          }
-
-          // Create a new JSON Patch that uses array indices instead of UIDs
-          const convertedPatch = {
-            op: patch.operation.toLowerCase(),
-            path: `/estimate_items/${itemIndex}/${propertyPath}`,
-            value: patch.operation !== 'Remove' ? patch.new_value : undefined
-          };
-
-          // Apply the converted patch
-          patchedDocument = applyPatch(currentEstimateObject, [convertedPatch as any as import('fast-json-patch').Operation]).newDocument;
-        } else {
-          // Standard patch for non-line item properties
-          const jsonPatch = {
-            op: patch.operation.toLowerCase(),
-            path: patch.json_path,
-            value: patch.operation !== 'Remove' ? patch.new_value : undefined
-          };
-
-          // Apply the patch
-          patchedDocument = applyPatch(currentEstimateObject, [jsonPatch as any as import('fast-json-patch').Operation]).newDocument;
-        }
-        currentEstimateObject = patchedDocument; // Update currentEstimateObject with the patched version
-
-        // Validate estimate structure (basic check)
-        if (!currentEstimateObject || !currentEstimateObject.project_description || !Array.isArray(currentEstimateObject.estimate_items)) {
-          throw new Error('Invalid estimate structure after patch');
-        }
-
-        results.push({ success: true });
-      } catch (e) {
-        console.error('Patch application failed:', e);
-        results.push({
-          success: false,
-          error_message: e instanceof Error ? e.message : 'Unknown error during patch'
-        });
-      }
-    }
-
+    // Apply all patches using our utility function
+    const { newEstimate, results } = applyEstimatePatches(currentEstimateObject, patches);
+    
     // Check if any patches failed or if there are too many patches (fallback criteria)
     const failCount = results.filter(r => !r.success).length;
     if (failCount > 0 || patches.length > 8) {
@@ -1034,7 +985,7 @@ export async function applyPatchAndPersist(
     let finalEstimateToStore: string;
     try {
       // First, stringify the object that resulted from patching
-      const patchedJsonString = JSON.stringify(currentEstimateObject);
+      const patchedJsonString = JSON.stringify(newEstimate);
       // Then, try to parse it back using BAML to ensure it's valid ConstructionProjectData
       const validatedEstimate = b.parse.GenerateProjectEstimate(patchedJsonString);
       
@@ -1042,8 +993,6 @@ export async function applyPatchAndPersist(
       const estimateWithCorrectTotals = calculateEstimateTotals(validatedEstimate);
       
       // If successful, stringify the BAML-validated and corrected object for storage
-      // This ensures any minor coercions or defaults applied by the BAML parser are included,
-      // and that the totals reflect the actual sum of line items.
       finalEstimateToStore = JSON.stringify(estimateWithCorrectTotals);
     } catch (validationError) {
       console.error('Validation of patched estimate failed with BAML parser:', validationError);
@@ -1051,7 +1000,6 @@ export async function applyPatchAndPersist(
       results.push({ success: false, error_message: `Post-patch validation failed: ${errorMsg}` });
       await recordChatPatchResponse(threadId, results); // Inform chat of the validation failure
 
-      // For now, returning an error. Consider triggering full re-estimate as a fallback.
       return { success: false, error: `Patched estimate failed validation: ${errorMsg}` };
     }
 
@@ -1069,7 +1017,7 @@ export async function applyPatchAndPersist(
     // Record the successful patch response in the chat thread
     await recordChatPatchResponse(threadId, results);
 
-    revalidatePath(`/projects/${projectId}`); // ADDED: Revalidate path after successful patch and persist
+    revalidatePath(`/projects/${projectId}`);
     return { success: true };
   } catch (e) {
     console.error('Error in applyPatchAndPersist:', e);
