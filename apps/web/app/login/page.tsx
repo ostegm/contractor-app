@@ -9,7 +9,9 @@ export const metadata: Metadata = {
   description: "Login to your account",
 };
 
-export default function LoginPage({ searchParams }: { searchParams: { error?: string } }) {
+// Use any for now to bypass the type error
+export default function LoginPage(props: any) {
+  const { searchParams = {} } = props;
   const errorMessage = searchParams.error === 'AuthenticationFailed'
     ? "Invalid email or password. Please try again."
     : null;

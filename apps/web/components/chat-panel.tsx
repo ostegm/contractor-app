@@ -5,6 +5,7 @@ import { X, Send, RefreshCw, ChevronDown, ChevronUp, GripVertical } from 'lucide
 import { getChatThreadDetails, createChatThreadAndPostMessage, postChatMessage, getChatEvents, DisplayableBamlEvent } from '@/app/projects/[id]/actions';
 import type {
   UserInput as BamlUserInput,
+  Event as BamlEvent,
   AssisantMessage as BamlAssistantMessage,
   UpdateEstimateRequest as BamlUpdateEstimateRequest,
   UpdateEstimateResponse as BamlUpdateEstimateResponse,
@@ -240,17 +241,17 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
               );
               
               if (requestEvent && requestEvent.data) {
-                const requestData = requestEvent.data as any;
-                if (requestData.patches) {
-                  // Extract field paths that were patched
-                  const patchedPaths = requestData.patches.map((patch: any) => patch.json_path);
-                  
-                  // Dispatch custom event to trigger flash animation
-                  const customEvent = new CustomEvent('patchCompleted', {
-                    detail: { fields: patchedPaths }
-                  });
-                  
-                  window.dispatchEvent(customEvent);
+                if (requestEvent.type === 'PatchEstimateRequest') {
+                  const requestData = requestEvent.data as BamlPatchEstimateRequest;
+                  if (requestData.patches) {
+                    // Extract field paths that were patched
+                    const patchedPaths = (requestData.patches as Array<{ json_path: string }>).map(patch => patch.json_path);
+                    // Dispatch custom event to trigger flash animation
+                    const customEvent = new CustomEvent('patchCompleted', {
+                      detail: { fields: patchedPaths }
+                    });
+                    window.dispatchEvent(customEvent);
+                  }
                 }
               }
             }
@@ -402,9 +403,10 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
           }
         }
       }
-    } catch (err: any) {
-      console.error('Error posting message:', err);
-      setError(err.message || 'Failed to send message.');
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Error posting message:', error);
+      setError(error.message || 'Failed to send message.');
       setEvents(prevEvents => prevEvents.filter(event => event.id !== tempUserEventId)); // Remove optimistic
       setNewMessage(currentNewMessage); // Restore message on hard failure
     } finally {

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Home, LogOut, Folder, MessageSquare, Settings, Menu, Briefcase, Cog } from "lucide-react";
+import { LogOut, Menu, Briefcase, Cog } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
 

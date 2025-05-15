@@ -70,16 +70,17 @@ contractor-monorepo/
 
 
 ## TODOS
-- Improve few shot examples for patches to show some examples of replacing the full line item.
-- Review fallback for patch failure (ideally we send errors to agent) or offer the option to regen full estimate.
-- Manual edit mode (clicking an item to edit)
+- Manual edit mode (clicking an item to edit, option to "edit with AI" - insert UID into chat)
+- Improve few shot examples for patches to show some examples of replacing the full line item, dont trigger full estimate update unless its a major overhaul.
+- Enable build errors in next.config.js and fix.
 - Export to CSV/pdf
 - Seed AI generated video card example.
 - Rename file_url column to storage_path, type to mimetype
 - Need to import into quickbooks (see chat gpt)
-- New project view - show button to open files view
+- New project view - default to files view?
 - Mobile UX?
 - Auto name chats async after 2 messages (baml impl with 4.1nano)
+- Figure out how to support better UI for editing outside the estimate line items (flash full section)
 - Allow recording audio note in UI.
 - Build test case for yard project
    - Plans from yard designer

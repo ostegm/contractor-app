@@ -985,7 +985,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 <div className="bg-gray-800 rounded-lg p-8 border border-gray-700 border-dashed text-center min-h-[400px] flex flex-col justify-center items-center">
                   <FileText className="h-12 w-12 text-blue-400 mb-4" />
                   <h2 className="text-xl font-semibold mb-2">No Estimate Generated Yet</h2>
-                  <p className="text-gray-400 mb-6 max-w-md mx-auto">Upload project files and click "Generate Estimate".</p>
+                  <p className="text-gray-400 mb-6 max-w-md mx-auto">Upload project files and click &quot;Generate Estimate&quot;.</p>
                   <Button onClick={handleGenerateEstimate} className={`text-white ${isEstimateOutdated ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700'}`} disabled={uploadedFiles.length === 0}>
                     <Play className="mr-2 h-4 w-4" /> Generate Estimate
                   </Button>
@@ -1162,7 +1162,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                                       <AlertDialogHeader>
                                         <AlertDialogTitle className="text-white">Delete File</AlertDialogTitle>
                                         <AlertDialogDescription className="text-gray-300">
-                                          Are you sure you want to delete "{file.file_name}"?
+                                          Are you sure you want to delete &quot;{file.file_name}&quot;?
                                           {isVideo && videoSummaryFile && (
                                             <span className="block mt-2 text-yellow-400">
                                               This will also delete all AI-generated content associated with this video.
