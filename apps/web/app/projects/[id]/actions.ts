@@ -175,8 +175,11 @@ export async function updateProjectEstimate(projectId: string, estimate: Constru
   try {
     const supabase = await createClient()
     
+    // Ensure totals are correctly calculated from line items
+    const estimateWithCorrectTotals = calculateEstimateTotals(estimate);
+    
     // Convert the estimate to a JSON string
-    const estimateJson = JSON.stringify(estimate)
+    const estimateJson = JSON.stringify(estimateWithCorrectTotals)
     
     // Try to update with ai_estimate
     const { error } = await supabase
@@ -189,7 +192,7 @@ export async function updateProjectEstimate(projectId: string, estimate: Constru
       console.warn('ai_estimate column not found in projects table. Please run the database migration.')
       return { 
         error: 'AI estimate could not be saved to the database. Database schema needs to be updated.',
-        ai_estimate: estimate // Still return the generated estimate for display
+        ai_estimate: estimateWithCorrectTotals // Still return the generated estimate for display
       }
     } else if (error) {
       console.error('Error updating AI estimate:', error)
@@ -369,7 +372,7 @@ async function _handleBamlResponse(
   // 2. Handle UpdateEstimateRequest if needed
   if (bamlEventOutput.type === "UpdateEstimateRequest") {
     const requestData = bamlEventOutput.data as BamlUpdateEstimateRequest;
-    // Assuming startEstimateGeneration exists and works correctly
+    // Start estimate generation - totals will be recalculated via updateProjectEstimate
     const estimateResult = await startEstimateGeneration(projectId, requestData.changes_to_make, threadId);
     if (estimateResult.error) {
       console.error('Error starting estimate generation from chat (_handleBamlResponse):', estimateResult.error);
@@ -1034,9 +1037,14 @@ export async function applyPatchAndPersist(
       const patchedJsonString = JSON.stringify(currentEstimateObject);
       // Then, try to parse it back using BAML to ensure it's valid ConstructionProjectData
       const validatedEstimate = b.parse.GenerateProjectEstimate(patchedJsonString);
-      // If successful, stringify the BAML-validated object for storage
-      // This ensures any minor coercions or defaults applied by the BAML parser are included.
-      finalEstimateToStore = JSON.stringify(validatedEstimate);
+      
+      // Ensure totals are recalculated based on line items
+      const estimateWithCorrectTotals = calculateEstimateTotals(validatedEstimate);
+      
+      // If successful, stringify the BAML-validated and corrected object for storage
+      // This ensures any minor coercions or defaults applied by the BAML parser are included,
+      // and that the totals reflect the actual sum of line items.
+      finalEstimateToStore = JSON.stringify(estimateWithCorrectTotals);
     } catch (validationError) {
       console.error('Validation of patched estimate failed with BAML parser:', validationError);
       const errorMsg = validationError instanceof Error ? validationError.message : 'Unknown validation error';
@@ -1091,9 +1099,9 @@ async function processCompletedRun(threadId: string, runId: string, projectId: s
 
     if (joinResponse.ok) {
         const result = await joinResponse.json();
-        const aiEstimate = extractAIEstimate(result); // Assumes extractAIEstimate is defined
+        const aiEstimate = extractAIEstimate(result); // extractAIEstimate also calculates totals
         if (aiEstimate) {
-            // Assumes updateProjectEstimate is defined
+            // updateProjectEstimate will ensure totals are correct
             const updateResult = await updateProjectEstimate(projectId, aiEstimate);
             if (updateResult.error) {
                 detailedErrorMessage = `Failed to update project estimate: ${updateResult.error}`;
@@ -1261,11 +1269,46 @@ interface ApiResponse {
 }
 
 /**
+ * Calculate the min and max totals from line items
+ * Note: Not exported as a server action, only used internally
+ */
+function calculateEstimateTotals(estimate: ConstructionProjectData): ConstructionProjectData {
+  // Make a copy of the estimate to avoid mutating the original
+  const updatedEstimate = { ...estimate };
+  
+  // Only calculate totals if there are line items
+  if (Array.isArray(updatedEstimate.estimate_items) && updatedEstimate.estimate_items.length > 0) {
+    // Calculate sums
+    const totals = updatedEstimate.estimate_items.reduce(
+      (acc, item) => {
+        acc.min += item.cost_range_min || 0;
+        acc.max += item.cost_range_max || 0;
+        return acc;
+      },
+      { min: 0, max: 0 }
+    );
+    
+    // Update the totals on the estimate
+    updatedEstimate.estimated_total_min = totals.min;
+    updatedEstimate.estimated_total_max = totals.max;
+  } else {
+    // Reset totals to zero if no line items
+    updatedEstimate.estimated_total_min = 0;
+    updatedEstimate.estimated_total_max = 0;
+  }
+  
+  return updatedEstimate;
+}
+
+/**
  * Helper to extract AI estimate from API response
  */
 function extractAIEstimate(result: ApiResponse): ConstructionProjectData | null {
   if (result.ai_estimate) {
-    return result.ai_estimate
+    // Get the estimate from API response
+    const estimate = result.ai_estimate;
+    // Calculate totals before returning
+    return calculateEstimateTotals(estimate);
   }
   return null
 }

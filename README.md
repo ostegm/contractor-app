@@ -70,18 +70,17 @@ contractor-monorepo/
 
 
 ## TODOS
-- Fast updates https://chatgpt.com/c/6822a808-f118-8001-8efe-94bf6c8408be
+- Improve few shot examples for patches to show some examples of replacing the full line item.
+- Review fallback for patch failure (ideally we send errors to agent) or offer the option to regen full estimate.
 - Manual edit mode (clicking an item to edit)
-- Export to CSV
+- Export to CSV/pdf
 - Seed AI generated video card example.
 - Rename file_url column to storage_path, type to mimetype
 - Need to import into quickbooks (see chat gpt)
 - New project view - show button to open files view
-- Review export/import functionality chatgpt - maybe add to app?
 - Mobile UX?
 - Auto name chats async after 2 messages (baml impl with 4.1nano)
 - Allow recording audio note in UI.
-- Cleanup polling (i think its happening due to chat thread polling)
 - Build test case for yard project
    - Plans from yard designer
    - Web search for Pricing per plant
