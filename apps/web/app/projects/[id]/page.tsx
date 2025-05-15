@@ -335,7 +335,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       // Give time for the UI to render and complete the flash animation
       const clearTimer = setTimeout(() => {
         setPatchedFields([]);
-      }, 3000); // Clear after 6 seconds to match our 5s animation
+      }, 2500); // Clear after 2.5 seconds to match our 2s animation (in globals.css)
 
       return () => clearTimeout(clearTimer);
     }

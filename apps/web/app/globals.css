@@ -6,11 +6,11 @@
   0% {
     background-color: rgba(0, 255, 0, 0);
   }
-  10% {
-    background-color: rgba(0, 255, 0, 0.8);
+  20% {
+    background-color: rgba(0, 255, 0, 0.6);
   }
-  50% {
-    background-color: rgba(0, 255, 0, 0.4);
+  80% {
+    background-color: rgba(0, 255, 0, 0.3);
   }
   100% {
     background-color: rgba(0, 255, 0, 0);
@@ -18,8 +18,7 @@
 }
 
 .flash-highlight {
-  animation: flash-highlight 5s ease-out;
-  outline: 2px solid green;
+  animation: flash-highlight 2s ease-out;
 }
 
 @layer base {
