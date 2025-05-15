@@ -11,7 +11,7 @@ import {
   applyEstimatePatches,
   calculateEstimateTotals
 } from '../../lib/estimate-patch-utils';
-import { type BamlPatch } from '@/baml_client/baml_client/types';
+import { type Patch } from '../../baml_client/baml_client/types';
 
 // Sample estimate for testing
 const sampleEstimate = {
@@ -48,7 +48,7 @@ const sampleEstimate = {
 
 describe('identifyPatchType', () => {
   it('should identify line item property updates', () => {
-    const patch: BamlPatch = {
+    const patch: Patch = {
       json_path: '/estimate_items/demo001/cost_range_min',
       operation: 'Replace',
       new_value: 1500
@@ -57,7 +57,7 @@ describe('identifyPatchType', () => {
   });
 
   it('should identify line item removals', () => {
-    const patch: BamlPatch = {
+    const patch: Patch = {
       json_path: '/estimate_items/demo001',
       operation: 'Remove',
       new_value: undefined
@@ -66,7 +66,7 @@ describe('identifyPatchType', () => {
   });
 
   it('should identify line item additions', () => {
-    const patch: BamlPatch = {
+    const patch: Patch = {
       json_path: '/estimate_items',
       operation: 'Add',
       new_value: { description: 'New item' }
@@ -75,7 +75,7 @@ describe('identifyPatchType', () => {
   });
 
   it('should identify estimate property updates', () => {
-    const patch: BamlPatch = {
+    const patch: Patch = {
       json_path: '/project_description',
       operation: 'Replace',
       new_value: 'Updated description'
@@ -86,7 +86,7 @@ describe('identifyPatchType', () => {
 
 describe('transformLineItemPropertyPatch', () => {
   it('should transform a line item property patch', () => {
-    const patch: BamlPatch = {
+    const patch: Patch = {
       json_path: '/estimate_items/demo001/cost_range_min',
       operation: 'Replace',
       new_value: 1500
@@ -100,7 +100,7 @@ describe('transformLineItemPropertyPatch', () => {
   });
 
   it('should throw an error for non-existent UIDs', () => {
-    const patch: BamlPatch = {
+    const patch: Patch = {
       json_path: '/estimate_items/nonexistent/cost_range_min',
       operation: 'Replace',
       new_value: 1500
@@ -111,7 +111,7 @@ describe('transformLineItemPropertyPatch', () => {
 
 describe('transformLineItemRemovalPatch', () => {
   it('should transform a line item removal patch', () => {
-    const patch: BamlPatch = {
+    const patch: Patch = {
       json_path: '/estimate_items/demo001',
       operation: 'Remove',
       new_value: undefined
@@ -124,7 +124,7 @@ describe('transformLineItemRemovalPatch', () => {
   });
 
   it('should throw an error for non-existent UIDs', () => {
-    const patch: BamlPatch = {
+    const patch: Patch = {
       json_path: '/estimate_items/nonexistent',
       operation: 'Remove',
       new_value: undefined
@@ -135,41 +135,58 @@ describe('transformLineItemRemovalPatch', () => {
 
 describe('parseLineItemValue', () => {
   it('should parse a valid JSON string', () => {
-    const value = '{"description":"New item","cost_range_min":1000}';
-    expect(parseLineItemValue(value)).toEqual({
-      description: 'New item',
-      cost_range_min: 1000
-    });
+    const value = '{"uid":"test001","description":"New item","category":"Test","cost_range_min":1000,"cost_range_max":1500}';
+    const result = parseLineItemValue(value);
+    expect(result.description).toBe('New item');
+    expect(result.cost_range_min).toBe(1000);
+    expect(result.uid).toBe('test001');
   });
 
   it('should handle JavaScript object notation without quotes', () => {
-    const value = '{description: "New item", cost_range_min: 1000}';
-    expect(parseLineItemValue(value)).toEqual({
-      description: 'New item',
-      cost_range_min: '1000'
-    });
+    const value = '{uid: "test002", description: "New item", category: "Test", cost_range_min: 1000, cost_range_max: 1500}';
+    const result = parseLineItemValue(value);
+    expect(result.description).toBe('New item');
+    expect(result.cost_range_min).toBe(1000);
+    expect(result.uid).toBe('test002');
   });
 
   it('should handle unquoted values', () => {
-    const value = '{description: New item, cost_range_min: 1000}';
-    expect(parseLineItemValue(value)).toEqual({
-      description: 'New item',
-      cost_range_min: '1000'
-    });
+    const value = '{uid: test003, description: New item, category: Test, cost_range_min: 1000, cost_range_max: 1500}';
+    const result = parseLineItemValue(value);
+    expect(result.description).toBe('New item');
+    expect(result.category).toBe('Test');
+    expect(result.cost_range_min).toBe(1000);
+    expect(result.cost_range_max).toBe(1500);
+    expect(result.uid).toBeDefined();
   });
 
   it('should pass through non-string values', () => {
-    const value = { description: 'New item', cost_range_min: 1000 };
-    expect(parseLineItemValue(value)).toEqual(value);
+    const value = { 
+      uid: 'test004', 
+      description: 'New item', 
+      category: 'Test', 
+      cost_range_min: 1000, 
+      cost_range_max: 1500 
+    };
+    const result = parseLineItemValue(value);
+    expect(result.description).toBe('New item');
+    expect(result.cost_range_min).toBe(1000);
+    expect(result.uid).toBe('test004');
   });
 });
 
 describe('transformLineItemAdditionPatch', () => {
   it('should transform a line item addition patch with an object value', () => {
-    const patch: BamlPatch = {
+    const patch: Patch = {
       json_path: '/estimate_items',
       operation: 'Add',
-      new_value: { description: 'New item', cost_range_min: 1000 }
+      new_value: { 
+        uid: 'test005', 
+        description: 'New item', 
+        category: 'Test', 
+        cost_range_min: 1000, 
+        cost_range_max: 1500 
+      }
     };
     const operation = transformLineItemAdditionPatch(sampleEstimate, patch);
     expect(operation).toMatchObject({
@@ -178,14 +195,14 @@ describe('transformLineItemAdditionPatch', () => {
     });
     expect(operation?.value).toHaveProperty('description', 'New item');
     expect(operation?.value).toHaveProperty('cost_range_min', 1000);
-    expect(operation?.value).toHaveProperty('uid');
+    expect(operation?.value).toHaveProperty('uid', 'test005');
   });
 
   it('should transform a line item addition patch with a string value', () => {
-    const patch: BamlPatch = {
+    const patch: Patch = {
       json_path: '/estimate_items',
       operation: 'Add',
-      new_value: '{"description":"New item","cost_range_min":1000}'
+      new_value: '{"uid":"test006","description":"New item","category":"Test","cost_range_min":1000,"cost_range_max":1500}'
     };
     const operation = transformLineItemAdditionPatch(sampleEstimate, patch);
     expect(operation).toMatchObject({
@@ -194,14 +211,20 @@ describe('transformLineItemAdditionPatch', () => {
     });
     expect(operation?.value).toHaveProperty('description', 'New item');
     expect(operation?.value).toHaveProperty('cost_range_min', 1000);
-    expect(operation?.value).toHaveProperty('uid');
+    expect(operation?.value).toHaveProperty('uid', 'test006');
   });
 
   it('should preserve existing UIDs', () => {
-    const patch: BamlPatch = {
+    const patch: Patch = {
       json_path: '/estimate_items',
       operation: 'Add',
-      new_value: { uid: 'custom123', description: 'New item' }
+      new_value: { 
+        uid: 'custom123', 
+        description: 'New item',
+        category: 'Test',
+        cost_range_min: 1000,
+        cost_range_max: 1500
+      }
     };
     const operation = transformLineItemAdditionPatch(sampleEstimate, patch);
     expect(operation?.value).toHaveProperty('uid', 'custom123');
@@ -210,7 +233,7 @@ describe('transformLineItemAdditionPatch', () => {
 
 describe('transformEstimatePropertyPatch', () => {
   it('should transform an estimate property patch', () => {
-    const patch: BamlPatch = {
+    const patch: Patch = {
       json_path: '/project_description',
       operation: 'Replace',
       new_value: 'Updated description'
@@ -224,7 +247,7 @@ describe('transformEstimatePropertyPatch', () => {
   });
 
   it('should handle remove operations', () => {
-    const patch: BamlPatch = {
+    const patch: Patch = {
       json_path: '/some_property',
       operation: 'Remove',
       new_value: undefined
@@ -239,7 +262,7 @@ describe('transformEstimatePropertyPatch', () => {
 
 describe('applyEstimatePatch', () => {
   it('should apply a line item property patch', () => {
-    const patch: BamlPatch = {
+    const patch: Patch = {
       json_path: '/estimate_items/demo001/cost_range_min',
       operation: 'Replace',
       new_value: 1500
@@ -250,7 +273,7 @@ describe('applyEstimatePatch', () => {
   });
 
   it('should apply a line item removal patch', () => {
-    const patch: BamlPatch = {
+    const patch: Patch = {
       json_path: '/estimate_items/demo001',
       operation: 'Remove',
       new_value: undefined
@@ -262,7 +285,7 @@ describe('applyEstimatePatch', () => {
   });
 
   it('should apply a line item addition patch', () => {
-    const patch: BamlPatch = {
+    const patch: Patch = {
       json_path: '/estimate_items',
       operation: 'Add',
       new_value: { 
@@ -283,7 +306,7 @@ describe('applyEstimatePatch', () => {
   });
 
   it('should apply an estimate property patch', () => {
-    const patch: BamlPatch = {
+    const patch: Patch = {
       json_path: '/project_description',
       operation: 'Replace',
       new_value: 'Updated description'
@@ -294,7 +317,7 @@ describe('applyEstimatePatch', () => {
   });
 
   it('should handle errors for invalid patches', () => {
-    const patch: BamlPatch = {
+    const patch: Patch = {
       json_path: '/estimate_items/nonexistent',
       operation: 'Remove',
       new_value: undefined
@@ -307,7 +330,7 @@ describe('applyEstimatePatch', () => {
 
 describe('applyEstimatePatches', () => {
   it('should apply multiple patches', () => {
-    const patches: BamlPatch[] = [
+    const patches: Patch[] = [
       {
         json_path: '/estimate_items/demo001/cost_range_min',
         operation: 'Replace',
@@ -342,7 +365,7 @@ describe('applyEstimatePatches', () => {
   });
 
   it('should continue applying patches after a failure', () => {
-    const patches: BamlPatch[] = [
+    const patches: Patch[] = [
       {
         json_path: '/estimate_items/nonexistent',
         operation: 'Remove',
