@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FileText, FolderOpen, MessageSquarePlus, LayoutDashboard, MessageSquare, RefreshCw, MoreHorizontal, Trash2, Edit } from 'lucide-react';
+import { FolderOpen, MessageSquarePlus, LayoutDashboard, MessageSquare, RefreshCw, MoreHorizontal, Trash2, Edit } from 'lucide-react';
 import { useView } from '../app/app-client-shell';
 import { Button } from '@/components/ui/button';
 import { getChatThreads, renameChatThread, deleteChatThread } from '@/app/projects/[id]/actions';
@@ -60,7 +60,6 @@ interface ChatThreadItemProps {
 }
 
 const ChatThreadItem: React.FC<ChatThreadItemProps> = ({ thread, onSelect, onRename, onDelete }) => {
-  const [isHovering, setIsHovering] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(thread.name);
   const [isSaving, setIsSaving] = useState(false);
@@ -68,11 +67,10 @@ const ChatThreadItem: React.FC<ChatThreadItemProps> = ({ thread, onSelect, onRen
   const [tooltipOpen, setTooltipOpen] = useState(false);
 
   const handleMouseEnter = () => {
-    setIsHovering(true);
+    // Mouseover handler logic
   };
 
   const handleMouseLeave = () => {
-    setIsHovering(false);
     setTooltipOpen(false);
   };
 
@@ -213,7 +211,7 @@ const ChatThreadItem: React.FC<ChatThreadItemProps> = ({ thread, onSelect, onRen
                    <AlertDialogHeader>
                      <AlertDialogTitle>Delete chat?</AlertDialogTitle>
                      <AlertDialogDescription>
-                       This will permanently delete the chat named "<span className='font-medium'>{thread.name}</span>". This action cannot be undone.
+                       This will permanently delete the chat named &quot;<span className='font-medium'>{thread.name}</span>&quot;. This action cannot be undone.
                      </AlertDialogDescription>
                    </AlertDialogHeader>
                    <AlertDialogFooter>

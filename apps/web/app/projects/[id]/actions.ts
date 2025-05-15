@@ -29,16 +29,6 @@ const STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET
 const LANGGRAPH_API_URL = process.env.LANGGRAPH_API_URL
 const LANGGRAPH_API_KEY = process.env.LANGGRAPH_API_KEY
 
-// Add UploadedFile interface, mirroring the one in page.tsx for clarity
-interface UploadedFile {
-  id: string;
-  file_name: string;
-  description?: string;
-  content?: string; // This might not be used directly here after changes
-  type?: string; // This might not be used directly here after changes
-  file_url: string;
-  uploaded_at: string;
-}
 
 // ADDED: Define a richer event type for UI display and DB interactions (II.A)
 export interface DisplayableBamlEvent {
@@ -119,7 +109,7 @@ export async function uploadFile(formData: FormData, projectId: string) {
     }
       
     // Check if the uploaded file is a video and start processing automatically
-    let videoProcessingInfo: { jobId?: string; error?: string, isVideo?: boolean } = { isVideo: false };
+    const videoProcessingInfo: { jobId?: string; error?: string, isVideo?: boolean } = { isVideo: false };
     const isVideo = newFileRecord.type?.startsWith('video/');
 
     if (isVideo) {
@@ -287,7 +277,7 @@ export async function clearProjectEstimate(projectId: string) {
 export async function getChatThreadDetails(threadId: string): Promise<{ events: DisplayableBamlEvent[]; name: string } | null> {
   const supabase = await createClient();
   // Fetch the specific thread by ID
-  let { data: thread, error: threadError } = await supabase
+  const { data: thread, error: threadError } = await supabase
     .from('chat_threads')
     .select('id, name')
     .eq('id', threadId)
@@ -317,7 +307,7 @@ export async function getChatThreadDetails(threadId: string): Promise<{ events: 
   const displayableEvents: DisplayableBamlEvent[] = (dbEvents || []).map(e => ({
     id: e.id,
     type: e.event_type as AllowedTypes,
-    data: e.data as any, // TODO: Consider more type safety if possible
+    data: e.data as BamlEvent['data'], // Explicitly cast to BAML event data type
     createdAt: e.created_at,
   }));
 
@@ -503,6 +493,9 @@ export async function postChatMessage(
     const now = new Date().toISOString();
     let userInputDisplayEvent: DisplayableBamlEvent;
 
+    // Initialize userInputDisplayEvent
+    userInputDisplayEvent = {} as DisplayableBamlEvent;
+    
     // 1. Save UserInput event
     const userInputToSave = {
       thread_id: threadId,
@@ -571,7 +564,7 @@ export async function postChatMessage(
 
     const bamlEventsForProcessing: BamlEvent[] = (dbEvents || []).map(dbEvent => ({
       type: dbEvent.event_type as AllowedTypes,
-      data: dbEvent.data as any,
+      data: dbEvent.data as BamlEvent['data'],
     }));
 
     const currentThreadState: BamlChatThread = { events: bamlEventsForProcessing };
@@ -605,7 +598,7 @@ export async function postChatMessage(
 
 export async function getChatThreads(projectId: string): Promise<{ id: string; name: string; lastMessageAt: string }[]> {
   const supabase = await createClient();
-  let query = supabase
+  const query = supabase
     .from('chat_threads')
     .select('id, name, created_at')
     .eq('project_id', projectId); // Only query for the specific project

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, createContext, useContext, Dispatch, SetStateAction } from "react";
-import { Inter } from "next/font/google"; // Keep Inter if needed for className
 import "./globals.css"; // Ensure globals are imported if body className relies on them here
 import { HeaderNav } from "@/components/header-nav";
 import { ProjectSidebar } from "../components/project-sidebar";
@@ -9,7 +8,6 @@ import { ChatPanel } from "@/components/chat-panel";
 import { Toaster } from 'sonner';
 import { usePathname } from 'next/navigation';
 
-const inter = Inter({ subsets: ["latin"] });
 
 // Context for View Management
 interface ViewContextType {

@@ -54,12 +54,45 @@ export function VideoSummaryCard({
     }
   }
 
+  const loadSummaryContent = React.useCallback(async () => {
+    if (!summaryFile) return
+    
+    setIsLoadingSummary(true)
+    try {
+      const { data, error } = await supabase.storage
+        .from(storageBucket)
+        .createSignedUrl(summaryFile.file_url, 3600) // 1 hour expiration
+      
+      if (error) {
+        console.error(`Error creating signed URL for summary ${summaryFile.file_name}:`, error)
+        toast.error('Failed to load video summary')
+        setIsLoadingSummary(false)
+        return
+      }
+      
+      // Fetch the content using the signed URL
+      const response = await fetch(data.signedUrl)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch summary: ${response.status} ${response.statusText}`)
+      }
+      
+      // Convert the response to text
+      const content = await response.text()
+      setSummaryContent(content)
+    } catch (error) {
+      console.error('Error loading summary content:', error)
+      toast.error('Failed to load video summary content')
+    } finally {
+      setIsLoadingSummary(false)
+    }
+  }, [summaryFile, supabase, storageBucket])
+
   // Load summary content if not already loaded
   React.useEffect(() => {
     if (summaryFile && !summaryContent && !isLoadingSummary) {
       loadSummaryContent()
     }
-  }, [summaryFile])
+  }, [summaryFile, summaryContent, isLoadingSummary, loadSummaryContent])
 
   // Generate signed URLs for all frames on component mount
   React.useEffect(() => {
@@ -95,39 +128,6 @@ export function VideoSummaryCard({
       loadFrameUrls()
     }
   }, [frames, storageBucket, supabase])
-
-  const loadSummaryContent = async () => {
-    if (!summaryFile) return
-    
-    setIsLoadingSummary(true)
-    try {
-      const { data, error } = await supabase.storage
-        .from(storageBucket)
-        .createSignedUrl(summaryFile.file_url, 3600) // 1 hour expiration
-      
-      if (error) {
-        console.error(`Error creating signed URL for summary ${summaryFile.file_name}:`, error)
-        toast.error('Failed to load video summary')
-        setIsLoadingSummary(false)
-        return
-      }
-      
-      // Fetch the content using the signed URL
-      const response = await fetch(data.signedUrl)
-      if (!response.ok) {
-        throw new Error(`Failed to fetch summary: ${response.status} ${response.statusText}`)
-      }
-      
-      // Convert the response to text
-      const content = await response.text()
-      setSummaryContent(content)
-    } catch (error) {
-      console.error('Error loading summary content:', error)
-      toast.error('Failed to load video summary content')
-    } finally {
-      setIsLoadingSummary(false)
-    }
-  }
 
   const downloadFrame = async (frame: KeyFrame) => {
     try {
