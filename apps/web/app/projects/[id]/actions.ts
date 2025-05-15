@@ -44,7 +44,7 @@ interface UploadedFile {
 export interface DisplayableBamlEvent {
   id: string; // Database ID for the event, useful for React keys
   type: AllowedTypes;
-  data: BamlUserInput | BamlAssistantMessage | BamlUpdateEstimateRequest | BamlUpdateEstimateResponse;
+  data: BamlUserInput | BamlAssistantMessage | BamlUpdateEstimateRequest | BamlUpdateEstimateResponse | BamlPatchEstimateRequest | BamlPatchEstimateResponse;
   createdAt: string; // ISO string timestamp from the database
 }
 
@@ -558,11 +558,11 @@ export async function postChatMessage(
     let currentEstimate: ConstructionProjectData | null = null;
     if (project?.ai_estimate) {
       try {
-        currentEstimate = JSON.parse(project.ai_estimate as string);
+        // Use the BAML parser to convert the JSON string from DB into a typed ConstructionProjectData object
+        currentEstimate = b.parse.GenerateProjectEstimate(project.ai_estimate as string);
       } catch (parseError) {
-        console.error('Error parsing current estimate JSON:', parseError);
-         // Decide how to handle - proceed without estimate? Return error?
-        // For now, proceeding without, but logging the error.
+        console.error('Error parsing current estimate JSON with BAML parser:', parseError);
+        return { userInputDisplayEvent, updateTriggered: false, error: 'Failed to parse current project estimate.' };
       }
     }
 
@@ -921,48 +921,49 @@ export async function applyPatchAndPersist(
     // Import dynamically to avoid SSR issues
     const { applyPatch } = await import('fast-json-patch');
 
-    let estimate = project.ai_estimate;
+    let currentEstimateObject: any; // Initialize as any, will be parsed ConstructionProjectData
+    if (typeof project.ai_estimate === 'string') {
+      try {
+        currentEstimateObject = JSON.parse(project.ai_estimate);
+      } catch (parseError) {
+        let errorMessage = 'Failed to parse current estimate JSON.';
+        if (parseError instanceof Error) {
+          errorMessage = `Failed to parse current estimate JSON: ${parseError.message}`;
+        }
+        console.error(errorMessage, parseError);
+        return { success: false, error: errorMessage };
+      }
+    } else if (project.ai_estimate === null || project.ai_estimate === undefined) {
+      // Handle case where estimate is explicitly null or not yet set
+      // This might mean we need a default structure or error out if patching a non-existent estimate
+      console.error('Cannot apply patches: Current estimate is null or undefined.');
+      return { success: false, error: 'Cannot apply patches to a non-existent estimate.' };
+    } else {
+      // If it's already an object (though Supabase usually returns string or null)
+      currentEstimateObject = project.ai_estimate;
+    }
+    
     const results: BamlPatchResult[] = [];
-
-    console.log(`Estimate JSON before patch: Type=${typeof estimate}, Length=${typeof estimate === 'string' ? estimate.length : 'N/A'}`);
-
     // Apply patches one by one and track results
     for (const patch of patches) {
       try {
-        // First, make sure we're working with a parsed object
-        let parsedEstimate;
-        if (typeof estimate === 'string') {
-          try {
-            parsedEstimate = JSON.parse(estimate);
-          } catch (parseError) {
-            // If the estimate is already a stringified JSON string (double stringified)
-            // Try parsing once more with the contents of the string
-            if (estimate.startsWith('"') && estimate.endsWith('"')) {
-              try {
-                // Remove outer quotes and try to parse
-                const innerJson = estimate.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, '\\');
-                parsedEstimate = JSON.parse(innerJson);
-              } catch (innerParseError) {
-                throw new Error(`Failed to parse estimate: ${parseError.message}`);
-              }
-            } else {
-              throw parseError;
-            }
-          }
-        } else {
-          parsedEstimate = estimate;
-        }
-
+        // currentEstimateObject is now guaranteed to be an object (or we'd have returned an error)
+        
         // Check if we're dealing with a line item patch (contains /estimate_items/UID/ pattern)
         const lineItemUidMatch = patch.json_path.match(/\/estimate_items\/([^\/]+)\/(.+)/);
 
+        let patchedDocument;
         if (lineItemUidMatch) {
           // This is a line item patch targeting a specific UID
           const uid = lineItemUidMatch[1];
           const propertyPath = lineItemUidMatch[2];
 
           // Find the index of the line item with this UID
-          const itemIndex = parsedEstimate.estimate_items.findIndex((item: any) => item.uid === uid);
+          // Ensure estimate_items exists and is an array
+          if (!currentEstimateObject.estimate_items || !Array.isArray(currentEstimateObject.estimate_items)) {
+            throw new Error('Invalid estimate structure: estimate_items is missing or not an array.');
+          }
+          const itemIndex = currentEstimateObject.estimate_items.findIndex((item: any) => item.uid === uid);
 
           if (itemIndex === -1) {
             throw new Error(`Line item with UID "${uid}" not found in the estimate`);
@@ -976,7 +977,7 @@ export async function applyPatchAndPersist(
           };
 
           // Apply the converted patch
-          estimate = applyPatch(parsedEstimate, [convertedPatch]).newDocument;
+          patchedDocument = applyPatch(currentEstimateObject, [convertedPatch as any as import('fast-json-patch').Operation]).newDocument;
         } else {
           // Standard patch for non-line item properties
           const jsonPatch = {
@@ -986,11 +987,12 @@ export async function applyPatchAndPersist(
           };
 
           // Apply the patch
-          estimate = applyPatch(parsedEstimate, [jsonPatch]).newDocument;
+          patchedDocument = applyPatch(currentEstimateObject, [jsonPatch as any as import('fast-json-patch').Operation]).newDocument;
         }
+        currentEstimateObject = patchedDocument; // Update currentEstimateObject with the patched version
 
         // Validate estimate structure (basic check)
-        if (!estimate || !estimate.project_description || !Array.isArray(estimate.estimate_items)) {
+        if (!currentEstimateObject || !currentEstimateObject.project_description || !Array.isArray(currentEstimateObject.estimate_items)) {
           throw new Error('Invalid estimate structure after patch');
         }
 
@@ -1022,16 +1024,33 @@ export async function applyPatchAndPersist(
       //   `Please apply these changes: ${patchesToText}`,
       //   threadId
       // );
-      return { success: true };
+      return { success: true }; // As per original logic, returns success even if fallback occurs.
     }
 
-    // If all patches succeeded, persist the updated estimate
-    // Make sure we're storing a stringified JSON, not an object
-    const estimateToStore = typeof estimate === 'string' ? estimate : JSON.stringify(estimate);
+    // If all patches seemed to succeed, try to validate the final structure with BAML parser
+    let finalEstimateToStore: string;
+    try {
+      // First, stringify the object that resulted from patching
+      const patchedJsonString = JSON.stringify(currentEstimateObject);
+      // Then, try to parse it back using BAML to ensure it's valid ConstructionProjectData
+      const validatedEstimate = b.parse.GenerateProjectEstimate(patchedJsonString);
+      // If successful, stringify the BAML-validated object for storage
+      // This ensures any minor coercions or defaults applied by the BAML parser are included.
+      finalEstimateToStore = JSON.stringify(validatedEstimate);
+    } catch (validationError) {
+      console.error('Validation of patched estimate failed with BAML parser:', validationError);
+      const errorMsg = validationError instanceof Error ? validationError.message : 'Unknown validation error';
+      results.push({ success: false, error_message: `Post-patch validation failed: ${errorMsg}` });
+      await recordChatPatchResponse(threadId, results); // Inform chat of the validation failure
 
+      // For now, returning an error. Consider triggering full re-estimate as a fallback.
+      return { success: false, error: `Patched estimate failed validation: ${errorMsg}` };
+    }
+
+    // If all patches succeeded AND validation passed, persist the updated estimate
     const { error: updateError } = await supabase
       .from('projects')
-      .update({ ai_estimate: estimateToStore })
+      .update({ ai_estimate: finalEstimateToStore }) // Use the validated and re-stringified estimate
       .eq('id', projectId);
 
     if (updateError) {
@@ -1042,6 +1061,7 @@ export async function applyPatchAndPersist(
     // Record the successful patch response in the chat thread
     await recordChatPatchResponse(threadId, results);
 
+    revalidatePath(`/projects/${projectId}`); // ADDED: Revalidate path after successful patch and persist
     return { success: true };
   } catch (e) {
     console.error('Error in applyPatchAndPersist:', e);

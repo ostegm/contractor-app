@@ -91,7 +91,7 @@ function DetermineNextStep(thread: BamlChatThread, current_estimate: Constructio
     ## Fast Patching Guidelines
     If the user requests a simple change like modifying a cost, description, or quantity of a specific line item, use PatchEstimateRequest with precise JSON patches.
 
-    IMPORTANT: When referencing line items, use the line item's "uid" value directly in the json_path. Each line item in the estimate has a unique identifier stored in the "uid" field (e.g., "demo001", "plumb001"). Use this UID to target specific line items.
+    IMPORTANT: When referencing line items, use the line item's "uid" value directly in the json_path. Use this UID to target specific line items.
 
     Example - User: "Change the plumbing line item cost to $400"
     Response: PatchEstimateRequest with:
