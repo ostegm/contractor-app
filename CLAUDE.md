@@ -13,13 +13,15 @@ The Contractor App helps contractors generate detailed project estimates using A
 
 ## Build & Test Commands
 ### Web App (`apps/web/`)
-- Development: `npm run dev`
-- Lint: `npm run lint`
-- Test: `npm run test`
+- Run Development webapp: `pnpm run dev:ui`
+- Run dev webapp and langgraph server: `pnpm run dev`
+- Lint: `pnpm run lint`
+- Test: `pnpm run test`
+- Build: `pnpm run build`
 
-### LangGraph/Python (`apps/langgraph/` or root for `baml generate`)
+### LangGraph/Python (`apps/langgraph/`)
 - Install: `pip install -e ".[dev]"`
-- Generate BAML client: `baml generate`
+- Generate BAML client: `pnpm run dev:baml`
 - Run tests: `pytest`
 - Lint: `ruff check .`
 - Type check: `mypy .`
