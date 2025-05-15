@@ -904,6 +904,11 @@ export async function applyPatchAndPersist(
   patches: BamlPatch[],
   threadId: string
 ): Promise<{ success: boolean; error?: string }> {
+  if (patches.length === 0) {
+    console.log(`No patches to apply to estimate for project ${projectId}`);
+    return { success: true };
+  }
+
   console.log(`Applying ${patches.length} patches to estimate for project ${projectId}`);
   
   // Log patch details for debugging
