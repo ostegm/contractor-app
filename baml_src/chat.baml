@@ -3,9 +3,16 @@ class BamlChatThread {
     events Event[]
 }
 
+// All events (used for storing in DB an input thread)
 class Event {
     type AllowedTypes
     data (UserInput | AssisantMessage | UpdateEstimateRequest | UpdateEstimateResponse | PatchEstimateRequest | PatchEstimateResponse)
+}
+
+// Response event (allowed output from the LLM)
+class ResponseEvent {
+    type AllowedTypes
+    data (AssisantMessage | UpdateEstimateRequest | PatchEstimateRequest)
 }
 
 // Event Types
@@ -62,7 +69,7 @@ class PatchEstimateResponse {
 }
 
 
-function DetermineNextStep(thread: BamlChatThread, current_estimate: ConstructionProjectData?) -> Event {
+function DetermineNextStep(thread: BamlChatThread, current_estimate: ConstructionProjectData?) -> ResponseEvent {
     client OpenaiFallback
     prompt #"
     You're a construction estimator working with a client. Help the client with any questions including updating the estimate as needed.

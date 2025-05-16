@@ -27,7 +27,7 @@ export default class TypeBuilder {
     constructor() {
         this.tb = new _TypeBuilder({
           classes: new Set([
-            "AssisantMessage","BamlChatThread","ConstructionProjectData","EstimateLineItem","Event","InputFile","KeyFrame","Patch","PatchEstimateRequest","PatchEstimateResponse","PatchResult","UpdateEstimateRequest","UpdateEstimateResponse","UserInput","VideoAnalysis",
+            "AssisantMessage","BamlChatThread","ConstructionProjectData","EstimateLineItem","Event","InputFile","KeyFrame","Patch","PatchEstimateRequest","PatchEstimateResponse","PatchResult","ResponseEvent","UpdateEstimateRequest","UpdateEstimateResponse","UserInput","VideoAnalysis",
           ]),
           enums: new Set([
             "AllowedTypes","PatchOperation",

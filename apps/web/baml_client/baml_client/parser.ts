@@ -20,7 +20,7 @@ import { toBamlError } from "@boundaryml/baml"
 import type { Checked, Check } from "./types"
 import type { partial_types } from "./partial_types"
 import type * as types from "./types"
-import type {AllowedTypes, AssisantMessage, BamlChatThread, ConstructionProjectData, EstimateLineItem, Event, InputFile, KeyFrame, Patch, PatchEstimateRequest, PatchEstimateResponse, PatchOperation, PatchResult, UpdateEstimateRequest, UpdateEstimateResponse, UserInput, VideoAnalysis} from "./types"
+import type {AllowedTypes, AssisantMessage, BamlChatThread, ConstructionProjectData, EstimateLineItem, Event, InputFile, KeyFrame, Patch, PatchEstimateRequest, PatchEstimateResponse, PatchOperation, PatchResult, ResponseEvent, UpdateEstimateRequest, UpdateEstimateResponse, UserInput, VideoAnalysis} from "./types"
 import type TypeBuilder from "./type_builder"
 
 export class LlmResponseParser {
@@ -48,7 +48,7 @@ export class LlmResponseParser {
   DetermineNextStep(
       llmResponse: string,
       __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry }
-  ): Event {
+  ): ResponseEvent {
     try {
       return this.runtime.parseLlmResponse(
         "DetermineNextStep",
@@ -57,7 +57,7 @@ export class LlmResponseParser {
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),
         __baml_options__?.clientRegistry,
-      ) as Event
+      ) as ResponseEvent
     } catch (error) {
       throw toBamlError(error);
     }
@@ -144,7 +144,7 @@ export class LlmStreamParser {
   DetermineNextStep(
       llmResponse: string,
       __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry }
-  ): partial_types.Event {
+  ): partial_types.ResponseEvent {
     try {
       return this.runtime.parseLlmResponse(
         "DetermineNextStep",
@@ -153,7 +153,7 @@ export class LlmStreamParser {
         this.ctxManager.cloneContext(),
         __baml_options__?.tb?.__tb(),
         __baml_options__?.clientRegistry,
-      ) as partial_types.Event
+      ) as partial_types.ResponseEvent
     } catch (error) {
       throw toBamlError(error);
     }

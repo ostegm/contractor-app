@@ -416,9 +416,9 @@ export function useAnalyzeVideo(
  *
  *
  * **Return Type:**
- * - **Non‑streaming:** Event
- * - **Streaming Partial:** partial_types.Event
- * - **Streaming Final:** Event
+ * - **Non‑streaming:** ResponseEvent
+ * - **Streaming Partial:** partial_types.ResponseEvent
+ * - **Streaming Final:** ResponseEvent
  *
  * **Usage Patterns:**
  * 1. **Non‑streaming (Default)**
