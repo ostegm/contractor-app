@@ -669,8 +669,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
     // If it's an image file, get the signed URL
     if (isImageFile(file.file_name)) {
-      const url = await getFileSignedUrl(file);
-      setSignedImageUrl(url);
+      try {
+        const url = await getFileSignedUrl(file);
+        if (url) {
+          setSignedImageUrl(url);
+        } else {
+          toast.error('Failed to load image preview');
+        }
+      } catch (error) {
+        toast.error('Failed to load image preview');
+      }
     }
     // If it's an audio file, get the signed URL
     else if (isAudioFile(file.file_name)) {
@@ -1576,6 +1584,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                  <FileText className="mr-2 h-5 w-5 text-blue-400" />}
                 {previewFile?.file_name}
               </DialogTitle>
+              <DialogDescription>
+                Preview of the uploaded file
+              </DialogDescription>
             </DialogHeader>
             <div className="py-4 flex-grow overflow-auto">
               {isLoadingPreview ? (
@@ -1589,13 +1600,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     <div className="flex justify-center">
                       {previewFile.file_url ? (
                         signedImageUrl ? (
-                          <Image 
+                          <img 
                             src={signedImageUrl} 
                             alt={previewFile.file_name} 
-                            width={800}
-                            height={600}
                             className="max-h-[60vh] object-contain"
-                            unoptimized // if using external Supabase URLs without Next.js image optimization configured for them
+                            style={{ maxWidth: '100%', height: 'auto' }}
+                            onError={(e) => {
+                              console.error('Image failed to load:', previewFile.file_name);
+                              e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23374151'/%3E%3Ctext x='400' y='300' text-anchor='middle' fill='%239CA3AF' font-family='Arial' font-size='24'%3EFailed to load image%3C/text%3E%3C/svg%3E";
+                              toast.error('Failed to load image');
+                            }}
                           />
                         ) : (
                           <div className="text-center text-gray-400">
