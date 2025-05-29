@@ -4,5 +4,8 @@
     "file_processor": "file_processor.graph:estimate_graph",
     "video_processor": "file_processor.video_graph:video_processor_graph"
   },
-  "env": ".env"
+  "env": ".env",
+  "dockerfile_lines": [
+    "RUN apt-get update && apt-get install -y ffmpeg poppler-utils && rm -rf /var/lib/apt/lists/*"
+  ]
 }
