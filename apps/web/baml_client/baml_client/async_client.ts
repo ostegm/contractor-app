@@ -20,7 +20,7 @@ import { toBamlError, BamlStream, type HTTPRequest } from "@boundaryml/baml"
 import type { Checked, Check, RecursivePartialNull as MovedRecursivePartialNull } from "./types"
 import type { partial_types } from "./partial_types"
 import type * as types from "./types"
-import type {AllowedTypes, AssisantMessage, BamlChatThread, ConstructionProjectData, EstimateLineItem, Event, InputFile, KeyFrame, Patch, PatchEstimateRequest, PatchEstimateResponse, PatchOperation, PatchResult, UpdateEstimateRequest, UpdateEstimateResponse, UserInput, VideoAnalysis} from "./types"
+import type {AllowedTypes, AssisantMessage, BamlChatThread, ConstructionProjectData, EstimateLineItem, Event, InputFile, KeyFrame, Patch, PatchEstimateRequest, PatchEstimateResponse, PatchOperation, PatchResult, ResponseEvent, UpdateEstimateRequest, UpdateEstimateResponse, UserInput, VideoAnalysis} from "./types"
 import type TypeBuilder from "./type_builder"
 import { AsyncHttpRequest, AsyncHttpStreamRequest } from "./async_request"
 import { LlmResponseParser, LlmStreamParser } from "./parser"
@@ -109,7 +109,7 @@ export class BamlAsyncClient {
   async DetermineNextStep(
       thread: BamlChatThread,current_estimate?: ConstructionProjectData | null,
       __baml_options__?: BamlCallOptions
-  ): Promise<Event> {
+  ): Promise<ResponseEvent> {
     try {
       const options = { ...this.bamlOptions, ...(__baml_options__ || {}) }
       const collector = options.collector ? (Array.isArray(options.collector) ? options.collector : [options.collector]) : [];
@@ -123,7 +123,7 @@ export class BamlAsyncClient {
         options.clientRegistry,
         collector,
       )
-      return raw.parsed(false) as Event
+      return raw.parsed(false) as ResponseEvent
     } catch (error) {
       throw toBamlError(error);
     }
@@ -244,7 +244,7 @@ class BamlStreamClient {
   DetermineNextStep(
       thread: BamlChatThread,current_estimate?: ConstructionProjectData | null,
       __baml_options__?: { tb?: TypeBuilder, clientRegistry?: ClientRegistry, collector?: Collector | Collector[] }
-  ): BamlStream<partial_types.Event, Event> {
+  ): BamlStream<partial_types.ResponseEvent, ResponseEvent> {
     try {
       const options = { ...this.bamlOptions, ...(__baml_options__ || {}) }
       const collector = options.collector ? (Array.isArray(options.collector) ? options.collector : [options.collector]) : [];
@@ -259,10 +259,10 @@ class BamlStreamClient {
         options.clientRegistry,
         collector,
       )
-      return new BamlStream<partial_types.Event, Event>(
+      return new BamlStream<partial_types.ResponseEvent, ResponseEvent>(
         raw,
-        (a): partial_types.Event => a,
-        (a): Event => a,
+        (a): partial_types.ResponseEvent => a,
+        (a): ResponseEvent => a,
         this.ctxManager.cloneContext(),
       )
     } catch (error) {

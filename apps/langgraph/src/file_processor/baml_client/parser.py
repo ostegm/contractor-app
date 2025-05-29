@@ -67,7 +67,7 @@ class LlmResponseParser:
         self,
         llm_response: str,
         baml_options: BamlCallOptions = {},
-    ) -> types.Event:
+    ) -> types.ResponseEvent:
       __tb__ = baml_options.get("tb", None)
       if __tb__ is not None:
         tb = __tb__._tb # type: ignore (we know how to use this private attribute)
@@ -87,7 +87,7 @@ class LlmResponseParser:
         __cr__,
       )
 
-      return cast(types.Event, parsed)
+      return cast(types.ResponseEvent, parsed)
     
     def GenerateProjectEstimate(
         self,
@@ -208,7 +208,7 @@ class LlmStreamParser:
         self,
         llm_response: str,
         baml_options: BamlCallOptions = {},
-    ) -> partial_types.Event:
+    ) -> partial_types.ResponseEvent:
       __tb__ = baml_options.get("tb", None)
       if __tb__ is not None:
         tb = __tb__._tb # type: ignore (we know how to use this private attribute)
@@ -228,7 +228,7 @@ class LlmStreamParser:
         __cr__,
       )
 
-      return cast(partial_types.Event, parsed)
+      return cast(partial_types.ResponseEvent, parsed)
     
     def GenerateProjectEstimate(
         self,

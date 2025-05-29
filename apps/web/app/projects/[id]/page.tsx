@@ -7,6 +7,10 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { VideoSummaryCard } from "@/components/video-summary-card"
 import { Badge } from "@/components/ui/badge"
+import { EditableEstimateItem, AddLineItemButton } from "../../../components/editable-estimate-item"
+import { AddLineItemForm } from "../../../components/add-line-item-form"
+import { updateEstimateField, deleteEstimateLineItem, addEstimateLineItem } from "./editable-actions"
+import { EditableEstimateRow } from "./editable-estimate-row"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -89,6 +93,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   // Track which fields were updated by a patch operation
   const [patchedFields, setPatchedFields] = useState<string[]>([]);
+  const [showAddLineItemForm, setShowAddLineItemForm] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('');
 
   // Callback for chat component to trigger loading state
   const handleEstimateUpdateTriggered = useCallback((isPatch?: boolean, fields?: string[]) => {
@@ -663,8 +669,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
     // If it's an image file, get the signed URL
     if (isImageFile(file.file_name)) {
-      const url = await getFileSignedUrl(file);
-      setSignedImageUrl(url);
+      try {
+        const url = await getFileSignedUrl(file);
+        if (url) {
+          setSignedImageUrl(url);
+        } else {
+          toast.error('Failed to load image preview');
+        }
+      } catch (error) {
+        toast.error('Failed to load image preview');
+      }
     }
     // If it's an audio file, get the signed URL
     else if (isAudioFile(file.file_name)) {
@@ -783,6 +797,23 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   // Main component render
   return (
     <div className="container mx-auto p-0 max-w-none">
+      {/* Add line item form dialog */}
+      <AddLineItemForm
+        isOpen={showAddLineItemForm}
+        onClose={() => setShowAddLineItemForm(false)}
+        onAdd={async (newItem) => {
+          const result = await addEstimateLineItem(id, newItem);
+          if (result.success) {
+            fetchProject();
+            return true;
+          } else {
+            toast.error(result.error || 'Failed to add line item');
+            return false;
+          }
+        }}
+        category={selectedCategory}
+      />
+      
       {/* Top Bar Controls - Include Project Name and Generate Estimate Button */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div className="flex items-center">
@@ -859,18 +890,39 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                             ? 'flash-highlight' : ''
                         }`}>
                         <h4 className="text-sm font-medium text-gray-400 mb-1">Estimated Cost Range</h4>
-                        <p className="text-xl font-bold text-green-400">
-                          ${aiEstimate.estimated_total_min?.toLocaleString() ?? 'N/A'} - ${aiEstimate.estimated_total_max?.toLocaleString() ?? 'N/A'}
-                        </p>
+                        <div className="text-xl font-bold text-green-400">
+                          <EditableEstimateItem
+                            value={`$${aiEstimate.estimated_total_min?.toLocaleString() ?? 'N/A'} - $${aiEstimate.estimated_total_max?.toLocaleString() ?? 'N/A'}`}
+                            fieldPath="cost_range"
+                            onEdit={async () => false} // This is a calculated field, not directly editable
+                          >
+                            ${aiEstimate.estimated_total_min?.toLocaleString() ?? 'N/A'} - ${aiEstimate.estimated_total_max?.toLocaleString() ?? 'N/A'}
+                          </EditableEstimateItem>
+                        </div>
                       </div>
                       <div className={`bg-gray-900/50 p-4 rounded-lg border border-gray-700 ${
                           patchedFields.some(path => path.includes('estimated_timeline_days'))
                             ? 'flash-highlight' : ''
                         }`}>
                         <h4 className="text-sm font-medium text-gray-400 mb-1">Estimated Timeline</h4>
-                        <p className="text-xl font-bold text-blue-400">
-                          {aiEstimate.estimated_timeline_days ? `${aiEstimate.estimated_timeline_days} days` : 'Not specified'}
-                        </p>
+                        <div className="text-xl font-bold text-blue-400">
+                          <EditableEstimateItem
+                            value={aiEstimate.estimated_timeline_days || 0}
+                            fieldPath="estimated_timeline_days"
+                            onEdit={async (value) => {
+                              const numValue = parseInt(value, 10);
+                              if (isNaN(numValue) || numValue < 0) return false;
+                              const result = await updateEstimateField(id, "estimated_timeline_days", numValue);
+                              if (result.success) {
+                                fetchProject();
+                                return true;
+                              }
+                              return false;
+                            }}
+                          >
+                            {aiEstimate.estimated_timeline_days ? `${aiEstimate.estimated_timeline_days} days` : 'Not specified'}
+                          </EditableEstimateItem>
+                        </div>
                       </div>
                     </div>
                     <div className="mb-4">
@@ -879,7 +931,21 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                           patchedFields.some(path => path.includes('project_description'))
                             ? 'flash-highlight' : ''
                         }`}>
-                         <ReactMarkdown>{aiEstimate.project_description}</ReactMarkdown>
+                         <EditableEstimateItem
+                            value={aiEstimate.project_description}
+                            fieldPath="project_description"
+                            isMarkdown={true}
+                            onEdit={async (value) => {
+                              const result = await updateEstimateField(id, "project_description", value);
+                              if (result.success) {
+                                fetchProject();
+                                return true;
+                              }
+                              return false;
+                            }}
+                         >
+                           <ReactMarkdown>{aiEstimate.project_description}</ReactMarkdown>
+                         </EditableEstimateItem>
                       </div>
                     </div>
                     <div className="mb-4">
@@ -918,32 +984,27 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         <tbody className="divide-y divide-gray-800">
                           {aiEstimate.estimate_items?.length > 0 ? (
                             aiEstimate.estimate_items.map((item: EstimateLineItem, index: number) => (
-                              <tr
+                              <EditableEstimateRow
                                 key={index}
-                                className={`hover:bg-gray-700/20 ${
-                                  // Apply flash animation if this line item was patched
-                                  item.uid && patchedFields.some(path => path.includes(item.uid)) ? 'flash-highlight' : ''
-                                }`}
-                              >
-                                <td className="py-3 pr-4">
-                                  <div className="font-medium text-gray-200">{item.description}</div>
-                                  {item.notes && <div className="text-xs text-gray-400 mt-1 prose prose-xs prose-invert max-w-none"><ReactMarkdown>{item.notes}</ReactMarkdown></div>}
-                                </td>
-                                <td className="py-3 text-gray-400">
-                                  {item.category}
-                                  {item.subcategory && <span className="text-xs block text-gray-500">{item.subcategory}</span>}
-                                </td>
-                                <td className="py-3 text-right text-gray-300">
-                                  {item.quantity ? `${item.quantity} ${item.unit || ''}` : '-'}
-                                </td>
-                                <td className="py-3 text-right font-medium text-green-400">
-                                  ${item.cost_range_min.toLocaleString()} - ${item.cost_range_max.toLocaleString()}
-                                </td>
-                              </tr>
+                                item={item}
+                                isPatched={item.uid && patchedFields.some(path => path.includes(item.uid))}
+                                projectId={id}
+                                onUpdate={fetchProject}
+                              />
                             ))
                           ) : (
                             <tr><td colSpan={4} className="py-4 text-center text-gray-500">No estimate items available</td></tr>
                           )}
+                          <tr>
+                            <td colSpan={4} className="py-2">
+                              <AddLineItemButton 
+                                onClick={() => {
+                                  setSelectedCategory('');
+                                  setShowAddLineItemForm(true);
+                                }} 
+                              />
+                            </td>
+                          </tr>
                         </tbody>
                         <tfoot>
                           <tr className="border-t border-gray-700">
@@ -1523,6 +1584,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                  <FileText className="mr-2 h-5 w-5 text-blue-400" />}
                 {previewFile?.file_name}
               </DialogTitle>
+              <DialogDescription>
+                Preview of the uploaded file
+              </DialogDescription>
             </DialogHeader>
             <div className="py-4 flex-grow overflow-auto">
               {isLoadingPreview ? (
@@ -1536,13 +1600,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     <div className="flex justify-center">
                       {previewFile.file_url ? (
                         signedImageUrl ? (
-                          <Image 
+                          <img 
                             src={signedImageUrl} 
                             alt={previewFile.file_name} 
-                            width={800}
-                            height={600}
                             className="max-h-[60vh] object-contain"
-                            unoptimized // if using external Supabase URLs without Next.js image optimization configured for them
+                            style={{ maxWidth: '100%', height: 'auto' }}
+                            onError={(e) => {
+                              console.error('Image failed to load:', previewFile.file_name);
+                              e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23374151'/%3E%3Ctext x='400' y='300' text-anchor='middle' fill='%239CA3AF' font-family='Arial' font-size='24'%3EFailed to load image%3C/text%3E%3C/svg%3E";
+                              toast.error('Failed to load image');
+                            }}
                           />
                         ) : (
                           <div className="text-center text-gray-400">

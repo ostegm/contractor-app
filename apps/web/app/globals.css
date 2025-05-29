@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Flash animation for patched fields */
 @keyframes flash-highlight {
   0% {
     background-color: rgba(0, 255, 0, 0);
@@ -19,6 +20,43 @@
 
 .flash-highlight {
   animation: flash-highlight 2s ease-out;
+}
+
+/* Editable item styles */
+.editable-area {
+  @apply relative transition-all duration-200;
+}
+
+.editable-area:hover {
+  @apply bg-gray-700/30 rounded-md;
+}
+
+.editable-area-content {
+  @apply p-2 rounded-md;
+}
+
+.editable-actions {
+  @apply absolute right-2 top-2 flex space-x-1 bg-gray-800 rounded-md border border-gray-700 shadow-lg p-1 z-10 opacity-0 transition-opacity duration-200;
+}
+
+.editable-area:hover .editable-actions {
+  @apply opacity-100;
+}
+
+.editable-icon-button {
+  @apply h-7 w-7 p-1 rounded-md flex items-center justify-center transition-colors duration-200;
+}
+
+.editable-edit-button {
+  @apply text-blue-400 hover:text-blue-300 hover:bg-gray-700;
+}
+
+.editable-chat-button {
+  @apply text-green-400 hover:text-green-300 hover:bg-gray-700;
+}
+
+.editable-delete-button {
+  @apply text-red-400 hover:text-red-300 hover:bg-red-900/20;
 }
 
 @layer base {

@@ -119,6 +119,10 @@ class PatchResult(BaseModel):
     success: bool
     error_message: Optional[str] = None
 
+class ResponseEvent(BaseModel):
+    type: "AllowedTypes"
+    data: Union["AssisantMessage", "UpdateEstimateRequest", "PatchEstimateRequest"]
+
 class UpdateEstimateRequest(BaseModel):
     changes_to_make: str
 

@@ -131,7 +131,7 @@ class BamlAsyncClient:
         self,
         thread: types.BamlChatThread,current_estimate: Optional[types.ConstructionProjectData],
         baml_options: BamlCallOptions = {},
-    ) -> types.Event:
+    ) -> types.ResponseEvent:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
 
       __tb__ = options.get("tb", None)
@@ -152,7 +152,7 @@ class BamlAsyncClient:
         __cr__,
         collectors,
       )
-      return cast(types.Event, raw.cast_to(types, types, partial_types, False))
+      return cast(types.ResponseEvent, raw.cast_to(types, types, partial_types, False))
     
     async def GenerateProjectEstimate(
         self,
@@ -285,7 +285,7 @@ class BamlStreamClient:
         self,
         thread: types.BamlChatThread,current_estimate: Optional[types.ConstructionProjectData],
         baml_options: BamlCallOptions = {},
-    ) -> baml_py.BamlStream[partial_types.Event, types.Event]:
+    ) -> baml_py.BamlStream[partial_types.ResponseEvent, types.ResponseEvent]:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
       __tb__ = options.get("tb", None)
       if __tb__ is not None:
@@ -308,10 +308,10 @@ class BamlStreamClient:
         collectors,
       )
 
-      return baml_py.BamlStream[partial_types.Event, types.Event](
+      return baml_py.BamlStream[partial_types.ResponseEvent, types.ResponseEvent](
         raw,
-        lambda x: cast(partial_types.Event, x.cast_to(types, types, partial_types, True)),
-        lambda x: cast(types.Event, x.cast_to(types, types, partial_types, False)),
+        lambda x: cast(partial_types.ResponseEvent, x.cast_to(types, types, partial_types, True)),
+        lambda x: cast(types.ResponseEvent, x.cast_to(types, types, partial_types, False)),
         self.__ctx_manager.get(),
       )
     

@@ -19,8 +19,13 @@
   "license": "ISC",
   "devDependencies": {
     "@boundaryml/baml": "0.86.1",
+    "@types/uuid": "^10.0.0",
     "eslint": "^9",
     "vitest": "^1.5"
   },
-  "packageManager": "pnpm@10.10.0"
+  "packageManager": "pnpm@10.10.0",
+  "dependencies": {
+    "json-patch": "^0.7.0",
+    "uuid": "^11.1.0"
+  }
 }

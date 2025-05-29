@@ -18,6 +18,11 @@ interface ViewContextType {
   // patchedFields: if it's a patch, which fields were updated
   onEstimateUpdateTriggeredByChat: ((isPatch?: boolean, patchedFields?: string[]) => void) | null;
   setOnEstimateUpdateTriggeredByChat: Dispatch<SetStateAction<((isPatch?: boolean, patchedFields?: string[]) => void) | null>>;
+  // Functions for manually editing estimate items
+  openChat: (prefillMessage?: string) => void;
+  updateEstimateItem: (path: string, value: string | number) => Promise<boolean>;
+  deleteEstimateItem: (path: string) => Promise<boolean>;
+  addEstimateItem: (item: any, category?: string) => Promise<boolean>;
 }
 
 export const ViewContext = createContext<ViewContextType | undefined>(undefined);
@@ -41,6 +46,8 @@ export default function AppClientShell({ children }: AppClientShellProps) {
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   // Track the selected chat thread
   const [currentChatThreadId, setCurrentChatThreadId] = useState<string | null>(null);
+  // For pre-filling the chat with a message
+  const [chatPrefillMessage, setChatPrefillMessage] = useState<string | undefined>(undefined);
   // ADDED: State to trigger sidebar refresh
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
   // ADDED: State to hold the callback from the project page
@@ -68,15 +75,27 @@ export default function AppClientShell({ children }: AppClientShellProps) {
     }
   }, [pathname, isDashboard]); // Add isDashboard dependency
 
-  const toggleChatPanel = (forceNewChat = false) => {
+  const toggleChatPanel = (forceNewChat = false, prefillMessage?: string) => {
     // If panel is closed, or forcing a new chat, start a new chat
     if (!isChatPanelOpen || forceNewChat) {
       setCurrentChatThreadId(null); // Clear thread ID to create a new chat
       setIsChatPanelOpen(true); // Make sure panel is open
+      
+      // Set prefill message if provided
+      if (prefillMessage) {
+        setChatPrefillMessage(prefillMessage);
+      } else {
+        setChatPrefillMessage(undefined);
+      }
     } else {
       // If panel is open and not forcing a new chat, close it
       setIsChatPanelOpen(false);
     }
+  };
+  
+  // Function to open chat with a prefilled message
+  const openChat = (prefillMessage?: string) => {
+    toggleChatPanel(true, prefillMessage);
   };
 
   // Dedicated function to close the panel, passed to ChatPanel
@@ -103,6 +122,41 @@ export default function AppClientShell({ children }: AppClientShellProps) {
   const handleNewChatCreated = () => {
     setSidebarRefreshKey(k => k + 1);
   };
+  
+  // Functions for manually editing estimate items
+  const updateEstimateItem = async (path: string, value: string | number): Promise<boolean> => {
+    try {
+      // This will be implemented in the project page component
+      // For now, we return true to indicate success
+      console.log(`Would update estimate item at path ${path} with value ${value}`);
+      return true;
+    } catch (error) {
+      console.error("Error updating estimate item:", error);
+      return false;
+    }
+  };
+  
+  const deleteEstimateItem = async (path: string): Promise<boolean> => {
+    try {
+      // This will be implemented in the project page component
+      console.log(`Would delete estimate item at path ${path}`);
+      return true;
+    } catch (error) {
+      console.error("Error deleting estimate item:", error);
+      return false;
+    }
+  };
+  
+  const addEstimateItem = async (item: any, category?: string): Promise<boolean> => {
+    try {
+      // This will be implemented in the project page component
+      console.log(`Would add new estimate item to ${category || 'estimate'}:`, item);
+      return true;
+    } catch (error) {
+      console.error("Error adding estimate item:", error);
+      return false;
+    }
+  };
 
   // Define classes based on panel state and dashboard view
   const sidebarWidthClass = isDashboard ? "" : "w-25"; // No width if on dashboard
@@ -116,7 +170,11 @@ export default function AppClientShell({ children }: AppClientShellProps) {
       currentProjectView, 
       setCurrentProjectView, 
       onEstimateUpdateTriggeredByChat, // Provide callback state
-      setOnEstimateUpdateTriggeredByChat // Provide setter function
+      setOnEstimateUpdateTriggeredByChat, // Provide setter function
+      openChat, // Function to open chat with prefilled message
+      updateEstimateItem, // Function to update an estimate item
+      deleteEstimateItem, // Function to delete an estimate item
+      addEstimateItem // Function to add a new estimate item
     }}>
       <HeaderNav />
       <div className="flex flex-1 min-h-0">
@@ -139,6 +197,7 @@ export default function AppClientShell({ children }: AppClientShellProps) {
             projectId={currentProjectId}
             threadId={currentChatThreadId}
             forceNewChat={currentChatThreadId === null && isChatPanelOpen}
+            initialMessage={chatPrefillMessage}
             onChatThreadCreated={handleNewChatCreated}
             onEstimateUpdateTriggered={onEstimateUpdateTriggeredByChat || undefined} // Pass callback to ChatPanel with patch info
           />

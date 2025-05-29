@@ -99,6 +99,10 @@ class PatchResult(BaseModel):
     success: Optional[bool] = None
     error_message: Optional[str] = None
 
+class ResponseEvent(BaseModel):
+    type: Optional[types.AllowedTypes] = None
+    data: Optional[Union["AssisantMessage", "UpdateEstimateRequest", "PatchEstimateRequest"]] = None
+
 class UpdateEstimateRequest(BaseModel):
     changes_to_make: Optional[str] = None
 

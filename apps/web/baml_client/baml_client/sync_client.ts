@@ -19,7 +19,7 @@ import type { BamlRuntime, FunctionResult, BamlCtxManager, Image, Audio, ClientR
 import { toBamlError, type HTTPRequest } from "@boundaryml/baml"
 import type { Checked, Check, RecursivePartialNull as MovedRecursivePartialNull } from "./types"
 import type * as types from "./types"
-import type {AllowedTypes, AssisantMessage, BamlChatThread, ConstructionProjectData, EstimateLineItem, Event, InputFile, KeyFrame, Patch, PatchEstimateRequest, PatchEstimateResponse, PatchOperation, PatchResult, UpdateEstimateRequest, UpdateEstimateResponse, UserInput, VideoAnalysis} from "./types"
+import type {AllowedTypes, AssisantMessage, BamlChatThread, ConstructionProjectData, EstimateLineItem, Event, InputFile, KeyFrame, Patch, PatchEstimateRequest, PatchEstimateResponse, PatchOperation, PatchResult, ResponseEvent, UpdateEstimateRequest, UpdateEstimateResponse, UserInput, VideoAnalysis} from "./types"
 import type TypeBuilder from "./type_builder"
 import { HttpRequest, HttpStreamRequest } from "./sync_request"
 import { LlmResponseParser, LlmStreamParser } from "./parser"
@@ -111,7 +111,7 @@ export class BamlSyncClient {
   DetermineNextStep(
       thread: BamlChatThread,current_estimate?: ConstructionProjectData | null,
       __baml_options__?: BamlCallOptions
-  ): Event {
+  ): ResponseEvent {
     try {
       const options = { ...this.bamlOptions, ...(__baml_options__ || {}) }
       const collector = options.collector ? (Array.isArray(options.collector) ? options.collector : [options.collector]) : [];
@@ -125,7 +125,7 @@ export class BamlSyncClient {
         options.clientRegistry,
         collector,
       )
-      return raw.parsed(false) as Event
+      return raw.parsed(false) as ResponseEvent
     } catch (error: any) {
       throw toBamlError(error);
     }

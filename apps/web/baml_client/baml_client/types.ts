@@ -147,6 +147,12 @@ export interface PatchResult {
   
 }
 
+export interface ResponseEvent {
+  type: AllowedTypes
+  data: AssisantMessage | UpdateEstimateRequest | PatchEstimateRequest
+  
+}
+
 export interface UpdateEstimateRequest {
   changes_to_make: string
   

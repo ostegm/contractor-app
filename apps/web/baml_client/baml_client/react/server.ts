@@ -21,7 +21,7 @@ import { b } from '../index';
 import type { Check, Checked  } from "../types";
 import type { Image, Audio } from "@boundaryml/baml";
 
-import type {  AllowedTypes,  AssisantMessage,  BamlChatThread,  ConstructionProjectData,  EstimateLineItem,  Event,  InputFile,  KeyFrame,  Patch,  PatchEstimateRequest,  PatchEstimateResponse,  PatchOperation,  PatchResult,  UpdateEstimateRequest,  UpdateEstimateResponse,  UserInput,  VideoAnalysis } from "../types"
+import type {  AllowedTypes,  AssisantMessage,  BamlChatThread,  ConstructionProjectData,  EstimateLineItem,  Event,  InputFile,  KeyFrame,  Patch,  PatchEstimateRequest,  PatchEstimateResponse,  PatchOperation,  PatchResult,  ResponseEvent,  UpdateEstimateRequest,  UpdateEstimateResponse,  UserInput,  VideoAnalysis } from "../types"
 
 import type * as types from "../types"
 
@@ -59,12 +59,12 @@ export const AnalyzeVideo = async (
  * @param { BamlChatThread } thread - Input parameter.
  * @param { ConstructionProjectData | null } current_estimate (optional) - Input parameter.
  *
- * @returns {Promise<Event>} A promise that resolves with the result of the action.
+ * @returns {Promise<ResponseEvent>} A promise that resolves with the result of the action.
  */
 export const DetermineNextStep = async (
   thread: BamlChatThread,
   current_estimate?: ConstructionProjectData | null,
-): Promise<Event> => {
+): Promise<ResponseEvent> => {
   return b.DetermineNextStep(
     thread,
     current_estimate,

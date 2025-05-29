@@ -21,11 +21,12 @@ interface ChatPanelProps {
   projectId?: string | null;
   threadId?: string | null; // Renamed from externalThreadId in previous plan, using this prop name
   forceNewChat?: boolean;
+  initialMessage?: string; // ADDED: Optional initial message to prefill
   onChatThreadCreated?: () => void; // ADDED: Callback when a new thread is successfully created
   onEstimateUpdateTriggered?: (isPatch?: boolean, patchedFields?: string[]) => void; // ADDED: Callback when estimate update is triggered
 }
 
-export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadIdProp, forceNewChat = false, onChatThreadCreated, onEstimateUpdateTriggered }: ChatPanelProps) {
+export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadIdProp, forceNewChat = false, initialMessage, onChatThreadCreated, onEstimateUpdateTriggered }: ChatPanelProps) {
   // Internal state for the active thread ID
   const [activeThreadId, setActiveThreadId] = useState<string | null>(initialThreadIdProp || null);
   const [threadName, setThreadName] = useState<string | null>(null);
@@ -108,6 +109,13 @@ export function ChatPanel({ isOpen, onClose, projectId, threadId: initialThreadI
   };
 
   // Effect for initial load & when initialThreadIdProp or forceNewChat changes
+  // Set initial message when provided
+  useEffect(() => {
+    if (initialMessage) {
+      setNewMessage(initialMessage);
+    }
+  }, [initialMessage]);
+
   useEffect(() => {
     if (!isOpen) {
         setActiveThreadId(null); // Clear active thread when panel closes
