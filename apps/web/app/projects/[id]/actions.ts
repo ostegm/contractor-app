@@ -49,13 +49,71 @@ function sanitizeFileName(fileName: string): string {
   return `${baseName}_${timestamp}.${ext}`
 }
 
+export async function saveFileMetadata(
+  fileName: string,
+  fileType: string,
+  filePath: string,
+  description: string,
+  projectId: string
+) {
+  const supabase = await createClient()
+  
+  try {
+    // Insert file metadata into the database
+    const { data: newFileRecord, error: dbError } = await supabase
+      .from('files')
+      .insert({
+        project_id: projectId,
+        file_name: fileName,
+        file_url: filePath,
+        description: description,
+        type: fileType || 'application/octet-stream',
+      })
+      .select('id, type')
+      .single();
+
+    if (dbError || !newFileRecord) {
+      console.error('Error inserting file record into database:', dbError)
+      return { error: `Failed to save file record to database: ${dbError?.message}` }
+    }
+      
+    // Check if the uploaded file is a video and start processing automatically
+    const videoProcessingInfo: { jobId?: string; error?: string, isVideo?: boolean } = { isVideo: false };
+    const isVideo = newFileRecord.type?.startsWith('video/');
+
+    if (isVideo) {
+      videoProcessingInfo.isVideo = true;
+      console.log(`Video file detected (${newFileRecord.id}), starting automatic processing...`);
+      const processingResult = await startVideoProcessing(projectId, newFileRecord.id);
+      if (processingResult.error) {
+        console.error(`Automatic video processing failed to start for file ${newFileRecord.id}:`, processingResult.error);
+        videoProcessingInfo.error = `File uploaded, but auto-processing failed: ${processingResult.error}`;
+      } else if (processingResult.jobId) {
+        videoProcessingInfo.jobId = processingResult.jobId;
+        console.log(`Automatic video processing started. Job ID: ${processingResult.jobId}`);
+      }
+    }
+    
+    revalidatePath(`/projects/${projectId}`);
+    return { 
+      success: true, 
+      fileId: newFileRecord.id, 
+      isVideoProcessing: videoProcessingInfo.isVideo,
+      processingJobId: videoProcessingInfo.jobId,
+      processingError: videoProcessingInfo.error
+    };
+  } catch (error) {
+    console.error('Unexpected error saving file metadata:', error)
+    return { error: error instanceof Error ? error.message : 'An unexpected error occurred' }
+  }
+}
+
 export async function uploadFile(formData: FormData, projectId: string) {
   const supabase = await createClient()
   
   try {
     const file = formData.get('file') as File
     const description = formData.get('description') as string
-    const isDirectUpload = formData.get('isDirectUpload') === 'true'
 
     if (!file) {
       return { error: 'No file provided' }
@@ -79,17 +137,14 @@ export async function uploadFile(formData: FormData, projectId: string) {
     const sanitizedFileName = sanitizeFileName(file.name)
     const filePath = `${projectId}/${sanitizedFileName}`
 
-    // If this is a direct upload (file was already uploaded client-side), skip the upload step
-    if (!isDirectUpload) {
-      // Upload file to Supabase Storage (for files <= 4MB)
-      const { error: uploadError } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .upload(filePath, file)
+    // Upload file to Supabase Storage
+    const { error: uploadError } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(filePath, file)
 
-      if (uploadError) {
-        console.error('Error uploading file:', uploadError)
-        return { error: `Failed to upload file: ${uploadError.message}` }
-      }
+    if (uploadError) {
+      console.error('Error uploading file:', uploadError)
+      return { error: `Failed to upload file: ${uploadError.message}` }
     }
 
     // Insert file metadata into the database

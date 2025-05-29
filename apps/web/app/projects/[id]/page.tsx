@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Trash2, Upload, File, ArrowLeft, FileText, Play, ChevronDown, ChevronRight, StickyNote, Download, RefreshCw, LayoutDashboard, FolderOpen, TriangleAlert, Music, Video, Eye, EyeOff } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { uploadFile, clearProjectInfo, clearProjectEstimate, startEstimateGeneration, checkEstimateStatus, startVideoProcessing } from "./actions"
+import { uploadFile, saveFileMetadata, clearProjectInfo, clearProjectEstimate, startEstimateGeneration, checkEstimateStatus, startVideoProcessing } from "./actions"
 import { sanitizeFileName } from "@/lib/file-utils"
 import { ConstructionProjectData, InputFile, EstimateLineItem } from "@/baml_client/baml_client/types"
 import { uploadFileDirectlyToSupabase, isLargeFile } from "@/lib/client-upload"
@@ -471,21 +471,34 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       }
 
       if (uploadSuccess) {
-        // Now save the file metadata to the database
-        const formData = new FormData()
-        formData.append('file', fileToUpload)
-        formData.append('description', fileDescription)
-        formData.append('isDirectUpload', shouldUseDirectUpload ? 'true' : 'false')
-
-        const result = await uploadFile(formData, id)
-
-        if (result.error) {
-          toast.error(`Failed to save file metadata: ${result.error}`)
-          // If direct upload succeeded but metadata save failed, try to clean up
-          if (shouldUseDirectUpload) {
+        // Save the file metadata to the database
+        let result
+        
+        if (shouldUseDirectUpload) {
+          // For large files that were uploaded directly, just save metadata
+          result = await saveFileMetadata(
+            fileToUpload.name,
+            fileToUpload.type,
+            filePath,
+            fileDescription,
+            id
+          )
+          
+          if (result.error) {
+            // If metadata save failed, clean up the uploaded file
             const supabase = createClient()
             await supabase.storage.from(STORAGE_BUCKET_NAME).remove([filePath])
           }
+        } else {
+          // For small files, use the regular upload flow
+          const formData = new FormData()
+          formData.append('file', fileToUpload)
+          formData.append('description', fileDescription)
+          result = await uploadFile(formData, id)
+        }
+
+        if (result.error) {
+          toast.error(`Failed to ${shouldUseDirectUpload ? 'save file metadata' : 'upload file'}: ${result.error}`)
         } else {
           toast.success(`Successfully uploaded ${fileToUpload.name}`)
 
@@ -640,22 +653,34 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       }
       
       if (uploadSuccess) {
-        // Create form data with the note
-        const formData = new FormData();
-        formData.append('file', noteFile);
-        formData.append('description', 'Project note');
-        formData.append('isDirectUpload', shouldUseDirectUpload ? 'true' : 'false');
+        // Save the note metadata
+        let result;
         
-        // Upload the note as a file
-        const result = await uploadFile(formData, id);
-        
-        if (result.error) {
-          toast.error(`Failed to add note: ${result.error}`);
-          // Clean up if direct upload succeeded but metadata save failed
-          if (shouldUseDirectUpload) {
+        if (shouldUseDirectUpload) {
+          // For large notes (unlikely but consistent), just save metadata
+          result = await saveFileMetadata(
+            noteFile.name,
+            noteFile.type,
+            filePath,
+            'Project note',
+            id
+          );
+          
+          if (result.error) {
+            // If metadata save failed, clean up the uploaded file
             const supabase = createClient();
             await supabase.storage.from(STORAGE_BUCKET_NAME).remove([filePath]);
           }
+        } else {
+          // For normal-sized notes, use the regular upload flow
+          const formData = new FormData();
+          formData.append('file', noteFile);
+          formData.append('description', 'Project note');
+          result = await uploadFile(formData, id);
+        }
+        
+        if (result.error) {
+          toast.error(`Failed to add note: ${result.error}`);
         } else {
           toast.success('Note added successfully');
           setNoteDialogOpen(false);
