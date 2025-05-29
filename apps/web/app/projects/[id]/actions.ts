@@ -55,6 +55,7 @@ export async function uploadFile(formData: FormData, projectId: string) {
   try {
     const file = formData.get('file') as File
     const description = formData.get('description') as string
+    const isDirectUpload = formData.get('isDirectUpload') === 'true'
 
     if (!file) {
       return { error: 'No file provided' }
@@ -78,14 +79,17 @@ export async function uploadFile(formData: FormData, projectId: string) {
     const sanitizedFileName = sanitizeFileName(file.name)
     const filePath = `${projectId}/${sanitizedFileName}`
 
-    // Upload file to Supabase Storage
-    const { error: uploadError } = await supabase.storage
-      .from(STORAGE_BUCKET)
-      .upload(filePath, file)
+    // If this is a direct upload (file was already uploaded client-side), skip the upload step
+    if (!isDirectUpload) {
+      // Upload file to Supabase Storage (for files <= 4MB)
+      const { error: uploadError } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(filePath, file)
 
-    if (uploadError) {
-      console.error('Error uploading file:', uploadError)
-      return { error: `Failed to upload file: ${uploadError.message}` }
+      if (uploadError) {
+        console.error('Error uploading file:', uploadError)
+        return { error: `Failed to upload file: ${uploadError.message}` }
+      }
     }
 
     // Insert file metadata into the database
@@ -103,8 +107,10 @@ export async function uploadFile(formData: FormData, projectId: string) {
 
     if (dbError || !newFileRecord) {
       console.error('Error inserting file record into database:', dbError)
-      // Optional: Attempt to delete the orphaned file from storage
-      await supabase.storage.from(STORAGE_BUCKET).remove([filePath]);
+      // If not a direct upload, attempt to delete the orphaned file from storage
+      if (!isDirectUpload) {
+        await supabase.storage.from(STORAGE_BUCKET).remove([filePath]);
+      }
       return { error: `Failed to save file record to database: ${dbError?.message}` }
     }
       
