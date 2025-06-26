@@ -4,7 +4,7 @@
 
 ## Demo
 
-https://github.com/user-attachments/assets/demo.mp4
+[Watch Demo Video](https://contractor-app-web.vercel.app/)
 
 This monorepo contains both the Next.js UI and LangGraph service for the Contractor project.
 
