@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import AppClientShell from "./app-client-shell"; // Import the new client shell
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -21,8 +20,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.className} bg-gray-900 text-gray-100 min-h-screen flex flex-col`}>
-        <AppClientShell>{children}</AppClientShell>
+      <body className={`${inter.className} bg-gray-900 text-gray-100 min-h-screen`}>
+        {children}
       </body>
     </html>
   );
