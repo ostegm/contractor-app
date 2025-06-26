@@ -1,5 +1,11 @@
 # Contractor Monorepo
 
+> **Note:** The backend service for this app has been taken down. Check out the demo video below to see how it worked.
+
+## Demo
+
+https://github.com/user-attachments/assets/demo.mp4
+
 This monorepo contains both the Next.js UI and LangGraph service for the Contractor project.
 
 ## Overview
